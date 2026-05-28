@@ -1,7 +1,3 @@
-import { readFileSync } from 'fs'
-const config = JSON.parse(readFileSync('./config.json', 'utf-8'));
-
-
 // persistent userid generation stuff
 let userId = localStorage.getItem("userId")
 if (!userId || userId == null) {
@@ -10,8 +6,8 @@ if (!userId || userId == null) {
 }
 
 
-// set "ip" to the ip/url of the site/proxy you're using for the backend server thing
-const socket = io(config.ip)
+// set this to the ip/url of the site/proxy you're using for the backend server thing
+const socket = io('wss://back.emmameowss.gay')
 
 function sendMessage(e) {
     e.preventDefault()

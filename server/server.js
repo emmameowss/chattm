@@ -4,12 +4,11 @@
 import {Server} from "socket.io"
 import {createServer} from "http"
 import { readFileSync } from 'fs'
-const config = JSON.parse(readFileSync('./config.json', 'utf-8'));
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
     cors: {
-        origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "http://127.0.0.1:5500", config.ip] 
+        origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "http://127.0.0.1:5500"] 
     }
 })
 
