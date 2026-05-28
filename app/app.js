@@ -10,6 +10,10 @@ function sendMessage(e) {
     input.focus()
 }
 
+socket.on('connect', () =>{
+    document.querySelector('p').textContent = `user id: ${socket.id} (only the first 5 characters show up in chat right now)`
+})
+
 document.querySelector('form')
 .addEventListener('submit', sendMessage)
 

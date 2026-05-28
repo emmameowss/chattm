@@ -1,0 +1,23 @@
+* {
+    font-size: large
+}
+body {
+    background-color: pink;
+    color: black;
+    padding: 1rem; 
+}
+form {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+}
+ul {
+    display: flex;
+    flex-flow: column;
+    justify-content: center;
+    list-style-type: none;
+}
+input, button {
+    border-radius: 10px;
+    padding: 10px;
+}
