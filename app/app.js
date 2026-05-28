@@ -11,7 +11,7 @@ function sendMessage(e) {
 }
 
 socket.on('connect', () =>{
-    document.querySelector('p').textContent = `user id: ${socket.id} (only the first 5 characters show up in chat right now)`
+    document.querySelector('p').textContent = `user id: ${socket.id.slice(0,5)}`
 })
 
 document.querySelector('form')
