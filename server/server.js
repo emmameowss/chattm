@@ -4,7 +4,7 @@
 import {Server} from "socket.io"
 import {createServer} from "http"
 import { readFileSync } from 'fs'
-const config = await fetch('./config.json').then(r => r.json())
+const config = JSON.parse(readFileSync('./config.json', 'utf-8'));
 
 const httpServer = createServer()
 const io = new Server(httpServer, {

@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs'
-const config = await fetch('./config.json').then(r => r.json())
+const config = JSON.parse(readFileSync('./config.json', 'utf-8'));
+
 
 // persistent userid generation stuff
 let userId = localStorage.getItem("userId")
