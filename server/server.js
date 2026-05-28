@@ -7,9 +7,7 @@ import {createServer} from "http"
 const httpServer = createServer()
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.NODE_ENV === "production" 
-        ? ["https://chat.emmameowss.gay", "http://localhost:3000"] 
-        : ["http://localhost:5500", "http://127.0.0.1:5500", "http://localhost:3000", "https://chat.emmameowss.gay"]
+        origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "http://127.0.0.1:5500"] 
     }
 })
 
