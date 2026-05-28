@@ -3,7 +3,7 @@
 
 import {Server} from "socket.io"
 import {createServer} from "http"
-import config from "./config.json" assert {type:'json'}
+const config = await fetch('./config.json').then(r => r.json())
 
 const httpServer = createServer()
 const io = new Server(httpServer, {

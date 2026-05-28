@@ -1,4 +1,4 @@
-import config from './config.json' assert {type:'json'}
+const config = await fetch('./config.json').then(r => r.json())
 // persistent userid generation stuff
 let userId = localStorage.getItem("userId")
 if (!userId || userId == null) {
