@@ -3,6 +3,7 @@
 
 import {Server} from "socket.io"
 import {createServer} from "http"
+import { readFileSync } from 'fs'
 const config = await fetch('./config.json').then(r => r.json())
 
 const httpServer = createServer()
