@@ -9,7 +9,7 @@ const io = new Server(httpServer, {
     cors: {
         origin: process.env.NODE_ENV === "production" 
         ? ["https://chat.emmameowss.gay"] 
-        : ["http://localhost:5500", "http://127.0.0.1:5500"]
+        : ["http://localhost:5500", "http://127.0.0.1:5500", "http://localhost:3000"]
     }
 })
 
