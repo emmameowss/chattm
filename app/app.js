@@ -5,7 +5,10 @@ if (!userId || userId == null) {
     localStorage.setItem("userId", userId)
 }
 
-const socket = io('ws://localhost:3000')
+import config from './config.json' assert {type:'json'}
+
+// set "ip" to the ip/url of the site/proxy you're using for the backend server thing
+const socket = io(config.ip)
 
 function sendMessage(e) {
     e.preventDefault()
