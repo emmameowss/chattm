@@ -1,3 +1,4 @@
+import config from './config.json' assert {type:'json'}
 // persistent userid generation stuff
 let userId = localStorage.getItem("userId")
 if (!userId || userId == null) {
@@ -5,7 +6,6 @@ if (!userId || userId == null) {
     localStorage.setItem("userId", userId)
 }
 
-import config from './config.json' assert {type:'json'}
 
 // set "ip" to the ip/url of the site/proxy you're using for the backend server thing
 const socket = io(config.ip)
