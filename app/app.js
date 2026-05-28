@@ -7,7 +7,7 @@ if (!userId || userId == null) {
 
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
-const socket = io('wss://back.emmameowss.gay')
+const socket = io('wss://domainnotverified.emmameowss.gay')
 
 function sendMessage(e) {
     e.preventDefault()
