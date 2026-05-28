@@ -1,0 +1,29 @@
+{
+  "name": "chattm",
+  "version": "0.1.0",
+  "description": "an incredibly simple, bare minimum chat app",
+  "keywords": [
+    "chat"
+  ],
+  "homepage": "https://github.com/emmameowss/chattm#readme",
+  "bugs": {
+    "url": "https://github.com/emmameowss/chattm/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emmameowss/chattm.git"
+  },
+  "author": "Emma",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node .",
+    "dev": "nodemon ."
+  },
+  "license": "MIT",
+  "dependencies": {
+    "nodemon": "^3.1.14",
+    "socket.io": "^4.8.3"
+  }
+}
