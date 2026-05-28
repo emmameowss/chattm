@@ -7,7 +7,9 @@ if (!userId || userId == null) {
 
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
-const socket = io('wss://domainnotverified.emmameowss.gay')
+//const socket = io('wss://domainnotverified.emmameowss.gay')
+const socket = io('ws://localhost:3000')
+const resetId = document.querySelector("#resetid")
 
 function sendMessage(e) {
     e.preventDefault()
@@ -28,6 +30,18 @@ socket.on('connect', () =>{
 
 document.querySelector('form')
 .addEventListener('submit', sendMessage)
+resetId.addEventListener("click", () => {
+    let reset = prompt("Please type RESET to confirm resetting your User ID.")
+    if (reset === null) {
+        return
+    } else if (reset === "RESET") {
+        userId = crypto.randomUUID()
+        localStorage.setItem("userId", userId)
+        document.querySelector('p').textContent = `user id: ${userId.slice(0,5)}`
+    } else if (reset === "") {
+        return
+    }
+})
 
 socket.on("message", (data) => {
     const li = document.createElement('li')
