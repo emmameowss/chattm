@@ -2,8 +2,8 @@
     font-size: large
 }
 body {
-    background-color: pink;
-    color: black;
+    background-color: #121212;
+    color: #f2f2f2;
     padding: 1rem; 
 }
 form {
@@ -18,14 +18,19 @@ ul {
     list-style-type: none;
 }
 input, button {
+    color: #f2f2f2;
+    background-color: #2a2a2a;
     border-radius: 10px;
     padding: 10px;
 }
 h1 {
+    margin-top: -5px;
+    font-size: xx-large;
     display: flex;
     justify-content: center;
 }
 p {
     display: flex;
+    margin-bottom: 25px;
     justify-content: center;
 }
