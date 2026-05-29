@@ -14,6 +14,7 @@ const io = new Server(httpServer, {
 })
 
 io.on('connection', socket => {
+    io.emit('usercount', io.engine.clientsCount)
 
     console.log(`User ${socket.id} connected successfully!`)
 
@@ -24,6 +25,9 @@ io.on('connection', socket => {
     socket.on('image', (payload) => {
         io.emit('image', payload)
         console.log('4. image received on client:', payload)
+    })
+    socket.on('disconnect', () => {
+        io.emit('usercount', io.engine.clientsCount)
     })
 })
 

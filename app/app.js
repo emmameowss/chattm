@@ -43,10 +43,13 @@ function sendMessage(e) {
     textinput.focus()
 }
 
-socket.on('connect', () =>{
-    document.querySelector('p').textContent = `user id: ${userId.slice(0,5)}`
+socket.on('connect', () => {
+    document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)}`
 })
 
+socket.on('usercount', (count) => {
+    document.querySelector(`#usercount`).textContent = `${count} users online`
+})
 document.querySelector('form')
 .addEventListener('submit', sendMessage)
 resetId.addEventListener("click", () => {
@@ -71,7 +74,12 @@ socket.on("message", (data) => {
 
 // more image sending stuff
 socket.on('image', (payload) => {
+    const li = document.createElement('li')
     const img = document.createElement('img')
     img.src = payload.data
-    document.querySelector('ul').appendChild(img)
+    img.style.maxWidth = '300px'
+    img.style.display = 'block'
+    li.textContent = `${payload.userId.slice(0,5)}: `
+    li.appendChild(img)
+    document.querySelector('ul').appendChild(li)
 })
