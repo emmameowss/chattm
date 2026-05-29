@@ -13,6 +13,7 @@ if (!userId || userId == null) {
 // for dev reasons:
 const socket = io('ws://localhost:3000')
 const resetId = document.querySelector("#resetid")
+const maxmessages = 25
 
 function sendMessage(e) {
     e.preventDefault()
@@ -43,6 +44,18 @@ function sendMessage(e) {
     textinput.focus()
 }
 
+function appendMessage(li) {
+    const ul = document.querySelector('ul')
+    ul.appendChild(li)
+    li.scrollIntoView({behavior: 'smooth'})
+
+    // nuke the oldest message because why not
+    while (ul.children.length > maxmessages) {
+        ul.removeChild(ul.firstChild)
+    }
+
+}
+
 socket.on('connect', () => {
     document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)}`
 })
@@ -69,7 +82,8 @@ resetId.addEventListener("click", () => {
 socket.on("message", (data) => {
     const li = document.createElement('li')
     li.textContent = data
-    document.querySelector('ul').appendChild(li)
+    appendMessage(li)
+    li.scrollIntoView({behavior: 'smooth'})
 })
 
 // more image sending stuff
@@ -81,5 +95,6 @@ socket.on('image', (payload) => {
     img.style.display = 'block'
     li.textContent = `${payload.userId.slice(0,5)}: `
     li.appendChild(img)
-    document.querySelector('ul').appendChild(li)
+    appendMessage(li)
+    li.scrollIntoView({behavior: 'smooth'})
 })
