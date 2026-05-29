@@ -42,6 +42,16 @@ resetId.addEventListener("click", () => {
     }
 })
 
+// image sending stuff
+document.getElementById('file').addEventListener('change', function() {
+    const reader = new FileReader()
+    reader.onload = function() {
+        const base64 = this.result.replace(/.*base64,/, '')
+        socket.emit('image', base64)
+    }
+    reader.readAsDataURL(this.files[0])
+}, false)
+
 socket.on("message", (data) => {
     const li = document.createElement('li')
     li.textContent = data
