@@ -22,12 +22,9 @@ function sendMessage(e) {
     // actual image stuff
     if (fileinput.files[0]) {
         const file = fileinput.files[0]
-        console.log("got file", file.name, file.size)
         const reader = new FileReader()
         reader.onload = () => {
-            console.log("read file")
             socket.emit('image', {userId, data: reader.result})
-            console.log("emitted")
             fileinput.value = ""
         }
         reader.onerror = () => console.log('reader error:', reader.error)
