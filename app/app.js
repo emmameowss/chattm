@@ -7,8 +7,8 @@ if (!userId || userId == null) {
 
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
-//const socket = io('wss://domainnotverified.emmameowss.gay')
-const socket = io('ws://localhost:3000')
+const socket = io('wss://domainnotverified.emmameowss.gay')
+//const socket = io('ws://localhost:3000')
 const resetId = document.querySelector("#resetid")
 
 function sendMessage(e) {
