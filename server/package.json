@@ -23,8 +23,10 @@
   },
   "license": "MIT",
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "jsonwebtoken": "^9.0.3",
     "nodemon": "^3.1.14",
-    "socket.io": "^4.8.3",
-    "dotenv": "^17.4.2"
+    "socket.io": "^4.8.3"
   }
 }
