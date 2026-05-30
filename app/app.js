@@ -7,6 +7,7 @@ if (!userId || userId == null) {
     localStorage.setItem("userId", userId)
 }
 
+let unread = 0
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
 // const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
@@ -122,6 +123,18 @@ socket.on("message", (data) => {
     }
 
     document.querySelector('ul').appendChild(li)
+
+    if (document.hidden) {
+        unread++
+        document.title = `(${unread}) chat™`
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            unread = 0
+            document.title = 'chat™'
+        }
+    })
 })
 
 /* old stuff
