@@ -1,7 +1,7 @@
 # chat™
 
 ### an incredibly simple literally bare minimum chat app
-available at: https://chat.emmameowss.gay
+available at: https://chat.emmameowss.gay, currently supports images and text, none of it saves so most of what you send gets thrown into the void
 
 ## Setup Instructions
 1. clone the repository
