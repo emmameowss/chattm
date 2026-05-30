@@ -18,3 +18,12 @@ available at: https://chat.emmameowss.gay
 - timestamps in messages
 - an active user counter
 - an unread message counter in the title of the tab
+
+## planned features
+- a better frontend (especially on mobile)
+- typing indicator
+- maybe: sound effect for message
+- normal file upload
+
+## not fully planned but possible features
+- HCA sign in
