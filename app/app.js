@@ -1,3 +1,4 @@
+import { append } from "vary"
 
 
 // persistent userid generation stuff
@@ -68,7 +69,7 @@ function sendMessageNew(e) {
         const reader = new FileReader()
         reader.onload = () => {
             socket.emit('message', {
-                userId,
+                username,
                 text: textInput.value || null,
                 image: reader.result
             })
@@ -78,7 +79,7 @@ function sendMessageNew(e) {
         reader.readAsDataURL(file)
     } else {
         socket.emit('message', {
-            userId,
+            username,
             text: textInput.value,
             image: null
         })
@@ -106,8 +107,8 @@ socket.on('connect', () => {
 socket.on('usercount', (count) => {
     document.querySelector(`#usercount`).textContent = `${count} users online`
 })
-document.querySelector('form')
-.addEventListener('submit', sendMessageNew)
+
+document.querySelector('#message-form').addEventListener('submit', sendMessageNew)
 resetId.addEventListener("click", () => {
     let reset = prompt("Please type RESET to confirm resetting your User ID.")
     if (reset === null) {
@@ -123,7 +124,7 @@ resetId.addEventListener("click", () => {
 
 socket.on("message", (data) => {
     const li = document.createElement('li')
-    li.textContent = `[${data.time}] ${data.userId.slice(0,5)}: `
+    li.textContent = `[${data.time}] ${data.username.slice(0,5)}: `
     if (data.text) {
         li.textContent += data.text
     }
@@ -135,21 +136,19 @@ socket.on("message", (data) => {
         li.appendChild(img)
     }
 
-    document.querySelector('ul').appendChild(li)
+    appendMessage(li)
 
     if (document.hidden) {
         unread++
         document.title = `(${unread}) chat™`
     }
-
+})
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
             unread = 0
             document.title = 'chat™'
         }
     })
-})
-
 /* old stuff
 socket.on("message", (data) => {
     const li = document.createElement('li')
