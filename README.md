@@ -10,6 +10,13 @@ available at: https://chat.emmameowss.gay, currently supports images and text, n
 4. do npm run start or npm run dev
 5. for the app part, you do know how to pull up a web server right? do that and you're mostly done
 
+## Owner Tag instructions
+1. make a .env file (no example is provided)
+2. in that file, add "TOKEN=[random string]"
+3. on the site, in your browser console, run "localStorage.setItem('token', '[TOKEN]'), with [TOKEN] being the same token you set in .env
+4. refresh and u should have the tag at the start of ur messages
+
+
 ## current features
 - usernames
 - name colors
