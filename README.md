@@ -25,6 +25,7 @@ available at: https://chat.emmameowss.gay, currently supports images and text, n
 - timestamps in messages
 - an active user counter
 - an unread message counter in the title of the tab
+- an owner/crown tag
 
 ## planned features
 - **message history**
