@@ -143,6 +143,7 @@ socket.on('usercount', (count) => {
 
 document.querySelector('#message-form').addEventListener('submit', sendMessageNew)
 // this is also mostly useless probably but id rather nto touch it for now
+/*
 resetId.addEventListener("click", () => {
     let reset = prompt("Please type RESET to confirm resetting your User ID.")
     if (reset === null) {
@@ -155,7 +156,7 @@ resetId.addEventListener("click", () => {
         return
     }
 })
-
+*/
 socket.on("message", (data) => {
     const li = document.createElement('li')
     const name = data.username
