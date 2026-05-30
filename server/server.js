@@ -18,9 +18,19 @@ io.on('connection', socket => {
     io.emit('usercount', io.engine.clientsCount)
 
     socket.on('setUsername', (name, token) => {
+        const prevUser = socket.username
         socket.username = name
         socket.isToken = token === process.env.TOKEN
-        socket.broadcast.emit('userJoined', name)
+        if (prevUser && prevUser !== name) {
+            socket.broadcast.emit('userRenamed', {from: prevUser, to: name})
+        }
+    })
+
+    socket.on('userActive', () => {
+        if (socket.username && !socket.hasJoined) {
+            socket.hasJoined = true
+            socket.broadcast.emit('userJoined', socket.username)
+        }
     })
 
     console.log(`User ${socket.id} connected successfully!`)

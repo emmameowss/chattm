@@ -1,5 +1,6 @@
 
 
+
 // persistent userid generation stuff
 let userId = localStorage.getItem("userId")
 if (!userId || userId == null) {
@@ -8,6 +9,7 @@ if (!userId || userId == null) {
 }
 
 let unread = 0
+let activity = false
 let username = localStorage.getItem('username') || userId.slice(0,5)
 
 // username functionality stuff
@@ -33,6 +35,14 @@ function systemMessage(text) {
     appendMessage(li)
 }
 
+// join only appears when active function
+function activitya() {
+    if (!activity) {
+        activity = true
+        socket.emit('userActive')
+    }
+}
+
 // colors
 function getNameColor(name) {
     if (name.toLowerCase() === 'emma') return 'hotpink'
@@ -44,9 +54,9 @@ function getNameColor(name) {
 }
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
-const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
+// const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
 // for dev reasons:
-// const socket = io('ws://localhost:3000')
+const socket = io('ws://localhost:3000')
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
 
@@ -157,6 +167,13 @@ resetId.addEventListener("click", () => {
     }
 })
 */
+
+// more activity stuff
+document.addEventListener('click', activitya)
+document.addEventListener('keydown', activitya)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) activitya()
+})
 socket.on("message", (data) => {
     const li = document.createElement('li')
     const name = data.username
@@ -194,6 +211,10 @@ socket.on("message", (data) => {
             document.title = 'chat™'
         }
     })
+// user renamed message
+socket.on('userRenamed', ({from, to}) => {
+    systemMessage(`${from} changed their username to ${to}`)
+})
 /* old stuff
 socket.on("message", (data) => {
     const li = document.createElement('li')
