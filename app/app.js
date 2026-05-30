@@ -1,4 +1,3 @@
-import { append } from "vary"
 
 
 // persistent userid generation stuff
