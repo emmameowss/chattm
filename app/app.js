@@ -115,7 +115,7 @@ resetId.addEventListener("click", () => {
     } else if (reset === "RESET") {
         userId = crypto.randomUUID()
         localStorage.setItem("userId", userId)
-        document.querySelector('p').textContent = `user id: ${userId.slice(0,5)}`
+        document.querySelector('p').textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
     } else if (reset === "") {
         return
     }
@@ -123,7 +123,7 @@ resetId.addEventListener("click", () => {
 
 socket.on("message", (data) => {
     const li = document.createElement('li')
-    li.textContent = `[${data.time}] ${data.username.slice(0,5)}: `
+    li.textContent = `[${data.time}] ${data.username.slice(0,20)}: `
     if (data.text) {
         li.textContent += data.text
     }
