@@ -22,7 +22,7 @@ io.on('connection', socket => {
         console.log(data)
         io.emit('message', {
             ...data,
-            time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit'})
+            time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit'})
         })
     })
     socket.on('image', (payload) => {

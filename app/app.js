@@ -9,9 +9,9 @@ if (!userId || userId == null) {
 
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
-const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
+// const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
 // for dev reasons:
-// const socket = io('ws://localhost:3000')
+const socket = io('ws://localhost:3000')
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
 
@@ -78,9 +78,8 @@ resetId.addEventListener("click", () => {
 
 socket.on("message", (data) => {
     const li = document.createElement('li')
-    li.textContent = data
+    li.textContent = `[${data.time}] ${data.userId.slice(0,5)}: ${data.text}`
     appendMessage(li)
-    li.scrollIntoView({behavior: 'smooth'})
 })
 
 // more image sending stuff
