@@ -115,8 +115,6 @@ function appendMessage(li) {
 
 }
 
-
-
 socket.on('connect', () => {
     const token = localStorage.getItem('token')
     socket.emit('setUsername', username, token)
