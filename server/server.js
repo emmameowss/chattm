@@ -56,7 +56,6 @@ io.on('connection', socket => {
         console.log(data)
         io.emit('message', {
             ...data,
-            time: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'}),
             isToken: socket.isToken
         })
     }

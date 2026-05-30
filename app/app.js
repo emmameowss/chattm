@@ -178,6 +178,7 @@ document.addEventListener('visibilitychange', () => {
 })
 socket.on("message", (data) => {
     const li = document.createElement('li')
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const name = data.username
     const namespan = document.createElement('span')
         namespan.style.color = getNameColor(name)
@@ -187,7 +188,7 @@ socket.on("message", (data) => {
         tag.style.color = 'hotpink'
         namespan.appendChild(tag)
         }
-    namespan.appendChild(document.createTextNode(`[${data.time}] ${name}: `))
+    namespan.appendChild(document.createTextNode(`[${time}] ${name}: `))
     li.appendChild(namespan)
     if (data.text) {
         li.appendChild(document.createTextNode(data.text))
