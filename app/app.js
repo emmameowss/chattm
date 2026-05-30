@@ -22,6 +22,15 @@ document.querySelector('#username-form').addEventListener('submit', (e) => {
     }
 })
 
+// colors
+function getNameColor(name) {
+    let hash = 0
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    return `hsl(${hash % 360}, 70%, 65%)`
+}
+
 // set this to the ip/url of the site/proxy you're using for the backend server thing
 const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
 // for dev reasons:
@@ -124,9 +133,13 @@ resetId.addEventListener("click", () => {
 
 socket.on("message", (data) => {
     const li = document.createElement('li')
-    li.textContent = `[${data.time}] ${data.username.slice(0,20)}: `
+    const name = data.username
+    const namespan = document.createElement('span')
+    namespan.textContent = `[${data.time}] ${name}: `
+    namespan.style.color = getNameColor(name)
+    li.appendChild(namespan)
     if (data.text) {
-        li.textContent += data.text
+        li.appendChild(document.createTextNode(data.text))
     }
     if (data.image) {
         const img = document.createElement('img')
