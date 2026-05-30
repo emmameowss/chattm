@@ -14,7 +14,7 @@ if (!userId || userId == null) {
 const socket = io('ws://localhost:3000')
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
-
+/* old stuff
 function sendMessage(e) {
     e.preventDefault()
     const textinput = document.querySelector('input[type="text"]')
@@ -40,6 +40,38 @@ function sendMessage(e) {
     }
     textinput.focus()
 }
+*/
+function sendMessageNew(e) {
+    e.preventDefault()
+    const textInput = document.querySelector('input[type="text"]')
+    const fileInput = document.querySelector('input[type="file"]')
+
+    const file = fileInput.files[0]
+
+    if (!textInput.value && !file) return
+
+    if (file) {
+        const reader = new FileReader()
+        reader.onload = () => {
+            socket.emit('message', {
+                userId,
+                text: textInput.value || null,
+                image: reader.result
+            })
+            textInput.value = ""
+            fileInput.value = ""
+        }
+        reader.readAsDataURL(file)
+    } else {
+        socket.emit('message', {
+            userId,
+            text: textInput.value,
+            image: null
+        })
+        textInput.value = ""
+    }
+    textInput.focus()
+}
 
 function appendMessage(li) {
     const ul = document.querySelector('ul')
@@ -61,7 +93,7 @@ socket.on('usercount', (count) => {
     document.querySelector(`#usercount`).textContent = `${count} users online`
 })
 document.querySelector('form')
-.addEventListener('submit', sendMessage)
+.addEventListener('submit', sendMessageNew)
 resetId.addEventListener("click", () => {
     let reset = prompt("Please type RESET to confirm resetting your User ID.")
     if (reset === null) {
@@ -75,7 +107,24 @@ resetId.addEventListener("click", () => {
     }
 })
 
+socket.on("message", (data) => {
+    const li = document.createElement('li')
+    li.textContent = `[${data.time}] ${data.userId.slice(0,5)}: `
+    if (data.text) {
+        li.textContent += data.text
+    }
+    if (data.image) {
+        const img = document.createElement('img')
+        img.src = data.image
+        img.style.maxWidth = '300px'
+        img.style.display = 'block'
+        li.appendChild(img)
+    }
 
+    document.querySelector('ul').appendChild(li)
+})
+
+/* old stuff
 socket.on("message", (data) => {
     const li = document.createElement('li')
     li.textContent = `[${data.time}] ${data.userId.slice(0,5)}: ${data.text}`
@@ -93,4 +142,4 @@ socket.on('image', (payload) => {
     li.appendChild(img)
     appendMessage(li)
     li.scrollIntoView({behavior: 'smooth'})
-})
+}) */

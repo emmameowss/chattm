@@ -17,7 +17,7 @@ io.on('connection', socket => {
     io.emit('usercount', io.engine.clientsCount)
 
     console.log(`User ${socket.id} connected successfully!`)
-
+/*
     socket.on('message', data => {
         console.log(data)
         io.emit('message', {
@@ -27,10 +27,19 @@ io.on('connection', socket => {
     })
     socket.on('image', (payload) => {
         io.emit('image', payload)
-    })
+    }) */
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
     })
+
+    socket.on('message', (data) => {
+        console.log(data)
+        io.emit('message', {
+            ...data,
+            time: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})
+        })
+    }
+    )
 })
 
 
