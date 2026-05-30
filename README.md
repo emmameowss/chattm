@@ -20,6 +20,7 @@ available at: https://chat.emmameowss.gay
 - an unread message counter in the title of the tab
 
 ## planned features
+- **message history**
 - a better frontend (especially on mobile)
 - typing indicator
 - maybe: sound effect for message
