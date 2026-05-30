@@ -35,15 +35,3 @@ p {
     margin-bottom: 25px;
     justify-content: center;
 }
-#banner {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: darkred;
-    color: white;
-    text-align: center;
-    padding: 7px;
-    font-weight: bold;
-    z-index: 9999;
-}
