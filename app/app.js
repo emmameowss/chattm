@@ -1,6 +1,3 @@
-
-
-
 // persistent userid generation stuff
 let userId = localStorage.getItem("userId")
 if (!userId || userId == null) {
@@ -69,33 +66,7 @@ socket.on('userJoined', (name) => {
 socket.on('userLeft', (name) =>  {
     systemMessage(`${name} left`)
 })
-/* old stuff
-function sendMessage(e) {
-    e.preventDefault()
-    const textinput = document.querySelector('input[type="text"]')
-    const fileinput = document.querySelector('input[type="file"]')
-    // actual image stuff
-    if (fileinput.files[0]) {
-        const file = fileinput.files[0]
-        const reader = new FileReader()
-        reader.onload = () => {
-            socket.emit('image', {userId, data: reader.result})
-            fileinput.value = ""
-        }
-        reader.onerror = () => console.log('reader error:', reader.error)
-        reader.readAsDataURL(file)
-    }
-    // text stuff
-    if (textinput.value) {  
-        socket.emit("message", {
-            userId,
-            text: textinput.value
-        })
-        textinput.value = ""
-    }
-    textinput.focus()
-}
-*/
+
 function sendMessageNew(e) {
     e.preventDefault()
     const textInput = document.querySelector('#message-input')
@@ -150,7 +121,6 @@ function appendMessage(li) {
 socket.on('connect', () => {
     const token = localStorage.getItem('token')
     socket.emit('setUsername', username, token)
-    // this is useless but still keeping it   document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
 })
 
 
@@ -159,21 +129,6 @@ socket.on('usercount', (count) => {
 })
 
 document.querySelector('#message-form').addEventListener('submit', sendMessageNew)
-// this is also mostly useless probably but id rather nto touch it for now
-/*
-resetId.addEventListener("click", () => {
-    let reset = prompt("Please type RESET to confirm resetting your User ID.")
-    if (reset === null) {
-        return
-    } else if (reset === "RESET") {
-        userId = crypto.randomUUID()
-        localStorage.setItem("userId", userId)
-        document.querySelector('p').textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
-    } else if (reset === "") {
-        return
-    }
-})
-*/
 
 // more activity stuff
 document.addEventListener('click', activitya)
@@ -223,22 +178,3 @@ socket.on("message", (data) => {
 socket.on('userRenamed', ({from, to}) => {
     systemMessage(`${from} changed their username to ${to}`)
 })
-/* old stuff
-socket.on("message", (data) => {
-    const li = document.createElement('li')
-    li.textContent = `[${data.time}] ${data.userId.slice(0,5)}: ${data.text}`
-    appendMessage(li)
-})
-
-// more image sending stuff
-socket.on('image', (payload) => {
-    const li = document.createElement('li')
-    const img = document.createElement('img')
-    img.src = payload.data
-    img.style.maxWidth = '300px'
-    img.style.display = 'block'
-    li.textContent = `${payload.userId.slice(0,5)}: `
-    li.appendChild(img)
-    appendMessage(li)
-    li.scrollIntoView({behavior: 'smooth'})
-}) */
