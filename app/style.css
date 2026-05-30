@@ -5,6 +5,7 @@ body {
     background-color: #121212;
     color: #f2f2f2;
     padding: 1rem; 
+    padding-top: 50px;
 }
 form {
     display: flex;
@@ -33,4 +34,16 @@ p {
     display: flex;
     margin-bottom: 25px;
     justify-content: center;
+}
+#banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: darkred;
+    color: white;
+    text-align: center;
+    padding: 6px;
+    font-weight: bold;
+    z-index: 9999;
 }
