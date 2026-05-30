@@ -53,10 +53,12 @@ function getNameColor(name) {
     return `hsl(${hash % 360}, 70%, 65%)`
 }
 
-// set this to the ip/url of the site/proxy you're using for the backend server thing
-const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
-// for dev reasons:
-// const socket = io('ws://localhost:3000')
+// set this (specifically the second one) to the ip/url of the site/proxy you're using for the backend server thing
+const socket = io(
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'ws://localhost:3000'
+        : 'wss://domainnotverified.emmameowss.gay'
+)
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
 
