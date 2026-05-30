@@ -58,7 +58,7 @@ function sendMessage(e) {
 function sendMessageNew(e) {
     e.preventDefault()
     const textInput = document.querySelector('#message-input')
-    const fileInput = document.querySelector('input[type="file"]')
+    const fileInput = document.querySelector('#file-input')
 
     const file = fileInput.files[0]
 
