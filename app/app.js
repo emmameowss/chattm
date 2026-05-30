@@ -44,9 +44,9 @@ function getNameColor(name) {
 }
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
-const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
+// const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
 // for dev reasons:
-// const socket = io('ws://localhost:3000')
+const socket = io('ws://localhost:3000')
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
 
@@ -131,9 +131,11 @@ function appendMessage(li) {
 
 
 socket.on('connect', () => {
-    socket.emit('setUsername', username)
+    const token = localStorage.getItem('token')
+    socket.emit('setUsername', username, token)
     // this is useless but still keeping it   document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
 })
+
 
 socket.on('usercount', (count) => {
     document.querySelector(`#usercount`).textContent = `${count} users online`
@@ -158,8 +160,14 @@ socket.on("message", (data) => {
     const li = document.createElement('li')
     const name = data.username
     const namespan = document.createElement('span')
-    namespan.textContent = `[${data.time}] ${name}: `
-    namespan.style.color = getNameColor(name)
+        namespan.style.color = getNameColor(name)
+        if (data.isToken) {
+        const tag = document.createElement('span')
+        tag.textContent = '♛ '
+        tag.style.color = 'hotpink'
+        namespan.appendChild(tag)
+        }
+    namespan.appendChild(document.createTextNode(`[${data.time}] ${name}: `))
     li.appendChild(namespan)
     if (data.text) {
         li.appendChild(document.createTextNode(data.text))

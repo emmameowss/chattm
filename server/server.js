@@ -4,6 +4,7 @@
 import {Server} from "socket.io"
 import {createServer} from "http"
 import { readFileSync } from 'fs'
+import 'dotenv/config'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -16,8 +17,9 @@ const io = new Server(httpServer, {
 io.on('connection', socket => {
     io.emit('usercount', io.engine.clientsCount)
 
-    socket.on('setUsername', (name) => {
+    socket.on('setUsername', (name, token) => {
         socket.username = name
+        socket.isToken = token === process.env.TOKEN
         socket.broadcast.emit('userJoined', name)
     })
 
@@ -44,7 +46,8 @@ io.on('connection', socket => {
         console.log(data)
         io.emit('message', {
             ...data,
-            time: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})
+            time: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'}),
+            isToken: socket.isToken
         })
     }
     )
