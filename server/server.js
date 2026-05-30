@@ -20,7 +20,10 @@ io.on('connection', socket => {
 
     socket.on('message', data => {
         console.log(data)
-        io.emit("message", `${data.userId.slice(0,5)}: ${data.text}`)
+        io.emit('message', {
+            ...data,
+            time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit'})
+        })
     })
     socket.on('image', (payload) => {
         io.emit('image', payload)
