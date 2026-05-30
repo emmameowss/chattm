@@ -24,6 +24,7 @@
   "license": "MIT",
   "dependencies": {
     "nodemon": "^3.1.14",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "dotenv": "^17.4.2"
   }
 }
