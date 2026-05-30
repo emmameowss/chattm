@@ -19,8 +19,19 @@ document.querySelector('#username-form').addEventListener('submit', (e) => {
     if (input.value.trim()) {
         username = input.value.trim()
         localStorage.setItem('username', username)
+        socket.emit('setUsername', username)
     }
 })
+
+// join/leave messages/system messages
+function systemMessage(text) {
+    console.log(text)
+    const li = document.createElement('li')
+    li.textContent = text
+    li.style.color = 'gray'
+    li.style.fontStyle = 'italic'
+    appendMessage(li)
+}
 
 // colors
 function getNameColor(name) {
@@ -37,6 +48,14 @@ const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - D
 // const socket = io('ws://localhost:3000')
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
+
+// move socket joined/left stuff after intialiing socket
+socket.on('userJoined', (name) => { 
+    systemMessage(`${name} joined`)
+})
+socket.on('userLeft', (name) =>  {
+    systemMessage(`${name} left`)
+})
 /* old stuff
 function sendMessage(e) {
     e.preventDefault()
@@ -108,8 +127,11 @@ function appendMessage(li) {
 
 }
 
+
+
 socket.on('connect', () => {
- // this is useless but still keeping it   document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
+    socket.emit('setUsername', username)
+    // this is useless but still keeping it   document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
 })
 
 socket.on('usercount', (count) => {

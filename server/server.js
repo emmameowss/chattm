@@ -16,6 +16,11 @@ const io = new Server(httpServer, {
 io.on('connection', socket => {
     io.emit('usercount', io.engine.clientsCount)
 
+    socket.on('setUsername', (name) => {
+        socket.username = name
+        socket.broadcast.emit('userJoined', name)
+    })
+
     console.log(`User ${socket.id} connected successfully!`)
 /*
     socket.on('message', data => {
@@ -30,6 +35,9 @@ io.on('connection', socket => {
     }) */
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
+        if (socket.username) {
+            io.emit('userLeft', socket.username)
+        }
     })
 
     socket.on('message', (data) => {
