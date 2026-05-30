@@ -106,6 +106,10 @@ function sendMessageNew(e) {
     if (!textInput.value && !file) return
 
     if (file) {
+        if (!file.type.startsWith('image/')) {
+            fileInput.value = ''
+            if (!textInput.value) return
+        } else {
         const reader = new FileReader()
         reader.onload = () => {
             socket.emit('message', {
@@ -117,7 +121,8 @@ function sendMessageNew(e) {
             fileInput.value = ""
         }
         reader.readAsDataURL(file)
-    } else {
+    }
+ } else {
         socket.emit('message', {
             username,
             text: textInput.value,
