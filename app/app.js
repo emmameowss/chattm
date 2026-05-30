@@ -100,7 +100,7 @@ function appendMessage(li) {
 }
 
 socket.on('connect', () => {
-    document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
+ // this is useless but still keeping it   document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
 })
 
 socket.on('usercount', (count) => {
@@ -108,6 +108,7 @@ socket.on('usercount', (count) => {
 })
 
 document.querySelector('#message-form').addEventListener('submit', sendMessageNew)
+// this is also mostly useless probably but id rather nto touch it for now
 resetId.addEventListener("click", () => {
     let reset = prompt("Please type RESET to confirm resetting your User ID.")
     if (reset === null) {
