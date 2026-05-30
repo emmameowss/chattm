@@ -8,6 +8,19 @@ if (!userId || userId == null) {
 }
 
 let unread = 0
+let username = localStorage.getItem('username') || userId.slice(0,5)
+
+// username functionality stuff
+document.querySelector('#username-input').value = username
+
+document.querySelector('#username-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const input = document.querySelector('#username-input')
+    if (input.value.trim()) {
+        username = input.value.trim()
+        localStorage.setItem('username', username)
+    }
+})
 
 // set this to the ip/url of the site/proxy you're using for the backend server thing
 const socket = io('wss://domainnotverified.emmameowss.gay') // note for emma - DONT TOUCH THIS EVER AGAIN I SWEAR
