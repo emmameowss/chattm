@@ -100,7 +100,7 @@ function appendMessage(li) {
 }
 
 socket.on('connect', () => {
-    document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)}`
+    document.querySelector(`#userid`).textContent = `user id: ${userId.slice(0,5)} (basically useless now)`
 })
 
 socket.on('usercount', (count) => {
