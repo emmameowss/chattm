@@ -56,6 +56,7 @@ const session = (() => {
     const hash = new URLSearchParams(window.location.hash.slice(1))
     const fromHash = hash.get('session')
     if (fromHash) {
+        sessionStorage.setItem('newlogin', '1')
         localStorage.setItem('session', fromHash)
         window.history.replaceState({}, '', '/')
         return fromHash
@@ -66,10 +67,16 @@ const session = (() => {
 if (!session) {
     document.body.innerHTML = `
     <h1>chat™</h1>
-    <p>new update: sign in to chat</p>
+    <p>new update: sign in to chat or do anything really</p>
     <a href="/login" style="display:flex; justify-content:center;"><button>Login with Hack Club</button></a>
     `
     throw new Error('not signed in')
+}
+
+if (sessionStorage.getItem('newlogin')) {
+    sessionStorage.removeItem('newlogin')
+    showUploadStatus("welcome to chat™, set your username above if you haven't", 'pink')
+    setTimeout(hideUploadStatus, 3000)
 }
 
 
