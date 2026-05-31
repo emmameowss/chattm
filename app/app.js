@@ -32,15 +32,6 @@ function systemMessage(text) {
     li.style.fontStyle = 'italic'
     appendMessage(li)
 }
-
-// join only appears when active function
-function activitya() {
-    if (!activity) {
-        activity = true
-        socket.emit('userActive')
-    }
-}
-
 // colors
 function getNameColor(name) {
     if (name.toLowerCase() === 'emma') return 'hotpink'
@@ -134,6 +125,15 @@ socket.on('stopTyping', (name) => {
     typingUsers.delete(name)
     updateTypingIndicator()
 })
+
+// join only appears when active function
+function activitya() {
+    if (!activity) {
+        activity = true
+        socket.emit('userActive')
+    }
+}
+
 
 // message history
 socket.on('history', (messages) => {
