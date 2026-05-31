@@ -92,13 +92,13 @@ io.on('connection', socket => {
         }
     })
 
-    socket.on('message', (data) => {
+    socket.on('message', async (data) => {
 
         if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetEmail = data.text.slice(5).trim()
             banlist.add(targetEmail)
             await savebans()
-            appendFile('bans.log', `${new Date().toISOString()}: ${socket.user.email} (${data.username}) banned ${targetEmail}\n`)
+            appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail}\n`)
         
         let targetUsername = targetEmail
         for (const [id,s] of io.sockets.sockets) {
@@ -138,7 +138,7 @@ io.on('connection', socket => {
 
 function pushSystemMessage(text) {
     const message = {
-        system = true,
+        system: true,
         text,
         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
     }

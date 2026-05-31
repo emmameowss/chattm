@@ -65,12 +65,13 @@ const session = (() => {
 })()
 
 if (!session) {
+    const banned = localStorage.getItem('banned')
     document.body.innerHTML = `
-    <h1>chat™</h1>
-    <p>new update: sign in to chat or do anything really</p>
-    <a href="/login" style="display:flex; justify-content:center;"><button>Login with Hack Club</button></a>
+        <h1>chat™</h1>
+        <p>${banned ? 'you have been banned' : 'you need to sign in to chat'}</p>
+        ${!banned ? '<a href="/login" style="display:flex; justify-content:center;"><button>Login with Hack Club</button></a>' : ''}
     `
-    throw new Error('not signed in')
+    throw new Error(banned ? 'banned' : 'not authenticated')
 }
 
 if (sessionStorage.getItem('newlogin')) {
@@ -370,8 +371,9 @@ document.querySelector('#signout').addEventListener('click', () => {
 // banned
 socket.on('banned', () => {
     localStorage.removeItem('session')
+    localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
     document.body.innerHTML = `
-    <h1>chat™</h1>
-    <p>you have been banned</p>
+        <h1>chat™</h1>
+        <p>you have been banned</p>
     `
 })
