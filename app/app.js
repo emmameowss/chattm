@@ -367,8 +367,6 @@ socket.on('banned', () => {
     localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
     location.reload()
 })
-}
-
 // an iq too high?
 // join/leave messages/system messages
 function systemMessage(text) {
@@ -378,4 +376,5 @@ function systemMessage(text) {
     li.style.color = 'gray'
     li.style.fontStyle = 'italic'
     appendMessage(li)
+}
 }
