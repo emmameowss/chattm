@@ -218,6 +218,7 @@ function appendMessage(li) {
 }
 
 socket.on('connect', () => {
+    localStorage.removeItem('banned')
     const token = localStorage.getItem('token')
     socket.emit('setUsername', username, token)
 })
