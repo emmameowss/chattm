@@ -66,8 +66,40 @@ socket.on('userLeft', (name) =>  {
     systemMessage(`${name} left`)
 })
 
+// typing indicator stuff
+let typeTimeout
+document.querySelector('#message-input').addEventListener('input', () => {
+    socket.emit('typing')
+    clearTimeout(typeTimeout)
+    typeTimeout = setTimeout(() => socket.emit('stopTyping'), 2000)
+})
+
+const typingUsers = new Set()
+
+function updateTypingIndicator() {
+    const ind = document.querySelector('#typing-indicator')
+    if (typingUsers.size === 0) {
+        ind.textContent = ''
+    } else {
+        const names = [...typingUsers].join(', ')
+        ind.textContent = `${names} ${typingUsers.size === 1 ? 'is' : 'are'} typing...`
+    }
+}
+
+socket.on('typing', (name) => {
+    typingUsers.add(name)
+    updateTypingIndicator()
+})
+
+socket.on('stopTyping', (name) => {
+    typingUsers.delete(name)
+    updateTypingIndicator()
+})
+
 function sendMessageNew(e) {
     e.preventDefault()
+    // stops typing when a message is sent
+    socket.emit('stopTyping')
     const textInput = document.querySelector('#message-input')
     const fileInput = document.querySelector('#file-input')
 
