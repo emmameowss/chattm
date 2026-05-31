@@ -10,7 +10,7 @@ import { randomBytes } from 'crypto'
 import { readFile } from 'fs/promises'
 import { appendFile } from 'fs/promises'
 import { writeFile } from 'fs/promises'
-import { extname } from 'path'
+import { extname, normalize, resolve, sep } from 'path'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -202,7 +202,15 @@ if (url.pathname === '/signout') {
 if (req.method === 'GET') {
     let filePath = url.pathname === '/' ? '/index.html' : url.pathname
     try {
-        const data = await readFile(`../app${filePath}`)
+        const appDir = resolve(process.cwd(), '../app')
+        const resolvedPath = resolve(appDir, `.${normalize(filePath)}`)
+        if (resolvedPath !== appDir && !resolvedPath.startsWith(`${appDir}${sep}`)) {
+            res.writeHead(403)
+            res.end('forbidden')
+            return
+        }
+
+        const data = await readFile(resolvedPath)
         const ext = extname(filePath)
         res.writeHead(200, { 'content-type': types[ext] || 'text/plain' })
         res.end(data)
