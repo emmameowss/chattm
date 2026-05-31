@@ -19,18 +19,19 @@
     <p id="usercount" style="display:flex; margin: 20px auto 25px auto;">x users online</p>
     <!-- <p id="notice" style="display:flex; margin: 10px auto 25px auto; color:lightcoral;">image sending may be slow, implementation is the most simple/basic that's probably the reason why</p> -->
     <!-- <a href="http://localhost:3000/login"><button>Login with Hack Club</button></a> -->
-    <form id="username-form" style="display: flex; margin-bottom: 25px;">
+    <form id="username-form" style="position: fixed; top: 16px; right: 110px; display: flex; gap: 8px;">
         <input type="text" id="username-input" placeholder="set a username" maxlength="20">
         <button>set</button>
     </form>
     <form id="message-form">
         <input type="file" accept=".jpg, .jpeg, .png, .gif, .webp, .svg" id="file-input">
         <input type="text" id="message-input" autocomplete="off" placeholder="Message">
-        <button>Send</button>
+        <button>send</button>
     </form>
     <p id="upload-error" style="color: pink; font-style: italic; display: none; text-align:center;"></p>
     <p id="upload-status" style="display: none; text-align: center;"></p>
     <p id="typing-indicator" style="color:gray; font-style:italic; min-height:1em;"></p>
+    <button id="signout" style="position: fixed; top: 16px; right: 16px;">log out</button>
     <ul></ul>
 </body>
 </html>
