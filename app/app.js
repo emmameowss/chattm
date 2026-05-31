@@ -374,5 +374,5 @@ document.querySelector('#signout').addEventListener('click', () => {
 socket.on('banned', () => {
     localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
     localStorage.removeItem('session')
-    window.location.href = '/signout?session=' + localStorage.getItem('session')
+    location.reload()
 })
