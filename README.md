@@ -4,9 +4,9 @@
 
 ![interface of the site](https://cdn.hackclub.com/019e7df7-00d8-78b2-a818-8952d38fd327/cleanshot_2026-05-31_at_14.16.01_2x.png)
 
-available at: https://chat.emmameowss.gay, currently supports images and text, please note that images are now permanently saved while the most recent 25 text messages are saved and disappear upon server restart
+available at: https://chat.emmameowss.gay, currently supports images and text, please note that images are now permanently saved while ~~the most recent 25 text messages are saved and disappear upon server restart~~ all text messages are now stored forever
 
-## Setup Instructions
+## Setup Instructions (Outdated)
 1. clone the repository
 2. in app/app.js, change const socket = io("wss://domainnotverified.emmameowss.gay) to your domain (good luck with this, for example: ws://randomdomain.com:3000 only add port if not reverse proxied)
 3. run npm i in server
@@ -40,6 +40,7 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - better status for uploading images instead of nothing
 - file size error
 - message sound effect
+- HCA sign in
 
 ## planned features
 - ~~message history~~
@@ -47,6 +48,3 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - ~~maybe: sound effect for message~~
 - ~~link detection in messages~~
 - ~~file size notification~~
-
-## not fully planned but possible features
-- HCA sign in
