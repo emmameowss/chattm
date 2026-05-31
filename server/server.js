@@ -8,6 +8,7 @@ import fetch from 'node-fetch'
 import { readFileSync, promises as fs } from 'fs'
 import { randomBytes } from 'crypto'
 import { readFile } from 'fs/promises'
+import { appendFile } from 'fs/promises'
 import { extname } from 'path'
 
 const httpServer = createServer()
@@ -31,10 +32,7 @@ const types = {
 }
 
 io.use((socket,next) => {
-    console.log('socket auth:', socket.handshake.auth)
     const sessionId = socket.handshake.auth.session
-    console.log('sessionId:', sessionId)
-    console.log('sessions:', sessions)
     const user = sessions[sessionId]
     if (!user) return next(new Error('not authenticated'))
     socket.userEmail = user.email 
@@ -73,7 +71,6 @@ io.on('connection', socket => {
         }
     })
 
-    console.log(`User ${socket.id} connected successfully!`)
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
         if (socket.username) {
@@ -105,7 +102,6 @@ io.on('connection', socket => {
 
 // cdn upload stuff and hca login stuff
 httpServer.on('request', async (req,res) => {
-    console.log(req.method, req.url)
 
     const url = new URL(req.url, 'http://localhost:3000')
     if (url.pathname.includes('socket.io')) return
@@ -117,7 +113,6 @@ httpServer.on('request', async (req,res) => {
     }
     if (url.pathname === '/callback') {
         const code = url.searchParams.get('code')
-        console.log('code:', code)
 
         const tokenres = await fetch('https://auth.hackclub.com/oauth/token', {
             method: 'POST',
@@ -138,10 +133,11 @@ httpServer.on('request', async (req,res) => {
         })
         const user = await userres.json()
         const {primary_email} = user.identity
+        const timestamp = new Date().toISOString()
+        await appendFile('login.log', `${timestamp}: ${primary_email} signed in`)
         const sessionid = randomBytes(32).toString('hex')
         sessions[sessionid] = { email: primary_email }
         const redirectUrl = `http://localhost:3000#session=${sessionid}` // live server hates me
-        console.log('redirecting to:', redirectUrl)
         res.writeHead(302, { Location: redirectUrl })
         res.end()
         return
