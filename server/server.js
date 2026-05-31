@@ -1,13 +1,13 @@
 
 // THIS CODE WORKS DONT TOUCH IT IF YOU DONT NEED TO PLEASE
-
+import 'dotenv/config'
 import {Server} from "socket.io"
 import {createServer} from "http"
 import formidable from 'formidable'
 import fetch from 'node-fetch'
 import { readFileSync, promises as fs } from 'fs'
 import { readFile } from 'fs/promises'
-import 'dotenv/config'
+import { randomBytes } from 'crypto'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -19,8 +19,21 @@ const io = new Server(httpServer, {
 const history = []
 const maxhistory = 25
 const CDN_API_KEY = process.env.CDN_API_KEY
+const sessions = {}
+
+io.use((socket,next) => {
+    const cookie = socket.handshake.headers.cookie || ''
+    const sessionId = cookie.match(/session=([^;]+)/)?.[1]
+    const user = sessions[sessionId]
+    if (!user) return next(new Error('not authenticated'))
+    socket.userEmail = user.email 
+    socket.username = null // this gets set later
+    next()
+})
 
 io.on('connection', socket => {
+
+    console.log(`${socket.user.name} connected`)
     io.emit('usercount', io.engine.clientsCount)
     socket.emit('history', history)
 
@@ -79,8 +92,56 @@ io.on('connection', socket => {
     )
 })
 
-// cdn upload stuff
+// cdn upload stuff and hca login stuff
 httpServer.on('request', async (req,res) => {
+
+    const url = new URL(req.url, 'http://localhost:3000')
+    if (url.pathname === '/login') {
+        const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
+        res.writeHead(302, {location: authUrl})
+        res.end()
+        return
+    }
+    if (url.pathname === '/callback') {
+    try {
+        const code = url.searchParams.get('code')
+        console.log('code:', code)
+
+        const tokenres = await fetch('https://auth.hackclub.com/oauth/token', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                client_id: process.env.HCA_CLIENT_ID,
+                client_secret: process.env.HCA_CLIENT_SECRET,
+                redirect_uri: process.env.HCA_REDIRECT_URI,
+                code,
+                grant_type: 'authorization_code'
+            })
+        })
+        const tokenJson = await tokenres.json()
+        console.log('token:', tokenJson)
+
+        const { access_token } = tokenJson
+        const userres = await fetch('https://auth.hackclub.com/api/v1/me', {
+            headers: { Authorization: `Bearer ${access_token}` }
+        })
+        const user = await userres.json()
+        console.log('user:', user)
+
+        const sessionid = randomBytes(32).toString('hex')
+        sessions[sessionid] = { email: primary_email }
+        res.writeHead(302, {
+            Location: '/',
+            'set-cookie': `session=${sessionid}; HttpOnly; Path=/`
+        })
+        res.end()
+    } catch (e) {
+        console.log('callback error:', e)
+        res.writeHead(500)
+        res.end('auth error: ' + e.message)
+    }
+    return
+}
     if (req.url !== '/upload') return
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -123,5 +184,6 @@ httpServer.on('request', async (req,res) => {
         })
     }
 })
+
 
 httpServer.listen(3000, () => console.log("Server listening on port 3000"))

@@ -40,11 +40,12 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - link detection in messages
 - better status for uploading images instead of nothing
 - file size error
+- message sound effect
 
 ## planned features
 - ~~message history~~
 - ~~typing indicator~~
-- maybe: sound effect for message
+- ~~maybe: sound effect for message~~
 - ~~link detection in messages~~
 - ~~file size notification~~
 
