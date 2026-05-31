@@ -113,7 +113,7 @@ socket.on('history', (messages) => {
         namespan.appendChild(document.createTextNode(`[${time}] ${name}: `))
         li.appendChild(namespan)
         if (data.text) {
-            li.appendChild(document.createTextNode(data.text))
+           li.appendChild(functioninglinks(data.text, getNameColor(name)))
         }
         if (data.image) {
             const img = document.createElement('img')
@@ -206,7 +206,7 @@ socket.on("message", (data) => {
     namespan.appendChild(document.createTextNode(`[${time}] ${name}: `))
     li.appendChild(namespan)
     if (data.text) {
-        li.appendChild(document.createTextNode(data.text))
+        li.appendChild(functioninglinks(data.text, getNameColor(name)))
     }
     if (data.image) {
         const img = document.createElement('img')
@@ -244,4 +244,26 @@ async function uploadImage(file) {
     })
     const {url} = await res.json()
     return url
+}
+
+// links show up as links in chat
+function functioninglinks(text, color) {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const parts = text.split(urlRegex)
+    const fragment = document.createDocumentFragment()
+
+    parts.forEach((part, i) => {
+        if (i % 2 === 1) {
+            const a = document.createElement('a')
+            a.href = part
+            a.textContent = part
+            a.target = '_blank'
+            a.rel = 'noopener noreferer'
+            a.style.color = color
+            fragment.appendChild(a)
+        } else {
+            fragment.appendChild(document.createTextNode(part))
+        }
+    })
+    return fragment
 }
