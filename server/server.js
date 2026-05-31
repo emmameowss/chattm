@@ -26,6 +26,15 @@ io.on('connection', socket => {
         }
     })
 
+    // serverside typing indicator stuff
+    socket.on('typing', () => {
+        socket.broadcast.emit('typing', socket.username)
+    })
+
+    socket.on('stopTyping', () => {
+        socket.broadcast.emit('stopTyping', socket.username)
+    })
+
     socket.on('userActive', () => {
         if (socket.username && !socket.hasJoined) {
             socket.hasJoined = true
@@ -48,6 +57,7 @@ io.on('connection', socket => {
             isToken: socket.isToken
         })
     }
+
     )
 })
 
