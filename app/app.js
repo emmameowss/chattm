@@ -52,13 +52,27 @@ function getNameColor(name) {
 }
 
 // hca stuff part 9 (live server really hates me)
-const hash = new URLSearchParams(window.location.hash.slice(1)) // remove the #
-const session = hash.get('session')
-console.log('session from hash:', session)
-if (session) {
-    localStorage.setItem('session', session)
-    window.history.replaceState({}, '', '/')
+const session = (() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    const fromHash = hash.get('session')
+    if (fromHash) {
+        localStorage.setItem('session', fromHash)
+        window.history.replaceState({}, '', '/')
+        return fromHash
+    }
+    return localStorage.getItem('session')
+})()
+
+if (!session) {
+    document.body.innerHTML = `
+    <h1>chat™</h1>
+    <p>new update: sign in to chat</p>
+    <a href="/login" style="display:flex; justify-content:center;"><button>Login with Hack Club</button></a>
+    `
+    throw new Error('not signed in')
 }
+
+
 const socket = io(
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'ws://localhost:3000'
