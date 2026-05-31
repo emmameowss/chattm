@@ -142,6 +142,13 @@ httpServer.on('request', async (req,res) => {
         res.end()
         return
 }
+if (url.pathname === '/signout') {
+        const sessionId = url.searchParams.get('session')
+        if (sessionId) delete sessions[sessionId]
+        res.writeHead(302, {Location: '/'})
+        res.end()
+        return
+    }
 if (req.method === 'GET') {
     let filePath = url.pathname === '/' ? '/index.html' : url.pathname
     try {

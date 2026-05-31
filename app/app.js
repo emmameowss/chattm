@@ -359,3 +359,10 @@ function beep() {
     osc.start(ctx.currentTime)
     osc.stop(ctx.currentTime + 0.2)
 }
+
+// sign out button thingys
+document.querySelector('#signout').addEventListener('click', () => {
+    const session = localStorage.getItem('session')
+    localStorage.removeItem('session')
+    window.location.href = `/signout?session=${session}`
+})
