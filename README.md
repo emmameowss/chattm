@@ -1,6 +1,7 @@
 # chat™
 
 ### an incredibly simple literally bare minimum chat app
+![interface of the site](https://cdn.hackclub.com/019e7df7-00d8-78b2-a818-8952d38fd327/cleanshot_2026-05-31_at_14.16.01_2x.png)
 available at: https://chat.emmameowss.gay, currently supports images and text, none of it saves so most of what you send gets thrown into the void
 
 ## Setup Instructions
