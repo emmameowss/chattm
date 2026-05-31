@@ -72,6 +72,7 @@ if (!session) {
     `
 }
 
+if (session) {
 if (localStorage.getItem('banned')) {
     // localStorage.removeItem('banned')
     showUploadStatus('you have been banned', 'red')
@@ -375,3 +376,4 @@ socket.on('banned', () => {
     localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
     location.reload()
 })
+}
