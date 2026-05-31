@@ -113,7 +113,7 @@ io.on('connection', socket => {
     }
 
     if (data.text?.startsWith('/unban ') && socket.userEmail === process.env.OWNER_EMAIL) {
-        const targetEmail = data.text.slice(7).trim
+        const targetEmail = data.text.slice(7).trim()
         banlist.delete(targetEmail)
         await savebans()
         pushSystemMessage(`${targetEmail} was unbanned`)
