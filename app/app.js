@@ -96,6 +96,36 @@ socket.on('stopTyping', (name) => {
     updateTypingIndicator()
 })
 
+// message history
+socket.on('history', (messages) => {
+    messages.forEach(data => {
+        const li = document.createElement('li')
+        const name = data.username
+        const namespan = document.createElement('span')
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        namespan.style.color = getNameColor(name)
+        if (data.isToken) {
+           const tag = document.createElement('span')
+           tag.textContent = '♛ '
+           tag.style.color = 'hotpink'
+           namespan.appendChild(tag)
+        }
+        namespan.appendChild(document.createTextNode(`[${time}] ${name}: `))
+        li.appendChild(namespan)
+        if (data.text) {
+            li.appendChild(document.createTextNode(data.text))
+        }
+        if (data.image) {
+            const img = document.createElement('img')
+            img.src = data.image
+            img.style.maxWidth = '300px'
+            img.style.display = 'block'
+            li.appendChild(img)
+        }
+        appendMessage(li)
+    })
+})
+
 function sendMessageNew(e) {
     e.preventDefault()
     // stops typing when a message is sent
