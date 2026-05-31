@@ -8,6 +8,7 @@ if (!userId || userId == null) {
 let unread = 0
 let activity = false
 let username = localStorage.getItem('username') || userId.slice(0,5)
+let audioctx = null
 
 // username functionality stuff
 document.querySelector('#username-input').value = username
@@ -226,6 +227,9 @@ socket.on("message", (data) => {
     }
 
     appendMessage(li)
+    if (document.hidden) {
+       beep()
+    }
 
     if (document.hidden) {
         unread++
@@ -300,4 +304,26 @@ function hideUploadStatus() {
     const e = document.querySelector('#upload-status')
     e.style.display = 'none'
     e.textContent = ''
+}
+// beep
+function getaudioctx() {
+    if (!audioctx) {
+        audioctx = new AudioContext()
+    }
+    if (audioctx.state === 'suspended') {
+        audioctx.resume()
+    }
+    return audioctx
+}
+function beep() {
+    const ctx = getaudioctx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = 440
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.2)
 }
