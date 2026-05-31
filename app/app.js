@@ -23,15 +23,6 @@ document.querySelector('#username-form').addEventListener('submit', (e) => {
     }
 })
 
-// join/leave messages/system messages
-function systemMessage(text) {
-    console.log(text)
-    const li = document.createElement('li')
-    li.textContent = text
-    li.style.color = 'gray'
-    li.style.fontStyle = 'italic'
-    appendMessage(li)
-}
 // colors
 function getNameColor(name) {
     if (name.toLowerCase() === 'emma') return 'hotpink'
@@ -376,4 +367,15 @@ socket.on('banned', () => {
     localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
     location.reload()
 })
+}
+
+// an iq too high?
+// join/leave messages/system messages
+function systemMessage(text) {
+    console.log(text)
+    const li = document.createElement('li')
+    li.textContent = text
+    li.style.color = 'gray'
+    li.style.fontStyle = 'italic'
+    appendMessage(li)
 }
