@@ -146,7 +146,7 @@ function pushSystemMessage(text) {
     if (history.length > maxhistory) {
         history.shift()
     }
-    io.emit('message, message')
+    io.emit('message', message)
 }
 
 // cdn upload stuff and hca login stuff
