@@ -72,14 +72,14 @@ if (!session) {
     `
 }
 
-if (sessionStorage.getItem('newlogin')) {
+if (localStorage.getItem('banned')) {
+    localStorage.removeItem('banned')
+    showUploadStatus('you have been banned', 'red')
+    setTimeout(hideUploadStatus, 5000)
+} else if (sessionStorage.getItem('newlogin')) {
     sessionStorage.removeItem('newlogin')
     showUploadStatus("welcome to chat™, set your username above if you haven't", 'pink')
     setTimeout(hideUploadStatus, 3000)
-}
-if (localStorage.getItem('banned')) {
-    localStorage.removeItem('banned')
-    showUploadStatus('you have been banned from this instance', 'red')
 }
 
 
