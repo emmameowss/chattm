@@ -18,6 +18,12 @@ available at: https://chat.emmameowss.gay, currently supports images and text, n
 2. on the site, in your browser console, run "localStorage.setItem('token', '[TOKEN]'), with [TOKEN] being the same token you set in .env
 3. refresh and u should have the tag at the start of ur messages
 
+## CDN Instructions (required)
+I'm using the HC CDN for this (it's free and kinda meant for this afaik), so this is what you'll probably need to as well.
+1. Create an API key on https://cdn.hackclub.com/api_keys
+2. Copy the .env.example to .env if you haven't already
+3. Set CDN_API_KEY to your API key
+4. Change "const res = await fetch('**https://domainnotverified.emmameowss.gay**/upload'," to your domain
 
 ## current features
 - usernames

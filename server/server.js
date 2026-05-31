@@ -4,6 +4,8 @@
 import {Server} from "socket.io"
 import {createServer} from "http"
 import { readFileSync } from 'fs'
+import formidable from 'formidable'
+import fetch from 'node-fetch'
 import 'dotenv/config'
 
 const httpServer = createServer()
@@ -15,6 +17,7 @@ const io = new Server(httpServer, {
 })
 const history = []
 const maxhistory = 25
+const CDN_API_KEY = process.env.CDN_API_KEY
 
 io.on('connection', socket => {
     io.emit('usercount', io.engine.clientsCount)
@@ -75,5 +78,25 @@ io.on('connection', socket => {
     )
 })
 
+// cdn upload stuff
+httpServer.on('request', async (req,res) => {
+    if (req.method === 'post' && req.url === '/upload') {
+        const form = formidable()
+        form.parse(req, async (err,fields,files) => {
+            const file = files.file[0]
+            const formData = new FormData()
+            formData.append('file', new Blob([await fs.promises.readFile(file.filepath)]), file.originalFilename)
+
+            const response = await fetch('https://cdn.hackclub.com/api/v4/upload', {
+                method: 'POST',
+                headers: {'Authorization': `Bearer: ${CDN_API_KEY}`},
+                body: formData
+            })
+            const { url } = await response.json()
+            res.writeHead(200, {'Content-Type': 'application/json', 'access-control-allow-origin': '*'})
+            res.end(JSON.stringify({url}))
+        })
+    }
+})
 
 httpServer.listen(3000, () => console.log("Server listening on port 3000"))
