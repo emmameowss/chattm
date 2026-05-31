@@ -2,7 +2,7 @@
 
 ### an incredibly simple literally bare minimum chat app
 
-![interface of the site](https://cdn.hackclub.com/019e7df7-00d8-78b2-a818-8952d38fd327/cleanshot_2026-05-31_at_14.16.01_2x.png)
+![interface of the site](https://cdn.hackclub.com/019e8027-6599-7668-bd82-ab9c84d20e58/CleanShot%202026-06-01%20at%2000.28.33@2x.png)
 
 available at: https://chat.emmameowss.gay, currently supports images and text, please note that images are now permanently saved while ~~the most recent 25 text messages are saved and disappear upon server restart~~ all text messages are now stored forever
 
