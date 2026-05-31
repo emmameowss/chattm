@@ -73,9 +73,8 @@ if (!session) {
 }
 
 if (localStorage.getItem('banned')) {
-    localStorage.removeItem('banned')
+    // localStorage.removeItem('banned')
     showUploadStatus('you have been banned', 'red')
-    setTimeout(hideUploadStatus, 5000)
 } else if (sessionStorage.getItem('newlogin')) {
     sessionStorage.removeItem('newlogin')
     showUploadStatus("welcome to chat™, set your username above if you haven't", 'pink')
@@ -373,6 +372,5 @@ document.querySelector('#signout').addEventListener('click', () => {
 // banned
 socket.on('banned', () => {
     localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
-    localStorage.removeItem('session')
     location.reload()
 })
