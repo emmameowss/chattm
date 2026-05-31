@@ -79,13 +79,6 @@ io.on('connection', socket => {
     })
 
     socket.on('message', (data) => {
-        /*
-        console.log(data)
-        io.emit('message', {
-            ...data,
-            isToken: socket.isToken
-        })
-        */
        const message = {
         ...data,
         isToken: socket.userEmail === process.env.OWNER_EMAIL
