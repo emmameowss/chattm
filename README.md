@@ -38,6 +38,8 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - 25 most recent messages are saved for everyone
 - image storing and hosting with hack club cdn (this is allowed, right?)
 - link detection in messages
+- better status for uploading images instead of nothing
+- file size error
 
 ## planned features
 - ~~message history~~
@@ -45,7 +47,7 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - ~~typing indicator~~
 - maybe: sound effect for message
 - ~~link detection in messages~~
-- file size notification
+- ~~file size notification~~
 
 ## not fully planned but possible features
 - HCA sign in
