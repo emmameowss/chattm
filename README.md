@@ -14,9 +14,8 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 5. for the app part, you do know how to pull up a web server right? do that and you're mostly done
 
 ## Owner Tag instructions
-1. in the .env, add "TOKEN=[random string]"
-2. on the site, in your browser console, run "localStorage.setItem('token', '[TOKEN]'), with [TOKEN] being the same token you set in .env
-3. refresh and u should have the tag at the start of ur messages
+1. in the .env, set OWNER_EMAIL to the email of ur HCA account
+2. refresh and u should have the tag at the start of ur messages
 
 ## CDN Instructions (required)
 I'm using the HC CDN for this (it's free and kinda meant for this afaik), so this is what you'll probably need to as well.
