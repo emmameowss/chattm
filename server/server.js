@@ -9,6 +9,7 @@ import { readFileSync, promises as fs } from 'fs'
 import { randomBytes } from 'crypto'
 import { readFile } from 'fs/promises'
 import { appendFile } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { extname } from 'path'
 
 const httpServer = createServer()
@@ -30,11 +31,24 @@ const types = {
     '.jpg': 'image/jpeg',
     '.ico': 'image/x-icon'
 }
+const banlist = new Set()
+try {
+    const data = await readFile('bans.txt', 'utf8')
+    data.split('\n').filter(Boolean).forEach(email => banlist.add(email))
+    console.log(`loaded ${banlist.size} bans`)
+} catch (e) {
+
+}
+
+async function savebans() {
+    await writeFile('bans.txt', [...banlist].join('\n'))
+}
 
 io.use((socket,next) => {
     const sessionId = socket.handshake.auth.session
     const user = sessions[sessionId]
     if (!user) return next(new Error('not authenticated'))
+    if (banlist.has(user.email)) return next(new Error('banned'))
     socket.userEmail = user.email 
     socket.username = null // this gets set later
     next()
@@ -79,6 +93,35 @@ io.on('connection', socket => {
     })
 
     socket.on('message', (data) => {
+
+        if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetEmail = data.text.slice(5).trim()
+            banlist.add(targetEmail)
+            await savebans()
+            appendFile('bans.log', `${new Date().toISOString()}: ${socket.user.email} (${data.username}) banned ${targetEmail}\n`)
+        
+        let targetUsername = targetEmail
+        for (const [id,s] of io.sockets.sockets) {
+            if (s.userEmail === targetEmail) {
+                targetUsername = s.username || targetEmail
+                s.emit('banned')
+                s.disconnect()
+            }
+        }
+        pushSystemMessage(`${targetUsername} was banned`)
+        return
+    }
+
+    if (data.text?.startsWith('/unban ') && socket.userEmail === process.env.OWNER_EMAIL) {
+        const targetEmail = data.text.slice(7).trim
+        banlist.delete(targetEmail)
+        await savebans()
+        pushSystemMessage(`${targetEmail} was unbanned`)
+    }
+
+        const timestamp = new Date().toISOString()
+        const logEntry = `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`
+        appendFile('messages.log', logEntry)
        const message = {
         ...data,
         isToken: socket.userEmail === process.env.OWNER_EMAIL
@@ -92,6 +135,19 @@ io.on('connection', socket => {
 
     )
 })
+
+function pushSystemMessage(text) {
+    const message = {
+        system = true,
+        text,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+    }
+    history.push(message)
+    if (history.length > maxhistory) {
+        history.shift()
+    }
+    io.emit('message, message')
+}
 
 // cdn upload stuff and hca login stuff
 httpServer.on('request', async (req,res) => {

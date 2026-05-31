@@ -366,3 +366,12 @@ document.querySelector('#signout').addEventListener('click', () => {
     localStorage.removeItem('session')
     window.location.href = `/signout?session=${session}`
 })
+
+// banned
+socket.on('banned', () => {
+    localStorage.removeItem('session')
+    document.body.innerHTML = `
+    <h1>chat™</h1>
+    <p>you have been banned</p>
+    `
+})
