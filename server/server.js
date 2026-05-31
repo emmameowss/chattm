@@ -1,13 +1,16 @@
 
 // THIS CODE WORKS DONT TOUCH IT IF YOU DONT NEED TO PLEASE
-
+import 'dotenv/config'
 import {Server} from "socket.io"
 import {createServer} from "http"
 import formidable from 'formidable'
 import fetch from 'node-fetch'
 import { readFileSync, promises as fs } from 'fs'
+import { randomBytes } from 'crypto'
 import { readFile } from 'fs/promises'
-import 'dotenv/config'
+import { appendFile } from 'fs/promises'
+import { writeFile } from 'fs/promises'
+import { extname, normalize, resolve, sep } from 'path'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -19,8 +22,41 @@ const io = new Server(httpServer, {
 const history = []
 const maxhistory = 25
 const CDN_API_KEY = process.env.CDN_API_KEY
+const sessions = {}
+const types = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.ico': 'image/x-icon'
+}
+const banlist = new Set()
+try {
+    const data = await readFile('bans.txt', 'utf8')
+    data.split('\n').filter(Boolean).forEach(email => banlist.add(email))
+    console.log(`loaded ${banlist.size} bans`)
+} catch (e) {
+
+}
+
+async function savebans() {
+    await writeFile('bans.txt', [...banlist].join('\n'))
+}
+
+io.use((socket,next) => {
+    const sessionId = socket.handshake.auth.session
+    const user = sessions[sessionId]
+    if (!user) return next(new Error('not authenticated'))
+    if (banlist.has(user.email)) return next(new Error('banned'))
+    socket.userEmail = user.email 
+    socket.username = null // this gets set later
+    next()
+})
 
 io.on('connection', socket => {
+
+    console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)
     socket.emit('history', history)
 
@@ -49,7 +85,6 @@ io.on('connection', socket => {
         }
     })
 
-    console.log(`User ${socket.id} connected successfully!`)
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
         if (socket.username) {
@@ -57,17 +92,40 @@ io.on('connection', socket => {
         }
     })
 
-    socket.on('message', (data) => {
-        /*
-        console.log(data)
-        io.emit('message', {
-            ...data,
-            isToken: socket.isToken
-        })
-        */
+    socket.on('message', async (data) => {
+
+        if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetEmail = data.text.slice(5).trim()
+            banlist.add(targetEmail)
+            await savebans()
+            appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail}\n`)
+        
+        let targetUsername = targetEmail
+        for (const [id,s] of io.sockets.sockets) {
+            if (s.userEmail === targetEmail) {
+                targetUsername = s.username || targetEmail
+                s.emit('banned')
+                s.disconnect()
+            }
+        }
+        pushSystemMessage(`${targetUsername} was banned`)
+        return
+    }
+
+    if (data.text?.startsWith('/unban ') && socket.userEmail === process.env.OWNER_EMAIL) {
+        const targetEmail = data.text.slice(7).trim()
+        banlist.delete(targetEmail)
+        await savebans()
+        pushSystemMessage(`${targetEmail} was unbanned`)
+        return
+    }
+
+        const timestamp = new Date().toISOString()
+        const logEntry = `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`
+        appendFile('messages.log', logEntry)
        const message = {
         ...data,
-        isToken: socket.isToken
+        isToken: socket.userEmail === process.env.OWNER_EMAIL
        }
        history.push(message)
        if (history.length > maxhistory) {
@@ -79,8 +137,91 @@ io.on('connection', socket => {
     )
 })
 
-// cdn upload stuff
+function pushSystemMessage(text) {
+    const message = {
+        system: true,
+        text,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+    }
+    history.push(message)
+    if (history.length > maxhistory) {
+        history.shift()
+    }
+    io.emit('message', message)
+}
+
+// cdn upload stuff and hca login stuff
 httpServer.on('request', async (req,res) => {
+
+    const url = new URL(req.url, 'http://localhost:3000')
+    if (url.pathname.includes('socket.io')) return
+    if (url.pathname === '/login') {
+        const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
+        res.writeHead(302, {location: authUrl})
+        res.end()
+        return
+    }
+    if (url.pathname === '/callback') {
+        const code = url.searchParams.get('code')
+
+        const tokenres = await fetch('https://auth.hackclub.com/oauth/token', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                client_id: process.env.HCA_CLIENT_ID,
+                client_secret: process.env.HCA_CLIENT_SECRET,
+                redirect_uri: process.env.HCA_REDIRECT_URI,
+                code,
+                grant_type: 'authorization_code'
+            })
+        })
+        const tokenJson = await tokenres.json()
+
+        const { access_token } = tokenJson
+        const userres = await fetch('https://auth.hackclub.com/api/v1/me', {
+            headers: { Authorization: `Bearer ${access_token}` }
+        })
+        const user = await userres.json()
+        const {primary_email} = user.identity
+        const timestamp = new Date().toISOString()
+        await appendFile('login.log', `${timestamp}: ${primary_email} signed in\n`)
+        const sessionid = randomBytes(32).toString('hex')
+        sessions[sessionid] = { email: primary_email }
+        const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
+        res.writeHead(302, { Location: redirectUrl })
+        res.end()
+        return
+}
+if (url.pathname === '/signout') {
+        const sessionId = url.searchParams.get('session')
+        if (sessionId) delete sessions[sessionId]
+        res.writeHead(302, {Location: '/'})
+        res.end()
+        return
+    }
+if (req.method === 'GET') {
+    let filePath = url.pathname === '/' ? '/index.html' : url.pathname
+    try {
+        const appDir = resolve(process.cwd(), '../app')
+        const resolvedPath = resolve(appDir, `.${normalize(filePath)}`)
+        if (resolvedPath !== appDir && !resolvedPath.startsWith(`${appDir}${sep}`)) {
+            res.writeHead(403)
+            res.end('forbidden')
+            return
+        }
+
+        const data = await readFile(resolvedPath)
+        const ext = extname(filePath)
+        res.writeHead(200, { 'content-type': types[ext] || 'text/plain' })
+        res.end(data)
+    } catch (e) {
+        if (!res.headersSent) {
+            res.writeHead(404)
+            res.end('not found')
+        }
+    }
+    return
+}
     if (req.url !== '/upload') return
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -123,5 +264,6 @@ httpServer.on('request', async (req,res) => {
         })
     }
 })
+
 
 httpServer.listen(3000, () => console.log("Server listening on port 3000"))

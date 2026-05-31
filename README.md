@@ -2,11 +2,11 @@
 
 ### an incredibly simple literally bare minimum chat app
 
-![interface of the site](https://cdn.hackclub.com/019e7df7-00d8-78b2-a818-8952d38fd327/cleanshot_2026-05-31_at_14.16.01_2x.png)
+![interface of the site](https://cdn.hackclub.com/019e8027-6599-7668-bd82-ab9c84d20e58/CleanShot%202026-06-01%20at%2000.28.33@2x.png)
 
-available at: https://chat.emmameowss.gay, currently supports images and text, please note that images are now permanently saved while the most recent 25 text messages are saved and disappear upon server restart
+available at: https://chat.emmameowss.gay, currently supports images and text, please note that images are now permanently saved while ~~the most recent 25 text messages are saved and disappear upon server restart~~ all text messages are now stored forever
 
-## Setup Instructions
+## Setup Instructions (Outdated)
 1. clone the repository
 2. in app/app.js, change const socket = io("wss://domainnotverified.emmameowss.gay) to your domain (good luck with this, for example: ws://randomdomain.com:3000 only add port if not reverse proxied)
 3. run npm i in server
@@ -14,9 +14,8 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 5. for the app part, you do know how to pull up a web server right? do that and you're mostly done
 
 ## Owner Tag instructions
-1. in the .env, add "TOKEN=[random string]"
-2. on the site, in your browser console, run "localStorage.setItem('token', '[TOKEN]'), with [TOKEN] being the same token you set in .env
-3. refresh and u should have the tag at the start of ur messages
+1. in the .env, set OWNER_EMAIL to the email of ur HCA account
+2. refresh and u should have the tag at the start of ur messages
 
 ## CDN Instructions (required)
 I'm using the HC CDN for this (it's free and kinda meant for this afaik), so this is what you'll probably need to as well.
@@ -40,13 +39,12 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - link detection in messages
 - better status for uploading images instead of nothing
 - file size error
+- message sound effect
+- HCA sign in
 
 ## planned features
 - ~~message history~~
 - ~~typing indicator~~
-- maybe: sound effect for message
+- ~~maybe: sound effect for message~~
 - ~~link detection in messages~~
 - ~~file size notification~~
-
-## not fully planned but possible features
-- HCA sign in

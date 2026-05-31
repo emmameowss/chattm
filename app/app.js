@@ -51,10 +51,45 @@ function getNameColor(name) {
     return `hsl(${hash % 360}, 70%, 65%)`
 }
 
+// hca stuff part 9 (live server really hates me)
+const session = (() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    const fromHash = hash.get('session')
+    if (fromHash) {
+        sessionStorage.setItem('newlogin', '1')
+        localStorage.setItem('session', fromHash)
+        window.history.replaceState({}, '', '/')
+        return fromHash
+    }
+    return localStorage.getItem('session')
+})()
+
+if (!session) {
+    document.body.innerHTML = `
+        <h1>chat™</h1>
+        <p>you need to sign in to chat</p>
+        <a href="/login" style="display:flex; justify-content:center;"><button>Login with Hack Club</button></a>
+    `
+}
+
+if (session) {
+if (localStorage.getItem('banned')) {
+    // localStorage.removeItem('banned')
+    showUploadStatus('you have been banned', 'red')
+} else if (sessionStorage.getItem('newlogin')) {
+    sessionStorage.removeItem('newlogin')
+    showUploadStatus("welcome to chat™, set your username above if you haven't", 'pink')
+    setTimeout(hideUploadStatus, 3000)
+}
+
+
 const socket = io(
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'ws://localhost:3000'
-        : 'wss://domainnotverified.emmameowss.gay' // set this to the ip/url of the site/proxy you're using for the backend server thing
+        : 'wss://domainnotverified.emmameowss.gay', // set this to the ip/url of the site/proxy you're using for the backend server thing
+    {
+        auth: { session: localStorage.getItem('session') }
+    }
 )
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
@@ -184,6 +219,7 @@ function appendMessage(li) {
 }
 
 socket.on('connect', () => {
+    localStorage.removeItem('banned')
     const token = localStorage.getItem('token')
     socket.emit('setUsername', username, token)
 })
@@ -326,4 +362,18 @@ function beep() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2)
     osc.start(ctx.currentTime)
     osc.stop(ctx.currentTime + 0.2)
+}
+
+// sign out button thingys
+document.querySelector('#signout').addEventListener('click', () => {
+    const session = localStorage.getItem('session')
+    localStorage.removeItem('session')
+    window.location.href = `/signout?session=${session}`
+})
+
+// banned
+socket.on('banned', () => {
+    localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
+    location.reload()
+})
 }
