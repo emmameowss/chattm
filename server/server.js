@@ -88,7 +88,7 @@ io.on('connection', socket => {
         */
        const message = {
         ...data,
-        isToken: socket.isToken
+        isToken: socket.userEmail === process.env.OWNER_EMAIL
        }
        history.push(message)
        if (history.length > maxhistory) {
