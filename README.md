@@ -37,13 +37,14 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - a typing indicator
 - 25 most recent messages are saved for everyone
 - image storing and hosting with hack club cdn (this is allowed, right?)
+- link detection in messages
 
 ## planned features
 - ~~message history~~
 - a better frontend (especially on mobile)
 - ~~typing indicator~~
 - maybe: sound effect for message
-- link detection in messages
+- ~~link detection in messages~~
 - file size notification
 
 ## not fully planned but possible features
