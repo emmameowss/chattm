@@ -117,6 +117,7 @@ io.on('connection', socket => {
         banlist.delete(targetEmail)
         await savebans()
         pushSystemMessage(`${targetEmail} was unbanned`)
+        return
     }
 
         const timestamp = new Date().toISOString()
