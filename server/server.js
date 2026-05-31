@@ -14,7 +14,7 @@ const io = new Server(httpServer, {
     cors: {
         origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "http://127.0.0.1:5500", "https://domainnotverified.emmameowss.gay"] 
     },
-    maxHttpBufferSize: 1e8
+    maxHttpBufferSize: 1e6
 })
 const history = []
 const maxhistory = 25
@@ -93,7 +93,7 @@ httpServer.on('request', async (req,res) => {
     }
 
     if (req.method === 'POST' && req.url === '/upload') {
-        const form = formidable()
+        const form = formidable({ maxFileSize: 10 * 1024 * 1024 }) // 10mb max file size i dont want my account full of whateverthehell
         form.parse(req, async (err, fields, files) => {
             if (err) {
                 res.writeHead(500)
