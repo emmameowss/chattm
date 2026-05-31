@@ -28,11 +28,12 @@ available at: https://chat.emmameowss.gay, currently supports images and text, n
 - an active user counter
 - an unread message counter in the title of the tab
 - an owner/crown tag
+- a typing indicator
 
 ## planned features
 - **message history**
 - a better frontend (especially on mobile)
-- typing indicator
+- ~~typing indicator~~
 - maybe: sound effect for message
 - normal file upload
 
