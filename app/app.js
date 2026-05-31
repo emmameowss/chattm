@@ -238,7 +238,7 @@ socket.on('userRenamed', ({from, to}) => {
 async function uploadImage(file) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await fetch('http://localhost:3000/upload', {
+    const res = await fetch('https://domainnotverified.emmameowss.gay/upload', {
         method: 'POST',
         body: formData
     })
