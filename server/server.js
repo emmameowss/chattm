@@ -31,7 +31,10 @@ const types = {
 }
 
 io.use((socket,next) => {
+    console.log('socket auth:', socket.handshake.auth)
     const sessionId = socket.handshake.auth.session
+    console.log('sessionId:', sessionId)
+    console.log('sessions:', sessions)
     const user = sessions[sessionId]
     if (!user) return next(new Error('not authenticated'))
     socket.userEmail = user.email 
@@ -104,6 +107,7 @@ io.on('connection', socket => {
 httpServer.on('request', async (req,res) => {
 
     const url = new URL(req.url, 'http://localhost:3000')
+    if (url.pathname.startsWith('socket.io')) return
     if (url.pathname === '/login') {
         const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
         res.writeHead(302, {location: authUrl})

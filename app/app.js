@@ -52,15 +52,13 @@ function getNameColor(name) {
 }
 
 // hca stuff part 9 (live server really hates me)
-const hash = new URLSearchParams(window.location.hash.slice(1))
-const session = hash.get('hash')
+const hash = new URLSearchParams(window.location.hash.slice(1)) // remove the #
+const session = hash.get('session')
 console.log('session from hash:', session)
 if (session) {
     localStorage.setItem('session', session)
-    window.location.hash = '' // clean up
+    window.history.replaceState({}, '', '/')
 }
-console.log('session from localStorage:', localStorage.getItem('session')); window.history.replaceState({}, '', '/')
-
 const socket = io(
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'ws://localhost:3000'
