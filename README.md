@@ -29,9 +29,10 @@ available at: https://chat.emmameowss.gay, currently supports images and text, n
 - an unread message counter in the title of the tab
 - an owner/crown tag
 - a typing indicator
+- 25 most recent messages are saved for everyone
 
 ## planned features
-- **message history**
+- ~~message history~~
 - a better frontend (especially on mobile)
 - ~~typing indicator~~
 - maybe: sound effect for message
