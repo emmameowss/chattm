@@ -13,9 +13,12 @@ const io = new Server(httpServer, {
     },
     maxHttpBufferSize: 1e8
 })
+const history = []
+const maxhistory = 25
 
 io.on('connection', socket => {
     io.emit('usercount', io.engine.clientsCount)
+    socket.emit('history', history)
 
     socket.on('setUsername', (name, token) => {
         const prevUser = socket.username
@@ -51,11 +54,22 @@ io.on('connection', socket => {
     })
 
     socket.on('message', (data) => {
+        /*
         console.log(data)
         io.emit('message', {
             ...data,
             isToken: socket.isToken
         })
+        */
+       const message = {
+        ...data,
+        isToken: socket.isToken
+       }
+       history.push(message)
+       if (history.length > maxhistory) {
+        history.shift()
+       }
+       io.emit('message', message)
     }
 
     )
