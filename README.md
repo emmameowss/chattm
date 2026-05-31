@@ -43,7 +43,6 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 
 ## planned features
 - ~~message history~~
-- a better frontend (especially on mobile)
 - ~~typing indicator~~
 - maybe: sound effect for message
 - ~~link detection in messages~~
