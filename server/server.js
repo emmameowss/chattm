@@ -105,9 +105,10 @@ io.on('connection', socket => {
 
 // cdn upload stuff and hca login stuff
 httpServer.on('request', async (req,res) => {
+    console.log(req.method, req.url)
 
     const url = new URL(req.url, 'http://localhost:3000')
-    if (url.pathname.startsWith('socket.io')) return
+    if (url.pathname.includes('socket.io')) return
     if (url.pathname === '/login') {
         const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
         res.writeHead(302, {location: authUrl})
