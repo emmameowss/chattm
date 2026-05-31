@@ -86,7 +86,7 @@ if (localStorage.getItem('banned')) {
 const socket = io(
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'ws://localhost:3000'
-        : 'wss://domainnotverified.emmameowss.gay', // set this to the ip/url of the site/proxy you're using for the backend server thing
+        : 'wss://chat.emmameowss.gay', // set this to the ip/url of the site/proxy you're using for the backend server thing
     {
         auth: { session: localStorage.getItem('session') }
     }
