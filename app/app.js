@@ -57,6 +57,9 @@ const socket = io(
 )
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
+// for testing reasons: 500kb limit
+// const MAX_SIZE = 500 * 1024
+const MAX_SIZE = 10 * 1024 * 1024 // 10mb limit to images
 
 // move socket joined/left stuff after intialiing socket
 socket.on('userJoined', (name) => { 
@@ -138,6 +141,11 @@ async function sendMessageNew(e) {
     if (!textInput.value && !file) return
 
     if (file) {
+        if (file.size > MAX_SIZE) {
+            showUploadError('image too big (max is 10mb)')
+            fileInput.value = ''
+            return
+        }
         const imageUrl = await uploadImage(file)
         const reader = new FileReader()
         reader.onload = () => {
@@ -266,4 +274,15 @@ function functioninglinks(text, color) {
         }
     })
     return fragment
+}
+
+// upload error stuff
+function showUploadError(msg) {
+    const e = document.querySelector('#upload-error')
+    e.textContent = msg
+    e.style.display = 'block'
+    setTimeout(() => {
+        e.style.display = 'none'
+        e.textContent = ''
+    }, 3000)
 }
