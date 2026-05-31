@@ -6,8 +6,9 @@ import {createServer} from "http"
 import formidable from 'formidable'
 import fetch from 'node-fetch'
 import { readFileSync, promises as fs } from 'fs'
-import { readFile } from 'fs/promises'
 import { randomBytes } from 'crypto'
+import { readFile } from 'fs/promises'
+import { extname } from 'path'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -20,6 +21,14 @@ const history = []
 const maxhistory = 25
 const CDN_API_KEY = process.env.CDN_API_KEY
 const sessions = {}
+const types = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.ico': 'image/x-icon'
+}
 
 io.use((socket,next) => {
     const sessionId = socket.handshake.auth.session
@@ -32,7 +41,7 @@ io.use((socket,next) => {
 
 io.on('connection', socket => {
 
-    console.log(`${socket.user.name} connected`)
+    console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)
     socket.emit('history', history)
 
@@ -132,6 +141,20 @@ httpServer.on('request', async (req,res) => {
         res.end()
         return
 }
+if (req.method === 'GET') {
+        let filePath = url.pathname === '/' ? '/index.html' : url.pathname
+        try {
+            const data = await readFile(`../app${filePath}`)
+            const ext = extname(filePath)
+            res.writeHead(200, {"content-type": types[ext] || 'text/plain'})
+            res.end(data)
+        }
+        catch (e) {
+            res.writeHead(404)
+            res.end('not found')
+        }
+        return
+    }
     if (req.url !== '/upload') return
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
