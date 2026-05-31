@@ -103,7 +103,7 @@ io.on('connection', socket => {
 // cdn upload stuff and hca login stuff
 httpServer.on('request', async (req,res) => {
 
-    const url = new URL(req.url, 'https://domainnotverified.emmameowss.gy')
+    const url = new URL(req.url, 'http://localhost:3000')
     if (url.pathname === '/login') {
         const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
         res.writeHead(302, {location: authUrl})
@@ -135,26 +135,27 @@ httpServer.on('request', async (req,res) => {
         const {primary_email} = user.identity
         const sessionid = randomBytes(32).toString('hex')
         sessions[sessionid] = { email: primary_email }
-        const redirectUrl = `https://chat.emmameowss.gay#session=${sessionid}` // live server hates me
+        const redirectUrl = `http://localhost:3000#session=${sessionid}` // live server hates me
         console.log('redirecting to:', redirectUrl)
         res.writeHead(302, { Location: redirectUrl })
         res.end()
         return
 }
 if (req.method === 'GET') {
-        let filePath = url.pathname === '/' ? '/index.html' : url.pathname
-        try {
-            const data = await readFile(`../app${filePath}`)
-            const ext = extname(filePath)
-            res.writeHead(200, {"content-type": types[ext] || 'text/plain'})
-            res.end(data)
-        }
-        catch (e) {
+    let filePath = url.pathname === '/' ? '/index.html' : url.pathname
+    try {
+        const data = await readFile(`../app${filePath}`)
+        const ext = extname(filePath)
+        res.writeHead(200, { 'content-type': types[ext] || 'text/plain' })
+        res.end(data)
+    } catch (e) {
+        if (!res.headersSent) {
             res.writeHead(404)
             res.end('not found')
         }
-        return
     }
+    return
+}
     if (req.url !== '/upload') return
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
