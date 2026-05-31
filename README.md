@@ -43,7 +43,8 @@ I'm using the HC CDN for this (it's free and kinda meant for this afaik), so thi
 - a better frontend (especially on mobile)
 - ~~typing indicator~~
 - maybe: sound effect for message
-- normal file upload
+- link detection in messages
+- file size notification
 
 ## not fully planned but possible features
 - HCA sign in
