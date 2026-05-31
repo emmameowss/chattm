@@ -134,7 +134,7 @@ httpServer.on('request', async (req,res) => {
         const user = await userres.json()
         const {primary_email} = user.identity
         const timestamp = new Date().toISOString()
-        await appendFile('login.log', `${timestamp}: ${primary_email} signed in`)
+        await appendFile('login.log', `${timestamp}: ${primary_email} signed in\n`)
         const sessionid = randomBytes(32).toString('hex')
         sessions[sessionid] = { email: primary_email }
         const redirectUrl = `http://localhost:3000#session=${sessionid}` // live server hates me
