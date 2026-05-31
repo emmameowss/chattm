@@ -94,7 +94,7 @@ io.on('connection', socket => {
 // cdn upload stuff and hca login stuff
 httpServer.on('request', async (req,res) => {
 
-    const url = new URL(req.url, 'http://localhost:3000')
+    const url = new URL(req.url, 'https://domainnotverified.emmameowss.gy')
     if (url.pathname === '/login') {
         const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
         res.writeHead(302, {location: authUrl})
@@ -126,7 +126,7 @@ httpServer.on('request', async (req,res) => {
         const {primary_email} = user.identity
         const sessionid = randomBytes(32).toString('hex')
         sessions[sessionid] = { email: primary_email }
-        const redirectUrl = `http://127.0.0.1:5500/app#session=${sessionid}` // live server hates me
+        const redirectUrl = `https://chat.emmameowss.gay#session=${sessionid}` // live server hates me
         console.log('redirecting to:', redirectUrl)
         res.writeHead(302, { Location: redirectUrl })
         res.end()
