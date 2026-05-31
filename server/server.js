@@ -22,8 +22,7 @@ const CDN_API_KEY = process.env.CDN_API_KEY
 const sessions = {}
 
 io.use((socket,next) => {
-    const cookie = socket.handshake.headers.cookie || ''
-    const sessionId = cookie.match(/session=([^;]+)/)?.[1]
+    const sessionId = socket.handshake.auth.session
     const user = sessions[sessionId]
     if (!user) return next(new Error('not authenticated'))
     socket.userEmail = user.email 
@@ -103,7 +102,6 @@ httpServer.on('request', async (req,res) => {
         return
     }
     if (url.pathname === '/callback') {
-    try {
         const code = url.searchParams.get('code')
         console.log('code:', code)
 
@@ -119,28 +117,20 @@ httpServer.on('request', async (req,res) => {
             })
         })
         const tokenJson = await tokenres.json()
-        console.log('token:', tokenJson)
 
         const { access_token } = tokenJson
         const userres = await fetch('https://auth.hackclub.com/api/v1/me', {
             headers: { Authorization: `Bearer ${access_token}` }
         })
         const user = await userres.json()
-        console.log('user:', user)
-
+        const {primary_email} = user.identity
         const sessionid = randomBytes(32).toString('hex')
         sessions[sessionid] = { email: primary_email }
-        res.writeHead(302, {
-            Location: '/',
-            'set-cookie': `session=${sessionid}; HttpOnly; Path=/`
-        })
+        const redirectUrl = `http://127.0.0.1:5500/app#session=${sessionid}` // live server hates me
+        console.log('redirecting to:', redirectUrl)
+        res.writeHead(302, { Location: redirectUrl })
         res.end()
-    } catch (e) {
-        console.log('callback error:', e)
-        res.writeHead(500)
-        res.end('auth error: ' + e.message)
-    }
-    return
+        return
 }
     if (req.url !== '/upload') return
     res.setHeader('Access-Control-Allow-Origin', '*')

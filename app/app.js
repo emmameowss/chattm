@@ -51,10 +51,23 @@ function getNameColor(name) {
     return `hsl(${hash % 360}, 70%, 65%)`
 }
 
+// hca stuff part 9 (live server really hates me)
+const hash = new URLSearchParams(window.location.hash.slice(1))
+const session = hash.get('hash')
+console.log('session from hash:', session)
+if (session) {
+    localStorage.setItem('session', session)
+    window.location.hash = '' // clean up
+}
+console.log('session from localStorage:', localStorage.getItem('session')); window.history.replaceState({}, '', '/')
+
 const socket = io(
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'ws://localhost:3000'
-        : 'wss://domainnotverified.emmameowss.gay' // set this to the ip/url of the site/proxy you're using for the backend server thing
+        : 'wss://domainnotverified.emmameowss.gay', // set this to the ip/url of the site/proxy you're using for the backend server thing
+    {
+        auth: { session: localStorage.getItem('session') }
+    }
 )
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
