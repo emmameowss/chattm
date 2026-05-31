@@ -6,6 +6,7 @@ import {createServer} from "http"
 import formidable from 'formidable'
 import fetch from 'node-fetch'
 import { readFileSync, promises as fs } from 'fs'
+import { readFile } from 'fs/promises'
 import 'dotenv/config'
 
 const httpServer = createServer()
@@ -80,21 +81,45 @@ io.on('connection', socket => {
 
 // cdn upload stuff
 httpServer.on('request', async (req,res) => {
-    if (req.method === 'post' && req.url === '/upload') {
-        const form = formidable()
-        form.parse(req, async (err,fields,files) => {
-            const file = files.file[0]
-            const formData = new FormData()
-            formData.append('file', new Blob([await fs.promises.readFile(file.filepath)]), file.originalFilename)
+    if (req.url !== '/upload') return
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
-            const response = await fetch('https://cdn.hackclub.com/api/v4/upload', {
-                method: 'POST',
-                headers: {'Authorization': `Bearer: ${CDN_API_KEY}`},
-                body: formData
-            })
-            const { url } = await response.json()
-            res.writeHead(200, {'Content-Type': 'application/json', 'access-control-allow-origin': '*'})
-            res.end(JSON.stringify({url}))
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204)
+        res.end()
+        return
+    }
+
+    if (req.method === 'POST' && req.url === '/upload') {
+        const form = formidable()
+        form.parse(req, async (err, fields, files) => {
+            if (err) {
+                res.writeHead(500)
+                res.end(JSON.stringify({ error: err.message }))
+                return
+            }
+
+            try {
+                const file = files.file[0]
+                const fileBuffer = await readFile(file.filepath)
+                const blob = new Blob([fileBuffer])
+                const formData = new FormData()
+                formData.append('file', blob, file.originalFilename)
+
+                const response = await fetch('https://cdn.hackclub.com/api/v4/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${CDN_API_KEY}` },
+                    body: formData
+                })
+                const json = await response.json()
+                res.writeHead(200, { 'Content-Type': 'application/json' })
+                res.end(JSON.stringify({ url: json.url }))
+            } catch (e) {
+                res.writeHead(500)
+                res.end(JSON.stringify({ error: e.message }))
+            }
         })
     }
 })
