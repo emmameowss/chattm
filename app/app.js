@@ -126,7 +126,7 @@ socket.on('history', (messages) => {
     })
 })
 
-function sendMessageNew(e) {
+async function sendMessageNew(e) {
     e.preventDefault()
     // stops typing when a message is sent
     socket.emit('stopTyping')
@@ -138,22 +138,18 @@ function sendMessageNew(e) {
     if (!textInput.value && !file) return
 
     if (file) {
-        if (!file.type.startsWith('image/')) {
-            fileInput.value = ''
-            if (!textInput.value) return
-        } else {
+        const imageUrl = await uploadImage(file)
         const reader = new FileReader()
         reader.onload = () => {
             socket.emit('message', {
                 username,
                 text: textInput.value || null,
-                image: reader.result
+                image: imageUrl
             })
             textInput.value = ""
             fileInput.value = ""
         }
         reader.readAsDataURL(file)
-    }
  } else {
         socket.emit('message', {
             username,
@@ -237,3 +233,15 @@ socket.on("message", (data) => {
 socket.on('userRenamed', ({from, to}) => {
     systemMessage(`${from} changed their username to ${to}`)
 })
+
+// cdn/image stuff
+async function uploadImage(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch('http://localhost:3000/upload', {
+        method: 'POST',
+        body: formData
+    })
+    const {url} = await res.json()
+    return url
+}

@@ -3,9 +3,9 @@
 
 import {Server} from "socket.io"
 import {createServer} from "http"
-import { readFileSync } from 'fs'
 import formidable from 'formidable'
 import fetch from 'node-fetch'
+import { readFileSync, promises as fs } from 'fs'
 import 'dotenv/config'
 
 const httpServer = createServer()
