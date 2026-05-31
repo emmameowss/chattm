@@ -187,7 +187,7 @@ httpServer.on('request', async (req,res) => {
         await appendFile('login.log', `${timestamp}: ${primary_email} signed in\n`)
         const sessionid = randomBytes(32).toString('hex')
         sessions[sessionid] = { email: primary_email }
-        const redirectUrl = `http://localhost:3000#session=${sessionid}` // live server hates me
+        const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
         res.writeHead(302, { Location: redirectUrl })
         res.end()
         return
