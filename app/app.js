@@ -146,9 +146,12 @@ async function sendMessageNew(e) {
             fileInput.value = ''
             return
         }
+
+        showUploadStatus('uploading...')
         const imageUrl = await uploadImage(file)
-        const reader = new FileReader()
-        reader.onload = () => {
+        showUploadStatus('uploaded!', 'pink')
+        setTimeout(hideUploadStatus, 3000)
+
             socket.emit('message', {
                 username,
                 text: textInput.value || null,
@@ -156,8 +159,6 @@ async function sendMessageNew(e) {
             })
             textInput.value = ""
             fileInput.value = ""
-        }
-        reader.readAsDataURL(file)
  } else {
         socket.emit('message', {
             username,
@@ -285,4 +286,18 @@ function showUploadError(msg) {
         e.style.display = 'none'
         e.textContent = ''
     }, 3000)
+}
+
+// upload status stuff
+function showUploadStatus(msg, color = 'gray') {
+    const e = document.querySelector('#upload-status')
+    e.textContent = msg
+    e.style.display = 'block'
+    e.style.color = color || 'gray'
+}
+
+function hideUploadStatus() {
+    const e = document.querySelector('#upload-status')
+    e.style.display = 'none'
+    e.textContent = ''
 }
