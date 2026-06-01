@@ -278,7 +278,7 @@ socket.on('userRenamed', ({from, to}) => {
 async function uploadImage(file) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await fetch('https://domainnotverified.emmameowss.gay/upload', {
+    const res = await fetch('https://chat.emmameowss.gay/upload', {
         method: 'POST',
         body: formData
     })

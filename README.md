@@ -6,23 +6,17 @@
 
 available at: https://chat.emmameowss.gay, currently supports images and text, please note that images are now permanently saved while ~~the most recent 25 text messages are saved and disappear upon server restart~~ all text messages are now stored forever
 
-## Setup Instructions (Outdated)
+## Setup Instructions
 1. clone the repository
 2. in app/app.js, change const socket = io("wss://domainnotverified.emmameowss.gay) to your domain (good luck with this, for example: ws://randomdomain.com:3000 only add port if not reverse proxied)
-3. run npm i in server
-4. do npm run start or npm run dev
-5. for the app part, you do know how to pull up a web server right? do that and you're mostly done
-
-## Owner Tag instructions
-1. in the .env, set OWNER_EMAIL to the email of ur HCA account
-2. refresh and u should have the tag at the start of ur messages
-
-## CDN Instructions (required)
-I'm using the HC CDN for this (it's free and kinda meant for this afaik), so this is what you'll probably need to as well.
-1. Create an API key on https://cdn.hackclub.com/api_keys
-2. Copy the .env.example to .env if you haven't already
-3. Set CDN_API_KEY to your API key
-4. Change "const res = await fetch('**https://domainnotverified.emmameowss.gay**/upload'," to your domain
+3. in app/app.js, "change const res = await fetch('**https://chat.emmameowss.gay/upload**', {" to your domain
+4. in server/server.js, add your domain to the cors allowed origins
+5. in server/server.js, change "const url = new URL(req.url, '**https://chat.emmameowss.gay**')" to your domain
+6. copy .env.example to .env
+7. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and your hack club CDN api key, preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
+8. run npm i in server
+9. do npm run start or npm run dev
+10. for the app part, you do know how to pull up a web server right? do that and you're mostly done
 
 ## current features
 - usernames
