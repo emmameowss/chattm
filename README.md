@@ -16,7 +16,6 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 7. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and your hack club CDN api key, preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
 8. run npm i in server
 9. do npm run start or npm run dev
-10. for the app part, you do know how to pull up a web server right? do that and you're mostly done
 
 ## current features
 - usernames
