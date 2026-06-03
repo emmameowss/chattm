@@ -11,6 +11,7 @@ import { readFile } from 'fs/promises'
 import { appendFile } from 'fs/promises'
 import { writeFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
+import { json } from 'stream/consumers'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -23,6 +24,13 @@ const history = []
 const maxhistory = 25
 const CDN_API_KEY = process.env.CDN_API_KEY
 const sessions = {}
+// save/load session to file
+try { 
+    const data = await readFile('sessions.json', 'utf8')
+    sessions = JSON.parse(data)
+} catch (e) {
+
+}
 const types = {
     '.html': 'text/html',
     '.js': 'application/javascript',
@@ -42,6 +50,12 @@ try {
 
 async function savebans() {
     await writeFile('bans.txt', [...banlist].join('\n'))
+}
+
+// save session to file
+async function saveSession(id, data) {
+    sessions[id] = data
+    await writeFile('sessions.json', JSON.stringify(sessions))
 }
 
 io.use((socket,next) => {
@@ -186,7 +200,7 @@ httpServer.on('request', async (req,res) => {
         const timestamp = new Date().toISOString()
         await appendFile('login.log', `${timestamp}: ${primary_email} signed in\n`)
         const sessionid = randomBytes(32).toString('hex')
-        sessions[sessionid] = { email: primary_email }
+        await saveSession(sessionid, {email: primary_email})
         const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
         res.writeHead(302, { Location: redirectUrl })
         res.end()
@@ -194,7 +208,10 @@ httpServer.on('request', async (req,res) => {
 }
 if (url.pathname === '/signout') {
         const sessionId = url.searchParams.get('session')
-        if (sessionId) delete sessions[sessionId]
+        if (sessionId) {
+            delete sessions[sessionid]
+            await writeFile('sessions.json', JSON.stringify(sessions))
+        }
         res.writeHead(302, {Location: '/'})
         res.end()
         return
