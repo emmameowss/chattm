@@ -51,16 +51,6 @@ async function saveSession(id, data) {
     await writeFile('sessions.json', JSON.stringify(sessions))
 }
 
-function pushSystemMessage(text) {
-    const message = {
-        system: true,
-        text,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-    history.push(message)
-    if (history.length > maxhistory) history.shift()
-    io.emit('message', message)
-}
 
 function emitUserList() {
     const users = []
@@ -145,7 +135,6 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             history.length = 0
             io.emit('clear')
-            pushSystemMessage('chat was cleared')
             return
         }
         const timestamp = new Date().toISOString()
