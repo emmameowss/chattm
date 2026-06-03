@@ -81,6 +81,7 @@ io.on('connection', socket => {
         if (prevUser && prevUser !== name) {
             socket.broadcast.emit('userRenamed', {from: prevUser, to: name})
         }
+        emitUserList()
     })
 
     // serverside typing indicator stuff
@@ -104,6 +105,7 @@ io.on('connection', socket => {
         if (socket.username) {
             io.emit('userLeft', socket.username)
         }
+        emitUserList()
     })
 
     socket.on('message', async (data) => {
@@ -210,7 +212,7 @@ httpServer.on('request', async (req,res) => {
 if (url.pathname === '/signout') {
         const sessionId = url.searchParams.get('session')
         if (sessionId) {
-            delete sessions[sessionid]
+            delete sessions[sessionId]
             await writeFile('sessions.json', JSON.stringify(sessions))
         }
         res.writeHead(302, {Location: '/'})
@@ -282,6 +284,16 @@ if (req.method === 'GET') {
         })
     }
 })
+
+// user list function
+
+function emitUserList() {
+    const users = []
+    for (const [id, s] of io.sockets.sockets) {
+        if (s.username) users.push({username: s.username, email: s.userEmail})
+    }
+    io.emit('userlist', users)
+}
 
 
 httpServer.listen(3000, () => console.log("Server listening on port 3000"))

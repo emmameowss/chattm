@@ -34,11 +34,13 @@ const session = (() => {
 })()
 
 if (!session) {
+    document.body.className = 'login-page'
     document.body.innerHTML = `
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
-        <a href="/login" style="display:flex; justify-content:center;"><button>Login with Hack Club</button></a>
+        <a href="/login"><button>login with Hack Club</button></a>
     `
+    throw new Error('not authenticated')
 }
 
 if (session) {
@@ -382,6 +384,18 @@ function systemMessage(text) {
 socket.on('connect_error', (err) => {
     localStorage.removeItem('session')
     location.reload()
+})
+
+// user list client side stuff
+socket.on('userlist', (users) => {
+    const ul = document.querySelector('#userlist')
+    ul.innerHTML = '<strong>online</strong><br>'
+    users.forEach(u => {
+        const span = document.createElement('div')
+        span.textContent = u.username
+        span.style.color = getNameColor(u.username)
+        ul.appendChild(span)
+    })
 })
 
 }

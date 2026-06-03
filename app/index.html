@@ -13,25 +13,22 @@
     <meta property="og:description" content="the very simple bare minimum chat app">
     <meta name="theme-color" content="#F5A9B8">
 </head>
-<body style="padding-top: 50px;">
-    <!-- <div id="banner" style="position: fixed; top: 0; left: 0; width: 100%; background: darkred; color: white; text-align: center; padding: 7px; font-weight: bold; z-index: 9999;">image sending may be slow, implementation is the most simple/basic that's probably the reason why</div> -->
+<body>
     <h1>chat™</h1>
-    <p id="usercount" style="display:flex; margin: 20px auto 25px auto;">x users online</p>
-    <!-- <p id="notice" style="display:flex; margin: 10px auto 25px auto; color:lightcoral;">image sending may be slow, implementation is the most simple/basic that's probably the reason why</p> -->
-    <!-- <a href="https://chat.emmameowss.gay/login"><button>Login with Hack Club</button></a> -->
-    <form id="username-form" style="position: fixed; top: 16px; right: 110px; display: flex; gap: 8px;">
+    <form id="username-form">
         <input type="text" id="username-input" placeholder="set a username" maxlength="20">
-        <button>set</button>
+        <button type="submit">set</button>
+        <button type="button" id="signout">log out</button>
     </form>
+    <div id="userlist"></div>
     <form id="message-form">
-        <input type="file" accept=".jpg, .jpeg, .png, .gif, .webp, .svg" id="file-input">
-        <input type="text" id="message-input" autocomplete="off" placeholder="Message">
-        <button>send</button>
+        <input type="file" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" id="file-input">
+        <input type="text" id="message-input" autocomplete="off" placeholder="message">
+        <button type="submit">send</button>
     </form>
-    <p id="upload-error" style="color: pink; font-style: italic; display: none; text-align:center;"></p>
-    <p id="upload-status" style="display: none; text-align: center;"></p>
-    <p id="typing-indicator" style="color:gray; font-style:italic; min-height:1em;"></p>
-    <button id="signout" style="position: fixed; top: 16px; right: 16px;">log out</button>
+    <p id="upload-error"></p>
+    <p id="upload-status"></p>
+    <p id="typing-indicator"></p>
     <ul></ul>
 </body>
 </html>
