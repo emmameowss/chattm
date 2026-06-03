@@ -377,4 +377,11 @@ function systemMessage(text) {
     li.style.fontStyle = 'italic'
     appendMessage(li)
 }
+
+// nuke session and reload if unauthenticated
+socket.on('connect_error', (err) => {
+    localStorage.removeItem('session')
+    location.reload()
+})
+
 }
