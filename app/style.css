@@ -180,7 +180,7 @@ a:hover {
 
 #typing-indicator {
   position: fixed;
-  bottom: 56px;
+  bottom: 68px;
   left: 20px;
   font-size: 11px;
   color: var(--muted);
