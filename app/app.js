@@ -10,19 +10,6 @@ let activity = false
 let username = localStorage.getItem('username') || userId.slice(0,5)
 let audioctx = null
 
-// username functionality stuff
-document.querySelector('#username-input').value = username
-
-document.querySelector('#username-form').addEventListener('submit', (e) => {
-    e.preventDefault()
-    const input = document.querySelector('#username-input')
-    if (input.value.trim()) {
-        username = input.value.trim()
-        localStorage.setItem('username', username)
-        socket.emit('setUsername', username)
-    }
-})
-
 // colors
 function getNameColor(name) {
     if (name.toLowerCase() === 'emma') return 'hotpink'
@@ -78,6 +65,19 @@ const maxmessages = 25
 // for testing reasons: 500kb limit
 // const MAX_SIZE = 500 * 1024
 const MAX_SIZE = 10 * 1024 * 1024 // 10mb limit to images
+
+// username functionality stuff
+document.querySelector('#username-input').value = username
+
+document.querySelector('#username-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const input = document.querySelector('#username-input')
+    if (input.value.trim()) {
+        username = input.value.trim()
+        localStorage.setItem('username', username)
+        socket.emit('setUsername', username)
+    }
+})
 
 // move socket joined/left stuff after intialiing socket
 socket.on('userJoined', (name) => { 
