@@ -188,6 +188,8 @@ async function sendMessageNew(e) {
             })
             textInput.value = ""
             fileInput.value = ""
+            document.querySelector('#attach-btn').style.borderColor = ''
+            document.querySelector('#attach-btn').style.color = ''
  } else {
         socket.emit('message', {
             username,
@@ -396,6 +398,18 @@ socket.on('userlist', (users) => {
         span.style.color = getNameColor(u.username)
         ul.appendChild(span)
     })
+})
+
+// file input stuff
+document.querySelector('#attach-btn').addEventListener('click', () => {
+    document.querySelector('#file-input').click()
+})
+
+document.querySelector('#file-input').addEventListener('change', () => {
+    const file = document.querySelector('#file-input').files[0]
+    const btn = document.querySelector('#attach-btn')
+    btn.style.borderColor = file ? 'var(--pink)' : ''
+    btn.style.color = file ? 'var(--pink)' : ''
 })
 
 }
