@@ -145,6 +145,7 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             history.length = 0
             io.emit('clear')
+            pushSystemMessage('chat was cleared')
             return
         }
         const timestamp = new Date().toISOString()
