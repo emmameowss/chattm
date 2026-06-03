@@ -121,7 +121,6 @@ io.on('connection', socket => {
                     s.disconnect()
                 }
             }
-            pushSystemMessage(`${targetUsername} was banned`)
             return
         }
 
@@ -129,7 +128,6 @@ io.on('connection', socket => {
             const targetEmail = data.text.slice(7).trim()
             banlist.delete(targetEmail)
             await saveBans()
-            pushSystemMessage(`${targetEmail} was unbanned`)
             return
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
