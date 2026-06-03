@@ -132,7 +132,7 @@ socket.on('history', (messages) => {
         const li = document.createElement('li')
         const name = data.username
         const namespan = document.createElement('span')
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        const time = data.time
         namespan.style.color = getNameColor(name)
         if (data.isToken) {
            const tag = document.createElement('span')
