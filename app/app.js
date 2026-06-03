@@ -219,10 +219,11 @@ socket.on('connect', () => {
     socket.emit('setUsername', username, token)
 })
 
-
+/*
 socket.on('usercount', (count) => {
     document.querySelector(`#usercount`).textContent = `${count} users online`
 })
+    */
 
 document.querySelector('#message-form').addEventListener('submit', sendMessageNew)
 
@@ -410,6 +411,11 @@ document.querySelector('#file-input').addEventListener('change', () => {
     const btn = document.querySelector('#attach-btn')
     btn.style.borderColor = file ? 'var(--pink)' : ''
     btn.style.color = file ? 'var(--pink)' : ''
+})
+
+// clear chat command
+socket.on('clear', () => {
+    document.querySelector('ul').innerHTML = ''
 })
 
 }
