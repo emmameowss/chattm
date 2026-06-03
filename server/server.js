@@ -139,6 +139,7 @@ io.on('connection', socket => {
         appendFile('messages.log', logEntry)
        const message = {
         ...data,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
         isToken: socket.userEmail === process.env.OWNER_EMAIL
        }
        history.push(message)
