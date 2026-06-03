@@ -420,4 +420,35 @@ socket.on('clear', () => {
     systemMessage('chat was cleared')
 })
 
+// command autocomplete
+const commands = ["/clear"]
+
+document.querySelector('#message-input').addEventListener('input', (e) => {
+    const value = e.target.value
+    const suggestion = document.querySelector('#command-suggestion')
+
+    if (value.startsWith('/')) {
+        const match = commands.find(c => c.startsWith(value))
+        if (match && match !== value) {
+            suggestion.textContent = match
+            suggestion.style.display = 'block'
+        } else {
+            suggestion.style.display = 'none'
+        }
+    } else {
+        suggestion.style.display = 'none'
+    }
+})
+
+document.querySelector('#message-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+        const suggestion = document.querySelector('#command-suggestion')
+        if (suggestion.style.display !== 'none') {
+            e.preventDefault()
+            document.querySelector('#message-input').value = suggestion.textContent
+            suggestion.style.display = 'none'
+        }
+    }
+})
+
 }

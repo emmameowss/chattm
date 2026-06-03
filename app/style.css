@@ -265,3 +265,12 @@ body.login-page a button:hover {
   align-items: center;
   justify-content: center;
 }
+#command-suggestion {
+  position: fixed;
+  bottom: 68px;
+  left: 20px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  pointer-events: none;
+}
