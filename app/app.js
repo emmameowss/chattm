@@ -443,7 +443,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/clear", "/announce ", "/mutechat"]
+const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat"]
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
@@ -516,5 +516,10 @@ socket.on('unmutechat', (ann) => {
     document.querySelector('#message-input').disabled = false
     document.querySelector('#message-form button[type="submit"]').disabled = false
     document.querySelector('#attach-btn').disabled = false
+})
+
+// status
+socket.on('status', (status) => {
+    showStatus(status, 'pink')
 })
 }

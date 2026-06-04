@@ -22,6 +22,7 @@ const CDN_API_KEY = process.env.CDN_API_KEY
 
 let sessions = {}
 let chatMuted = false
+let status = ''
 try {
     const data = await readFile('sessions.json', 'utf8')
     sessions = JSON.parse(data)
@@ -89,6 +90,7 @@ io.on('connection', socket => {
         isOwner: socket.userEmail === process.env.OWNER_EMAIL,
         chatMuted
     })
+    if (status) socket.emit('status', status)
 
 
     if (chatMuted) {
@@ -189,6 +191,11 @@ io.on('connection', socket => {
             const ann = "chat has been unmuted"
             chatMuted = false
             io.emit('unmutechat', ann)
+            return
+        }
+        if (data.text?.startsWith('/status ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            status = data.text.slice(8).trim()
+            socket.emit('status', status)
             return
         }
         const timestamp = new Date().toISOString()
