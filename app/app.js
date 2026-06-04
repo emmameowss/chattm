@@ -490,10 +490,12 @@ socket.on('role', (role) => {
 
 // mute chat
 socket.on('mutechat', (ann) => {
-    systemMessage(ann)
+    if (!isOwner) {
     document.querySelector('#message-input').disabled = true
     document.querySelector('#message-form button[type="submit"]').disabled = true
     document.querySelector('#message-form input[type="file"').disabled = false
+    }
+    systemMessage(ann)
 })
 
 // unmute chat
@@ -501,7 +503,6 @@ socket.on('unmutechat', (ann) => {
     systemMessage(ann)
     document.querySelector('#message-input').disabled = false
     document.querySelector('#message-form button[type="submit"]').disabled = false
-    document.querySelector('#message-form input[type="file"]').disabled = false
+    document.querySelector('#attach-btn').disabled = false
 })
-
 }
