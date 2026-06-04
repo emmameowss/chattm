@@ -155,6 +155,12 @@ io.on('connection', socket => {
             io.emit('clear')
             return
         }
+
+        if (data.text?.startsWith('/announce ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const ann = data.text.slice(10).trim()
+            io.emit('announcement', ann)
+            return
+        }
         const timestamp = new Date().toISOString()
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
         const message = {

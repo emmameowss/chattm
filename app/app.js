@@ -66,6 +66,7 @@ const socket = io(
 )
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
+let announce = false
 // for testing reasons: 500kb limit
 // const MAX_SIZE = 500 * 1024
 const MAX_SIZE = 10 * 1024 * 1024 // 10mb limit to images
@@ -374,15 +375,30 @@ socket.on('banned', () => {
     localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
     location.reload()
 })
+// handle announcement command
+socket.on('announcement', (ann) => {
+    announce = true
+    systemMessage(ann)
+})
 // an iq too high?
 // join/leave messages/system messages
 function systemMessage(text) {
     console.log(text)
+    if (announce) {
+        const li = document.createElement('li')
+        li.textContent = text
+        li.style.color = 'pink'
+        li.style.fontStyle = 'italic'
+        appendMessage(li)
+        announce = false
+    } 
+    else {
     const li = document.createElement('li')
     li.textContent = text
     li.style.color = 'gray'
     li.style.fontStyle = 'italic'
     appendMessage(li)
+    }
 }
 
 // nuke session and reload if unauthenticated
@@ -422,7 +438,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/clear"]
+const commands = ["/clear", "/announce "]
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
