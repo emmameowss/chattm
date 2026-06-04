@@ -87,6 +87,11 @@ io.on('connection', socket => {
     socket.emit('history', history)
     socket.emit('role', { isOwner: socket.userEmail === process.env.OWNER_EMAIL })
 
+    if (chatmuted) {
+        const ann = 'chat is currently muted'
+        io.emit('chatmuted', ann)
+    }
+
     if (socket.userEmail.endsWith('@guest')) {
         const guestUsername = socket.userEmail.replace('@guest', '')
         socket.emit('guestUsername', guestUsername)
@@ -171,7 +176,13 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/mutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
             const ann = "chat has been muted"
             chatMuted = true
-            io.emit(chatMuted ? 'mutechat' : 'unmutechat', chatMuted ? 'chat has been muted' : 'chat has been unmuted', ann)
+            io.emit('mutechat', ann)
+            return
+        }
+        if (data.text?.startsWith('/unmutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const ann = "chat has been unmuted"
+            chatMuted = false
+            io.emit('unmutechat', ann)
             return
         }
         const timestamp = new Date().toISOString()
