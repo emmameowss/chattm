@@ -274,3 +274,13 @@ body.login-page a button:hover {
   font-style: italic;
   pointer-events: none;
 }
+input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}

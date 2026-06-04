@@ -452,4 +452,14 @@ document.querySelector('#message-input').addEventListener('keydown', (e) => {
     }
 })
 
+// guest sign in stuff
+socket.on('guestUsername', (name) => {
+    username = name
+    document.querySelector('#username-input').value = name
+    socket.emit('setUsername', name)
+
+    document.querySelector('#username-input').disabled = true
+    document.querySelector('#username-form button[type="submit"]').disabled = true
+})
+
 }

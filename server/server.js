@@ -85,6 +85,11 @@ io.on('connection', socket => {
     io.emit('usercount', io.engine.clientsCount)
     socket.emit('history', history)
 
+    if (socket.userEmail.endsWith('@guest')) {
+        const guestUsername = socket.userEmail.replace('@guest', '')
+        socket.emit('guestUsername', guestUsername)
+    }
+
     socket.on('setUsername', (name, token) => {
         const prevUser = socket.username
         socket.username = name
