@@ -487,6 +487,7 @@ socket.on('commandError', (msg) => {
 socket.on('init', ({isOwner: owner, chatMuted: muted}) => {
     isOwner = owner
     if (muted && !isOwner) {
+        showStatus(ann, 'pink')
         document.querySelector('#message-input').disabled = true
         document.querySelector('#message-form button[type="submit"]').disabled = true
         document.querySelector('#attach-btn').disabled = true
