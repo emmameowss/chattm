@@ -169,13 +169,13 @@ io.on('connection', socket => {
         }
         if (data.text?.startsWith('/mutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
             const ann = "chat has been muted"
-            chatmuted = true
+            chatMuted = true
             io.emit('mutechat', ann)
             return
         }
         if (data.text?.startsWith('/unmutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
             const ann = "chat has been unmuted"
-            chatmuted = false
+            chatMuted = false
             io.emit('unmutechat', ann)
             return
         }
