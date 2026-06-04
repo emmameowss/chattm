@@ -85,6 +85,7 @@ io.on('connection', socket => {
     console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)
     socket.emit('history', history)
+    socket.emit('role', { isOwner: socket.userEmail === process.env.OWNER_EMAIL })
 
     if (socket.userEmail.endsWith('@guest')) {
         const guestUsername = socket.userEmail.replace('@guest', '')
