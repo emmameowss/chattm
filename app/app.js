@@ -9,6 +9,7 @@ let unread = 0
 let activity = false
 let username = localStorage.getItem('username') || userId.slice(0,5)
 let audioctx = null
+let isOwner = false
 
 // colors
 function getNameColor(name) {
@@ -480,6 +481,11 @@ socket.on('guestUsername', (name) => {
 
 socket.on('commandError', (msg) => {
     showError(msg)
+})
+
+// check owner status on connect
+socket.on('role', (role) => {
+    isOwner = role.isOwner
 })
 
 // mute chat
