@@ -19,6 +19,15 @@ const io = new Server(httpServer, {
 const history = []
 const maxhistory = 25
 const CDN_API_KEY = process.env.CDN_API_KEY
+const userColors = {}
+try {
+    const data = await readFile('colors.json', 'utf-8')
+    Object.assign(userColors, JSON.parse(data))
+} catch (e) {}
+
+async function saveColors() {
+    await writeFile('colors.json', JSON.stringify(userColors))
+}
 
 let sessions = {}
 let chatMuted = false
@@ -57,7 +66,11 @@ async function saveSession(id, data) {
 function emitUserList() {
     const users = []
     for (const [id, s] of io.sockets.sockets) {
-        if (s.username) users.push({ username: s.username, email: s.userEmail })
+        if (s.username) users.push({ 
+            username: s.username, 
+            email: s.userEmail,
+            color: userColors[s.userEmail] || null
+        })
     }
     io.emit('userlist', users)
 }
@@ -198,12 +211,21 @@ io.on('connection', socket => {
             socket.emit('status', status)
             return
         }
+        if (data.text?.startsWith('/color ')) {
+            const color = data.text.slice(7).trim()
+            userColors[socket.userEmail] = color
+            await saveColors()
+            socket.emit('colorChanged', color)
+            emitUserList()
+            return
+        }
         const timestamp = new Date().toISOString()
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
         const message = {
             ...data,
             time: Date.now(),
-            isToken: socket.userEmail === process.env.OWNER_EMAIL
+            isToken: socket.userEmail === process.env.OWNER_EMAIL,
+            color: userColors[socket.userEmail] || null
         }
         history.push(message)
         if (history.length > maxhistory) history.shift()

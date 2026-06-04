@@ -134,20 +134,21 @@ function activitya() {
 socket.on('history', (messages) => {
     messages.forEach(data => {
         const li = document.createElement('li')
-        const name = data.username
+        const ausername = data.username
+        const color = data.color || getNameColor(ausername)
         const namespan = document.createElement('span')
         const time = new Date(data.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        namespan.style.color = getNameColor(name)
+        namespan.style.color = color
         if (data.isToken) {
            const tag = document.createElement('span')
            tag.textContent = '♛ '
            tag.style.color = 'hotpink'
            namespan.appendChild(tag)
         }
-        namespan.appendChild(document.createTextNode(`[${time}] ${name}: `))
+        namespan.appendChild(document.createTextNode(`[${time}] ${ausername}: `))
         li.appendChild(namespan)
         if (data.text) {
-           li.appendChild(functioninglinks(data.text, getNameColor(name)))
+           li.appendChild(functioninglinks(data.text, color))
         }
         if (data.image) {
             const img = document.createElement('img')
@@ -239,20 +240,21 @@ document.addEventListener('visibilitychange', () => {
 })
 socket.on("message", (data) => {
     const li = document.createElement('li')
+    const ausername = data.username
+    const color = data.color || getNameColor(ausername)
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    const name = data.username
     const namespan = document.createElement('span')
-        namespan.style.color = getNameColor(name)
+        namespan.style.color = color
         if (data.isToken) {
         const tag = document.createElement('span')
         tag.textContent = '♛ '
         tag.style.color = 'hotpink'
         namespan.appendChild(tag)
         }
-    namespan.appendChild(document.createTextNode(`[${time}] ${name}: `))
+    namespan.appendChild(document.createTextNode(`[${time}] ${ausername}: `))
     li.appendChild(namespan)
     if (data.text) {
-        li.appendChild(functioninglinks(data.text, getNameColor(name)))
+        li.appendChild(functioninglinks(data.text, color))
     }
     if (data.image) {
         const img = document.createElement('img')
@@ -419,7 +421,7 @@ socket.on('userlist', (users) => {
     users.forEach(u => {
         const span = document.createElement('div')
         span.textContent = u.username
-        span.style.color = getNameColor(u.username)
+        span.style.color = u.color || getNameColor(u.username)
         ul.appendChild(span)
     })
 })
@@ -443,7 +445,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat"]
+const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat", "/color [color]"]
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
@@ -488,7 +490,7 @@ socket.on('commandError', (msg) => {
 })
 
 // check owner status and mute chat status on connect
-socket.on('init', ({isOwner: owner, chatMuted: muted}) => {
+socket.on('init', ({isOwner: owner, chatMuted: muted, color}) => {
     isOwner = owner
     if (muted && !isOwner) {
         showStatus('chat has been muted', 'pink')
@@ -496,6 +498,7 @@ socket.on('init', ({isOwner: owner, chatMuted: muted}) => {
         document.querySelector('#message-form button[type="submit"]').disabled = true
         document.querySelector('#attach-btn').disabled = true
     }
+    if (color) userColor = color
 })
 
 // mute chat
