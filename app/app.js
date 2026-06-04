@@ -204,6 +204,13 @@ async function sendMessageNew(e) {
     textInput.focus()
 }
 
+// force enter to send message
+document.querySelector('#message-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' ** !e.shiftKey) {
+        e.preventDefault()
+        document.querySelector('#message-form').requestSubmit()
+    }
+})
 function appendMessage(li) {
     const ul = document.querySelector('ul')
     ul.appendChild(li)
