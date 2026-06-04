@@ -39,6 +39,7 @@ try {
     sessions = JSON.parse(data)
 } catch (e) {}
 
+
 const types = {
     '.html': 'text/html',
     '.js': 'application/javascript',

@@ -90,6 +90,18 @@ socket.on('userJoined', (name) => {
 socket.on('userLeft', (name) =>  {
     systemMessage(`${name} left`)
 })
+// mute button
+let notifymuted = localStorage.getItem('notifymuted') === 'true'
+const mutebtn = document.querySelector('#mute-btn')
+mutebtn.innerHTML = ''
+mutebtn.classList.toggle('muted', notifymuted)
+
+
+mutebtn.addEventListener('click', () => {
+    notifymuted = !notifymuted
+    localStorage.setItem('notifymuted', notifymuted)
+    mutebtn.classList.toggle('muted', notifymuted)
+})
 
 // typing indicator stuff
 let typeTimeout
@@ -265,8 +277,8 @@ socket.on("message", (data) => {
     }
 
     appendMessage(li)
-    if (document.hidden) {
-       beep()
+    if (document.hidden && !notifymuted) {
+        beep()
     }
 
     if (document.hidden) {

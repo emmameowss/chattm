@@ -295,3 +295,12 @@ input:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+#mute-btn::before {
+    font-family: 'tabler-icons';
+    content: '\ea35';
+}
+
+#mute-btn.muted::before {
+    content: '\ece9'; /* ti-bell-off */
+}
