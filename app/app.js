@@ -67,8 +67,6 @@ const socket = io(
 const resetId = document.querySelector("#resetid")
 const maxmessages = 25
 let announce = false
-// for testing reasons: 500kb limit
-// const MAX_SIZE = 500 * 1024
 const MAX_SIZE = 10 * 1024 * 1024 // 10mb limit to images
 
 // username functionality stuff
