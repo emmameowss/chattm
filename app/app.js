@@ -174,7 +174,7 @@ async function sendMessageNew(e) {
 
     if (file) {
         if (file.size > MAX_SIZE) {
-            showUploadError('image too big (max is 10mb)')
+            showError('image too big (max is 10mb)')
             fileInput.value = ''
             return
         }
@@ -324,7 +324,7 @@ function functioninglinks(text, color) {
 }
 
 // upload error stuff
-function showUploadError(msg) {
+function showError(msg) {
     const e = document.querySelector('#upload-error')
     e.textContent = msg
     e.style.display = 'block'
@@ -486,7 +486,7 @@ socket.on('guestUsername', (name) => {
 })
 
 socket.on('commandError', (msg) => {
-    showUploadError(msg)
+    showError(msg)
 })
 
 }
