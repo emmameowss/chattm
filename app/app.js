@@ -525,4 +525,10 @@ socket.on('unmutechat', (ann) => {
 socket.on('status', (status) => {
     showStatus(status, 'pink')
 })
+
+// color status
+socket.on('colorChanged', (color) => {
+    showStatus(`name color changed to ${color.toString()}`, 'pink')
+    setTimeout(hideStatus, 3000)
+})
 }
