@@ -123,7 +123,7 @@ io.on('connection', socket => {
 
     socket.on('message', async (data) => {
 
-        if (data.text.startsWith('/') && socket.userEmail !== process.env.OWNER_EMAIL) {
+        if (data.text?.startsWith('/') && socket.userEmail !== process.env.OWNER_EMAIL) {
             socket.emit('commandError', "you don't have permission to use commands")
             return
         }
