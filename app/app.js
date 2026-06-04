@@ -483,9 +483,14 @@ socket.on('commandError', (msg) => {
     showError(msg)
 })
 
-// check owner status on connect
-socket.on('role', (role) => {
-    isOwner = role.isOwner
+// check owner status and mute chat status on connect
+socket.on('init', ({isOwner: owner, chatMuted: muted}) => {
+    isOwner = owner
+    if (muted ** !isOwner) {
+        document.querySelector('#message-input').disabled = true
+        document.querySelector('#message-form button[type="submit"]').disabled = true
+        document.querySelector('#attach-btn').disabled = true
+    }
 })
 
 // mute chat

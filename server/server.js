@@ -85,7 +85,11 @@ io.on('connection', socket => {
     console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)
     socket.emit('history', history)
-    socket.emit('role', { isOwner: socket.userEmail === process.env.OWNER_EMAIL })
+    socket.emit('init', { 
+        isOwner: socket.userEmail === process.env.OWNER_EMAIL,
+        chatMuted
+    })
+
 
     if (chatMuted) {
         const ann = 'chat is currently muted'
