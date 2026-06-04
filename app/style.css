@@ -34,8 +34,13 @@ h1 {
   position: fixed;
   top: 12px;
   left: 16px;
+  right: auto;
   padding: 0;
   line-height: 28px;
+  z-index: 200;
+  background: var(--bg);
+  padding: 0 16px 0 0;
+  text-align: left;
 }
 
 form {
@@ -146,6 +151,7 @@ button:active {
 }
 
 ul {
+  padding-top: 50px;
   list-style: none;
   padding: 70px 280px 80px 20px;
   max-width: calc(100% - 130px);
