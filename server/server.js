@@ -87,9 +87,9 @@ io.on('connection', socket => {
     socket.emit('history', history)
     socket.emit('role', { isOwner: socket.userEmail === process.env.OWNER_EMAIL })
 
-    if (chatmuted) {
+    if (chatMuted) {
         const ann = 'chat is currently muted'
-        io.emit('chatmuted', ann)
+        socket.emit('chatmuted', ann)
     }
 
     if (socket.userEmail.endsWith('@guest')) {
