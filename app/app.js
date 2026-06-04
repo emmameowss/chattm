@@ -493,7 +493,7 @@ socket.on('mutechat', (ann) => {
     if (!isOwner) {
     document.querySelector('#message-input').disabled = true
     document.querySelector('#message-form button[type="submit"]').disabled = true
-    document.querySelector('#message-form input[type="file"').disabled = false
+    document.querySelector('#attach-btn').disabled = false
     }
     systemMessage(ann)
     showStatus(ann, 'pink')
