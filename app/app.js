@@ -462,4 +462,8 @@ socket.on('guestUsername', (name) => {
     document.querySelector('#username-form button[type="submit"]').disabled = true
 })
 
+socket.on('commandError', (msg) => {
+    showUploadError(msg)
+})
+
 }

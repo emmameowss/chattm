@@ -122,6 +122,11 @@ io.on('connection', socket => {
     })
 
     socket.on('message', async (data) => {
+
+        if (data.text.startsWith('/') && socket.userEmail !== process.env.OWNER_EMAIL) {
+            socket.emit('commandError', "you don't have permission to use commands")
+            return
+        }
         // /ban command
         if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetEmail = data.text.slice(5).trim()
