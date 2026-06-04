@@ -229,11 +229,6 @@ socket.on('connect', () => {
     socket.emit('setUsername', username, token)
 })
 
-/*
-socket.on('usercount', (count) => {
-    document.querySelector(`#usercount`).textContent = `${count} users online`
-})
-    */
 
 document.querySelector('#message-form').addEventListener('submit', sendMessageNew)
 
