@@ -98,15 +98,16 @@ io.on('connection', socket => {
 
     if (socket.userEmail.endsWith('@guest')) {
         const guestUsername = socket.userEmail.replace('@guest', '')
+        socket.username = guestUsername
         socket.emit('guestUsername', guestUsername)
+        emitUserList()
     }
 
-    socket.on('setUsername', (name, token) => {
+    socket.on('setUsername', (name, guest) => {
         const prevUser = socket.username
         socket.username = name
-        socket.isToken = token === process.env.TOKEN
         if (prevUser && prevUser !== name) {
-            socket.broadcast.emit('userRenamed', { from: prevUser, to: name })
+            socket.broadcast.emit('userRenamed', { from: prevUser, to: name }, guest)
         }
         emitUserList()
     })

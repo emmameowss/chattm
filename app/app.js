@@ -279,8 +279,12 @@ socket.on("message", (data) => {
         }
     })
 // user renamed message
-socket.on('userRenamed', ({from, to}) => {
-    systemMessage(`${from} changed their username to ${to}`)
+socket.on('userRenamed', ({from, to}, guest) => {
+    if (guest) {
+        return
+    } else {
+        systemMessage(`${from} changed their username to ${to}`)
+    }
 })
 
 // cdn/image stuff
@@ -468,12 +472,12 @@ document.querySelector('#message-input').addEventListener('keydown', (e) => {
         }
     }
 })
-
 // guest sign in stuff
-socket.on('guestUsername', (name) => {
+socket.on('guestUsername', (name, guest) => {
     username = name
+    guest = true
     document.querySelector('#username-input').value = name
-    socket.emit('setUsername', name)
+    socket.emit('setUsername', name, guest)
 
     document.querySelector('#username-input').disabled = true
     document.querySelector('#username-form button[type="submit"]').disabled = true
