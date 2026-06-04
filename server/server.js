@@ -29,6 +29,8 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
+const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat']
+
 let sessions = {}
 let chatMuted = false
 let status = ''
@@ -156,8 +158,8 @@ io.on('connection', socket => {
             return
         }
 
-        if (data.text?.startsWith('/') && socket.userEmail !== process.env.OWNER_EMAIL) {
-            socket.emit('commandError', "you don't have permission to use commands")
+        if (ownercmds.some(cmd => data.text.startsWith(cmd))) {
+            socket.emit('commandError', 'you do not have permission to use commands')
             return
         }
         // /ban command
