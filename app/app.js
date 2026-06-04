@@ -48,11 +48,11 @@ if (!session) {
 if (session) {
 if (localStorage.getItem('banned')) {
     // localStorage.removeItem('banned')
-    showUploadStatus('you have been banned', 'red')
+    showStatus('you have been banned', 'red')
 } else if (sessionStorage.getItem('newlogin')) {
     sessionStorage.removeItem('newlogin')
-    showUploadStatus("welcome to chat™, set your username above if you haven't", 'pink')
-    setTimeout(hideUploadStatus, 3000)
+    showStatus("welcome to chat™, set your username above if you haven't", 'pink')
+    setTimeout(hideStatus, 3000)
 }
 
 
@@ -177,10 +177,10 @@ async function sendMessageNew(e) {
             return
         }
 
-        showUploadStatus('uploading...')
+        showStatus('uploading...')
         const imageUrl = await uploadImage(file)
-        showUploadStatus('uploaded!', 'pink')
-        setTimeout(hideUploadStatus, 3000)
+        showStatus('uploaded!', 'pink')
+        setTimeout(hideStatus, 3000)
 
             socket.emit('message', {
                 username,
@@ -327,15 +327,15 @@ function showError(msg) {
     }, 3000)
 }
 
-// upload status stuff
-function showUploadStatus(msg, color = 'gray') {
+// status stuff
+function showStatus(msg, color = 'gray') {
     const e = document.querySelector('#upload-status')
     e.textContent = msg
     e.style.display = 'block'
     e.style.color = color || 'gray'
 }
 
-function hideUploadStatus() {
+function hideStatus() {
     const e = document.querySelector('#upload-status')
     e.style.display = 'none'
     e.textContent = ''
