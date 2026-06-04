@@ -40,6 +40,7 @@ if (!session) {
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
         <a href="/login"><button>login with Hack Club</button></a>
+        <a href="/guest"><button>continue as guest</button></a>
     `
     throw new Error('not authenticated')
 }

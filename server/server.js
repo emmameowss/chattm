@@ -65,6 +65,16 @@ io.use((socket, next) => {
     const user = sessions[sessionId]
     if (!user) return next(new Error('not authenticated'))
     if (banlist.has(user.email)) return next(new Error('banned'))
+    
+    // guest expiry stuff
+    if (user.guest) {
+        const today = new Date().toISOString().slice(0,10)
+        if (user.expires !== today) {
+            delete sessions[sessionId]
+            writeFile('sessions.json', JSON.stringify(sessions))
+            return next(new Error('not authenticated'))
+        }
+    }
     socket.userEmail = user.email
     socket.username = null
     next()
