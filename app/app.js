@@ -496,11 +496,13 @@ socket.on('mutechat', (ann) => {
     document.querySelector('#message-form input[type="file"').disabled = false
     }
     systemMessage(ann)
+    showStatus(ann, 'pink')
 })
 
 // unmute chat
 socket.on('unmutechat', (ann) => {
     systemMessage(ann)
+    hideStatus()
     document.querySelector('#message-input').disabled = false
     document.querySelector('#message-form button[type="submit"]').disabled = false
     document.querySelector('#attach-btn').disabled = false
