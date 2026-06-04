@@ -2,7 +2,7 @@
 
 ### an incredibly simple literally bare minimum chat app
 
-![interface of the site](https://cdn.hackclub.com/019e8027-6599-7668-bd82-ab9c84d20e58/CleanShot%202026-06-01%20at%2000.28.33@2x.png)
+![interface of the site](https://cdn.hackclub.com/019e93b3-806e-702a-b857-b302d5e2b877/cleanshot_2026-06-04_at_19.34.14_2x.png)
 
 available at: https://chat.emmameowss.gay, currently supports images and text, please note that images are now permanently saved while ~~the most recent 25 text messages are saved and disappear upon server restart~~ all text messages are now stored forever
 
@@ -21,7 +21,7 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 - usernames
 - name colors
 - basic text and image sending
-- crappy ui
+- ~~crappy~~ a better ui
 - timestamps in messages
 - an active user counter
 - an unread message counter in the title of the tab
@@ -34,6 +34,9 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 - file size error
 - message sound effect
 - HCA sign in
+- guest sign in
+- command autocomplete
+- a user list
 
 ## planned features
 - ~~message history~~
