@@ -240,6 +240,22 @@ httpServer.on('request', async (req, res) => {
         return
     }
 
+    if (url.pathname === '/guest') {
+        const guestId = randomBytes(3).toString('hex')
+        const today = new Date().toISOString().slice(0,10)
+        const sessionid = randomBytes(32).toString('hex')
+        const guestUsername = `guest-${guestId}`
+        await saveSession(sessionid, {
+            email: `guest-${guestId}@guest`,
+            guest: true,
+            expires: today
+        })
+        const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
+        res.writeHead(302, {Location: redirectUrl})
+        res.end()
+        return
+    }
+
     if (req.method === 'GET') {
         let filePath = url.pathname === '/' ? '/index.html' : url.pathname
         try {
