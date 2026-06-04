@@ -21,6 +21,7 @@ const maxhistory = 25
 const CDN_API_KEY = process.env.CDN_API_KEY
 
 let sessions = {}
+let chatmuted = false
 try {
     const data = await readFile('sessions.json', 'utf8')
     sessions = JSON.parse(data)
@@ -123,6 +124,11 @@ io.on('connection', socket => {
 
     socket.on('message', async (data) => {
 
+        if (chatMuted && socket.userEmail !== process.env.OWNER_EMAIL) {
+            socket.emit('commandError', "chat is currently muted") // disabled input should prevent messages, this is in case it fails
+            return
+        }
+
         if (data.text?.startsWith('/') && socket.userEmail !== process.env.OWNER_EMAIL) {
             socket.emit('commandError', "you don't have permission to use commands")
             return
@@ -159,6 +165,18 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/announce ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const ann = data.text.slice(10).trim()
             io.emit('announcement', ann)
+            return
+        }
+        if (data.text?.startsWith('/mutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const ann = "chat has been muted"
+            chatmuted = true
+            io.emit('mutechat', ann)
+            return
+        }
+        if (data.text?.startsWith('/unmutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const ann = "chat has been unmuted"
+            chatmuted = false
+            io.emit('unmutechat', ann)
             return
         }
         const timestamp = new Date().toISOString()

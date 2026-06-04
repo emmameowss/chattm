@@ -279,7 +279,12 @@ input:disabled {
     cursor: not-allowed;
 }
 
-button:disabled {
+#username-form button[type="submit"]:disabled {
     display: none;
     pointer-events: none;
+}
+#message-form button[type="submit"]:disabled {
+  pointer-events: none;
+  opacity: 0.4;
+  cursor: not-allowed;
 }

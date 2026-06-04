@@ -438,7 +438,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/clear", "/announce "]
+const commands = ["/clear", "/announce ", "/mutechat"]
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
@@ -480,6 +480,22 @@ socket.on('guestUsername', (name) => {
 
 socket.on('commandError', (msg) => {
     showError(msg)
+})
+
+// mute chat
+socket.on('mutechat', (ann) => {
+    systemMessage(ann)
+    document.querySelector('#message-input').disabled = true
+    document.querySelector('#message-form button[type="submit"]').disabled = true
+    document.querySelector('#message-form input[type="file"').disabled = false
+})
+
+// unmute chat
+socket.on('unmutechat', (ann) => {
+    systemMessage(ann)
+    document.querySelector('#message-input').disabled = false
+    document.querySelector('#message-form button[type="submit"]').disabled = false
+    document.querySelector('#message-form input[type="file"]').disabled = false
 })
 
 }
