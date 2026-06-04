@@ -2,6 +2,7 @@
 logs
 *.log
 bans.txt
+sessions.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

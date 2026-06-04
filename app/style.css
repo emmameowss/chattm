@@ -280,7 +280,6 @@ input:disabled {
 }
 
 button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+    display: none;
     pointer-events: none;
 }
