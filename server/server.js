@@ -158,10 +158,12 @@ io.on('connection', socket => {
             return
         }
 
-        if (ownercmds.some(cmd => data.text.startsWith(cmd))) {
-            socket.emit('commandError', 'you do not have permission to use commands')
-            return
-        }
+        if (data.text?.startsWith('/') && socket.userEmail !== process.env.OWNER_EMAIL) {
+            if (ownercmds.some(cmd => data.text.startsWith(cmd))) {
+                socket.emit('commandError', 'you do not have permission to use commands')
+                return
+    }
+}
         // /ban command
         if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetEmail = data.text.slice(5).trim()

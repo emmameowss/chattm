@@ -147,8 +147,8 @@ button:active {
 
 ul {
   list-style: none;
-  padding: 70px 20px 80px;
-  max-width: 760px;
+  padding: 70px 280px 80px 20px;
+  max-width: calc(100% - 130px);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -158,7 +158,8 @@ ul {
 li {
   font-size: 13px;
   line-height: 1.7;
-  word-break: break-word;
+  word-break: break-all;
+  overflow-wrap: anywhere;
   padding: 2px 0;
 }
 
