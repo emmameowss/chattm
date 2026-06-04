@@ -21,7 +21,7 @@ const maxhistory = 25
 const CDN_API_KEY = process.env.CDN_API_KEY
 
 let sessions = {}
-let chatmuted = false
+let chatMuted = false
 try {
     const data = await readFile('sessions.json', 'utf8')
     sessions = JSON.parse(data)
