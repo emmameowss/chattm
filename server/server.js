@@ -170,13 +170,7 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/mutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
             const ann = "chat has been muted"
             chatMuted = true
-            io.emit('mutechat', ann)
-            return
-        }
-        if (data.text?.startsWith('/unmutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
-            const ann = "chat has been unmuted"
-            chatMuted = false
-            io.emit('unmutechat', ann)
+            io.emit(chatMuted ? 'mutechat' : 'unmutechat', chatMuted ? 'chat has been muted' : 'chat has been unmuted', ann)
             return
         }
         const timestamp = new Date().toISOString()
