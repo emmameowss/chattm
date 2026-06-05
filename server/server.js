@@ -18,6 +18,8 @@ const io = new Server(httpServer, {
 
 const history = []
 const maxhistory = 25
+const msgcooldown = 1000
+const lastmessage = {}
 const CDN_API_KEY = process.env.CDN_API_KEY
 const userColors = {}
 try {
@@ -99,6 +101,7 @@ io.use((socket, next) => {
 })
 
 io.on('connection', socket => {
+    let lastMessage = 0
     console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)
     socket.emit('history', history)
@@ -153,6 +156,13 @@ io.on('connection', socket => {
     })
 
     socket.on('message', async (data) => {
+
+        const now = Date.now()
+        if (lastmessage[socket.userEmail] && now - lastmessage[socket.userEmail] < msgcooldown) {
+            socket.emit('commandError', 'slow down')
+            return
+        }
+        lastmessage[socket.userEmail] = now
 
         if (chatMuted && socket.userEmail !== process.env.OWNER_EMAIL) {
             socket.emit('commandError', "chat is currently muted") // disabled input should prevent messages, this is in case it fails
@@ -310,6 +320,12 @@ httpServer.on('request', async (req, res) => {
             }
             try {
                 const file = files.file[0]
+                const allowedtypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+                if (!allowedtypes.includes(file.mimetype)) {
+                    res.writeHead(400)
+                    res.end(JSON.stringify({error: "non image files are banned"}))
+                    return
+                }
                 const fileBuffer = await readFile(file.filepath)
                 const blob = new Blob([fileBuffer])
                 const formData = new FormData()
