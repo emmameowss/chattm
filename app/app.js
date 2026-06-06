@@ -288,7 +288,6 @@ socket.on("message", (data) => {
     timespan.className = 'msg-time'
     timespan.textContent = `[${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}]`
     const namespan = document.createElement('span')
-    applyFlagColor(namespan,color)
     applyFlagColor(timespan, color)
     if (data.isToken) {
         const tag = document.createElement('span')
@@ -298,7 +297,12 @@ socket.on("message", (data) => {
         }
     li.appendChild(timespan)
     li.appendChild(namespan)
-    namespan.appendChild(document.createTextNode(`${ausername}: `))
+    const nametext = document.createElement('span')
+    nametext.textContent = ausername
+    applyFlagColor(nametext, color)
+    nametext.style.display = 'inline-block'
+    namespan.appendChild(nametext)
+    namespan.appendChild(document.createTextNode(': '))
     if (data.text) {
         li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
     }
