@@ -108,7 +108,7 @@ const socket = io(
 const resetId = document.querySelector("#resetid")
 const maxmessages = 20
 let announce = false
-const MAX_SIZE = 10 * 1024 * 1024 // 10mb limit to images
+const MAX_SIZE = 50 * 1024 * 1024 // 10mb limit to images
 
 // username functionality stuff
 document.querySelector('#username-input').value = username
@@ -234,32 +234,31 @@ async function sendMessageNew(e) {
 
     if (file) {
         if (file.size > MAX_SIZE) {
-            showError('image too big (max is 10mb)')
-            fileInput.value = ''
+            showError('file too big (max is 50mb)')
+            fileInput.value('')
             return
         }
-
+        const isImage = file.type.startsWith('image/')
         showStatus('uploading...')
-        const imageUrl = await uploadImage(file)
+        const url = await uploadImage(file)
         showStatus('uploaded!', 'pink')
         setTimeout(hideStatus, 3000)
-
-            socket.emit('message', {
-                username,
-                text: textInput.value || null,
-                image: imageUrl
-            })
-            textInput.value = ""
-            fileInput.value = ""
-            document.querySelector('#attach-btn').style.borderColor = ''
-            document.querySelector('#attach-btn').style.color = ''
- } else {
+        socket.emit('message', {
+            username, 
+            text: isImage ? (textInput.value || null) : `${file.name}: ${url}`,
+            image: isImage ? url : null
+        })
+        textInput.value = ''
+        fileInput.value = ''
+        document.querySelector('#attach-btn').style.borderColor = ''
+        document.querySelector('#attach-btn').style.color = ''
+    } else {
         socket.emit('message', {
             username,
             text: textInput.value,
             image: null
         })
-        textInput.value = ""
+        textInput.value = ''
     }
     textInput.focus()
 }
