@@ -167,16 +167,12 @@ li {
   word-break: break-all;
   overflow-wrap: anywhere;
   padding: 2px 0;
-  position: relative;
 }
 
 .msg-time {
   display: none;
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
   font-size: 11px;
+  margin-right: 6px;
   color: var(--muted);
   background: var(--bg);
   padding: 0 4px 0 8px;
