@@ -485,11 +485,13 @@ socket.on('userlist', (users) => {
     const ul = document.querySelector('#userlist')
     ul.innerHTML = '<strong>online</strong><br>'
     users.forEach(u => {
-        const span = document.createElement('div')
-        span.textContent = u.username
-        span.style.display = 'inline-block'
-        applyFlagColor(span, u.color || getNameColor(u.username))
-        ul.appendChild(span)
+        const div = document.createElement('div')
+        const inner = document.createElement('span')
+        inner.textContent = u.username
+        inner.style.display = 'inline-block'
+        applyFlagColor(inner, u.color || getNameColor(u.username))
+        div.appendChild(inner)
+        ul.appendChild(div)
     })
 })
 

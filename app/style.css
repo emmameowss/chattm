@@ -249,6 +249,8 @@ a:hover {
 #userlist div {
   padding: 0;
   font-size: 12px;
+  display: block;
+  clear: both;
 }
 
 ::-webkit-scrollbar { width: 4px; }
