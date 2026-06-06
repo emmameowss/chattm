@@ -341,6 +341,9 @@ input:disabled {
     flex: 1;
     width: auto;
   }
+  input[type="text"] {
+    font-size: 16px
+  }
   #message-form {
     bottom: 0;
     padding: 8px 12px;
