@@ -179,16 +179,20 @@ socket.on('history', (messages) => {
         timespan.className = 'msg-time'
         timespan.textContent = `[${new Date(data.time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}]`
         applyFlagColor(timespan, color)
-        applyFlagColor(namespan,color)
         if (data.isToken) {
            const tag = document.createElement('span')
            tag.textContent = '♛ '
            tag.style.color = 'hotpink'
            namespan.appendChild(tag)
         }
-        namespan.appendChild(document.createTextNode(`${ausername}: `))
         li.appendChild(timespan)
         li.appendChild(namespan)
+        const nametext = document.createElement('span')
+        nametext.textContent = ausername
+        applyFlagColor(nametext, color)
+        nametext.style.display = 'inline-block'
+        namespan.appendChild(nametext)
+        namespan.appendChild(document.createTextNode(': '))
         if (data.text) {
            li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
         }
