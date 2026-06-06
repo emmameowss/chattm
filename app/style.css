@@ -327,3 +327,67 @@ input:disabled {
 #mute-btn.muted::before {
     content: '\ece9'; /* ti-bell-off */
 }
+
+@media (max-width: 600px) {
+  h1 {
+    font-size: 12px;
+    top: 10px;
+    left: 12px;
+  }
+  #username-form {
+    top: auto;
+    bottom: 60px;
+    right: 0;
+    left: 0;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+    z-index: 101;
+  }
+  #username-form input[type="text"] {
+    flex: 1;
+    width: auto;
+  }
+  #message-form {
+    bottom: 0;
+    padding: 8px 12px;
+  }
+  ul {
+    padding: 44px 12px 130px 12px;
+    max-width: 100%;
+  }
+  #userlist {
+    position: fixed;
+    top: 8px;
+    right: 12px;
+    max-width: 120px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px;
+  }
+  #userlist strong {
+    display: none;
+  }
+  #userlist div {
+    display: inline;
+    font-size: 11px;
+  }
+  #userlist div::after {
+    content: ' ';
+  }
+  #typing-indicator, #command-suggestion {
+    bottom: 128px;
+    left: 12px;
+    font-size: 10px;
+  }
+  #upload-error, #upload-status {
+    bottom: 132px;
+  }
+  li {
+    font-size: 12px;
+  }
+}
