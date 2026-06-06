@@ -318,7 +318,7 @@ socket.on("message", (data) => {
             document.title = 'chat™'
         }
     })
-// user renamed message
+// user renamed status
 socket.on('userRenamed', ({from, to}, guest) => {
     if (guest) {
         return
@@ -328,6 +328,7 @@ socket.on('userRenamed', ({from, to}, guest) => {
     }
 })
 
+// user renamed system message
 socket.on('userRenamedSys', ({from, to}, guest) => {
     if (guest) {
         return
