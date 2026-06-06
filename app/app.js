@@ -179,7 +179,7 @@ socket.on('history', (messages) => {
         const namespan = document.createElement('span')
         const timespan = document.createElement('span')
         timespan.className = 'msg-time'
-        timespan.textContent = `[${new Date(data.time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}]`
+        timespan.textContent = `[${new Date(Number(data.time)).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}]`
         applyFlagColor(timespan, color)
         if (data.isToken) {
            const tag = document.createElement('span')
