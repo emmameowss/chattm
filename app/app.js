@@ -175,7 +175,7 @@ socket.on('history', (messages) => {
         const ausername = data.username
         const color = data.color || getNameColor(ausername)
         const namespan = document.createElement('span')
-        const time = new Date(data.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        const timespan = document.createElement('span')
         applyFlagColor(namespan,color)
         if (data.isToken) {
            const tag = document.createElement('span')
@@ -183,8 +183,11 @@ socket.on('history', (messages) => {
            tag.style.color = 'hotpink'
            namespan.appendChild(tag)
         }
-        namespan.appendChild(document.createTextNode(`[${time}] ${ausername}: `))
+        namespan.appendChild(document.createTextNode(`${ausername}: `))
         li.appendChild(namespan)
+        timespan.className = 'msg-time'
+        timespan.textContent = new Date(data.time).toLocaleString([], {hour: '2-digit', minute: '2-digit'})
+        li.appendChild(timespan)
         if (data.text) {
            li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
         }
@@ -280,7 +283,7 @@ socket.on("message", (data) => {
     const li = document.createElement('li')
     const ausername = data.username
     const color = data.color || getNameColor(ausername)
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const timespan = document.createElement('span')
     const namespan = document.createElement('span')
     applyFlagColor(namespan,color)
     if (data.isToken) {
@@ -289,8 +292,11 @@ socket.on("message", (data) => {
         tag.style.color = 'hotpink'
         namespan.appendChild(tag)
         }
-    namespan.appendChild(document.createTextNode(`[${time}] ${ausername}: `))
     li.appendChild(namespan)
+    timespan.className = 'msg-time'
+    timespan.textContent = new Date(data.time).toLocaleString([], {hour: '2-digit', minute: '2-digit'})
+    namespan.appendChild(document.createTextNode(`${ausername}: `))
+    li.appendChild(timespan)
     if (data.text) {
         li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
     }
