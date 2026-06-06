@@ -260,7 +260,7 @@ io.on('connection', socket => {
 httpServer.on('request', async (req, res) => {
     if (req.url.includes('socket.io')) return
 
-    const url = new URL(req.url, 'https://chat.emmameowss.gay')
+    const url = new URL(req.url, `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`)
 
     if (url.pathname === '/login') {
         const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
@@ -339,7 +339,7 @@ httpServer.on('request', async (req, res) => {
                     'application/json', 'text/csv',
                     'image/vnd.adobe.photoshop', 'application/figma'
                ]
-                if (!allowedtypes.includes(file.mimetype)) {
+                if (!allowedTypes.includes(file.mimetype)) {
                     res.writeHead(400)
                     res.end(JSON.stringify({error: "file type not allowed"}))
                     return

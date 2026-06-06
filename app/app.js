@@ -370,7 +370,7 @@ socket.on('userRenamedSys', ({from, to}, guest) => {
 async function uploadFile(file) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await fetch('https://chat.emmameowss.gay/upload', {
+    const res = await fetch(`${window.location.origin}/upload`, {
         method: 'POST',
         body: formData
     })
