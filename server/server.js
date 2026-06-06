@@ -329,10 +329,19 @@ httpServer.on('request', async (req, res) => {
             }
             try {
                 const file = files.file[0]
-                const allowedtypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+                const allowedTypes = [
+                    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+                    'video/mp4', 'video/quicktime',
+                    'audio/mpeg', 'audio/ogg', 'audio/wav',
+                    'application/pdf', 'text/plain', 'text/markdown',
+                    'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+                    'application/x-tar', 'application/gzip',
+                    'application/json', 'text/csv',
+                    'image/vnd.adobe.photoshop', 'application/figma'
+               ]
                 if (!allowedtypes.includes(file.mimetype)) {
                     res.writeHead(400)
-                    res.end(JSON.stringify({error: "non image files are banned"}))
+                    res.end(JSON.stringify({error: "file type not allowed"}))
                     return
                 }
                 const fileBuffer = await readFile(file.filepath)

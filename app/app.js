@@ -240,7 +240,7 @@ async function sendMessageNew(e) {
         }
         const isImage = file.type.startsWith('image/')
         showStatus('uploading...')
-        const url = await uploadImage(file)
+        const url = await uploadFIle(file)
         showStatus('uploaded!', 'pink')
         setTimeout(hideStatus, 3000)
         socket.emit('message', {
@@ -367,7 +367,7 @@ socket.on('userRenamedSys', ({from, to}, guest) => {
 }) 
 
 // cdn/image stuff
-async function uploadImage(file) {
+async function uploadFile(file) {
     const formData = new FormData()
     formData.append('file', file)
     const res = await fetch('https://chat.emmameowss.gay/upload', {
