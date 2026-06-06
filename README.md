@@ -1,6 +1,6 @@
 # chat™
 
-### an incredibly simple literally bare minimum chat app
+### an incredibly simple chat app
 
 ![interface of the site](https://cdn.hackclub.com/019e93b3-806e-702a-b857-b302d5e2b877/cleanshot_2026-06-04_at_19.34.14_2x.png)
 
@@ -22,6 +22,7 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 - name colors
 - basic text and image sending
 - ~~crappy~~ a better ui
+- better mobile ui
 - timestamps in messages
 - an active user counter
 - an unread message counter in the title of the tab
@@ -37,6 +38,9 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 - guest sign in
 - command autocomplete
 - a user list
+- zooming images
+- timestamp hovering over
+- pride flag name colors
 
 ## planned features
 - ~~message history~~
