@@ -613,4 +613,21 @@ socket.on('colorChanged', (color) => {
     showStatus(`name color changed to ${display}`, 'pink')
     setTimeout(hideStatus, 3000)
 })
+
+// color picker stuff
+const colorBtn = document.querySelector('#color-btn')
+const colorInput = document.querySelector('#color-input')
+
+colorBtn.addEventListener('click', () => {
+    const rect = colorBtn.getBoundingClientRect()
+    colorInput.style.position = 'fixed'
+    colorInput.style.top = `${rect.bottom + 4}px`
+    colorInput.style.left = `${rect.left}px`
+    colorInput.click()
+})
+
+colorInput.addEventListener('change', (e) => {
+    socket.emit('message', { text: `/color ${e.target.value}` })
+})
+
 }
