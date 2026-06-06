@@ -17,7 +17,7 @@ const io = new Server(httpServer, {
 })
 
 const history = []
-const maxhistory = 25
+const maxhistory = 20
 const msgcooldown = 1000
 const lastmessage = {}
 const CDN_API_KEY = process.env.CDN_API_KEY

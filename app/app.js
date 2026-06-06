@@ -22,6 +22,18 @@ function getNameColor(name) {
     return `hsl(${hash % 360}, 70%, 65%)`
 }
 
+// lightbox
+function lightbox(src) {
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;display:flex;align-items:center;justify-content:center;cursor:zoom-out'
+    const img = document.createElement('img')
+    img.src = src
+    img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:6px;object-fit:contain'
+    overlay.appendChild(img)
+    overlay.addEventListener('click', () => overlay.remove())
+    document.body.appendChild(overlay)
+}
+
 const flags = {
     'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
     'flag:trans':       'linear-gradient(90deg,#55cdfc,#f7a8b8,#fff,#f7a8b8,#55cdfc)',
@@ -94,7 +106,7 @@ const socket = io(
     }
 )
 const resetId = document.querySelector("#resetid")
-const maxmessages = 25
+const maxmessages = 20
 let announce = false
 const MAX_SIZE = 10 * 1024 * 1024 // 10mb limit to images
 
@@ -201,8 +213,8 @@ socket.on('history', (messages) => {
         if (data.image) {
             const img = document.createElement('img')
             img.src = data.image
-            img.style.maxWidth = '300px'
-            img.style.display = 'block'
+            img.style.cssText = 'max-width:300px;display:block;cursor:zoom-in'
+            img.addEventListener('click', () => lightbox(data.image))
             li.appendChild(img)
         }
         appendMessage(li)
@@ -315,8 +327,8 @@ socket.on("message", (data) => {
     if (data.image) {
         const img = document.createElement('img')
         img.src = data.image
-        img.style.maxWidth = '300px'
-        img.style.display = 'block'
+        img.style.cssText = 'max-width:300px;display:block;cursor:zoom-in'
+        img.addEventListener('click', () => lightbox(data.image))
         li.appendChild(img)
     }
 
