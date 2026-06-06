@@ -359,6 +359,9 @@ input:disabled {
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 11px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
   }
   #userlist strong {
     display: none;
