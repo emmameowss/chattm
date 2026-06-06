@@ -244,8 +244,8 @@ async function sendMessageNew(e) {
         showStatus('uploaded!', 'pink')
         setTimeout(hideStatus, 3000)
         socket.emit('message', {
-            username, 
-            text: isImage ? (textInput.value || null) : `${file.name}: ${url}`,
+            username,
+            text: isImage ? (textInput.value || null) : `${textInput.value ? textInput.value + ' ' : ''}${file.name}: ${url}`,
             image: isImage ? url : null
         })
         textInput.value = ''
