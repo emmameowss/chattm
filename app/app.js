@@ -618,6 +618,8 @@ socket.on('colorChanged', (color) => {
 const colorBtn = document.querySelector('#color-btn')
 const colorInput = document.querySelector('#color-input')
 
+// i am aware this implementation sucks and the position probably doesn't work but i am not making a custom color picker
+
 colorBtn.addEventListener('click', () => {
     const rect = colorBtn.getBoundingClientRect()
     colorInput.style.position = 'fixed'
