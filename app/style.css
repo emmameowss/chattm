@@ -318,6 +318,13 @@ input:disabled {
 #mute-btn.muted::before {
     content: '\ece9'; /* ti-bell-off */
 }
+  #color-input {
+    position: fixed;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
 
 @media (max-width: 600px) {
   h1 {
@@ -398,10 +405,9 @@ input:disabled {
     display: none;
   }
   #color-input {
-    position: fixed;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    pointer-events: none;
+    display: none;
+  }
+  #color-btn {
+    display: none;
   }
 }
