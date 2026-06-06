@@ -1,7 +1,7 @@
 {
   "name": "chattm",
-  "version": "0.1.0",
-  "description": "an incredibly simple, bare minimum chat app",
+  "version": "1.0.0",
+  "description": "an incredibly simple chat app",
   "keywords": [
     "chat"
   ],
