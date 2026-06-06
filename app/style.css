@@ -390,4 +390,14 @@ input:disabled {
   li {
     font-size: 12px;
   }
+  #signout span, #signout .ti-logout + * {
+    display: none;
+  }
+  #signout {
+    padding: 0 10px;
+    flex-shrink: 0;
+  }
+  .btn-label {
+    display: none;
+  }
 }

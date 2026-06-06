@@ -70,9 +70,11 @@ if (!session) {
 }
 
 if (session) {
+    /* not needed anymore
     if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
         showStatus('ui not optimised for mobile', 'pink')
     }
+        */
 if (localStorage.getItem('banned')) {
     // localStorage.removeItem('banned')
     showStatus('you have been banned', 'red')
