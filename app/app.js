@@ -240,7 +240,7 @@ async function sendMessageNew(e) {
         }
         const isImage = file.type.startsWith('image/')
         showStatus('uploading...')
-        const url = await uploadFIle(file)
+        const url = await uploadFile(file)
         showStatus('uploaded!', 'pink')
         setTimeout(hideStatus, 3000)
         socket.emit('message', {
