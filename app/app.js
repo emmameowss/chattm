@@ -485,6 +485,7 @@ socket.on('userlist', (users) => {
     users.forEach(u => {
         const span = document.createElement('div')
         span.textContent = u.username
+        span.style.display = 'inline-block'
         applyFlagColor(span, u.color || getNameColor(u.username))
         ul.appendChild(span)
     })
