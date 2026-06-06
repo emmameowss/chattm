@@ -22,6 +22,29 @@ function getNameColor(name) {
     return `hsl(${hash % 360}, 70%, 65%)`
 }
 
+const flags = {
+    'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
+    'flag:trans':       'linear-gradient(90deg,#55cdfc,#f7a8b8,#fff,#f7a8b8,#55cdfc)',
+    'flag:bi':          'linear-gradient(90deg,#d60270,#d60270,#9b4f96,#0038a8,#0038a8)',
+    'flag:lesbian':     'linear-gradient(90deg,#d62900,#ff9b55,#fff,#d461a6,#a50062)',
+    'flag:nb':          'linear-gradient(90deg,#fcf434,#fff,#9c59d1,#2c2c2c)'
+}
+
+function applyFlagColor(el, color) {
+    const gradient = flags[color]
+    if (gradient) {
+        el.style.color = 'transparent'
+        el.style.backgroundImage = gradient
+        el.style.backgroundClip = 'text'
+        el.style.webkitBackgroundClip = 'text'
+    } else {
+        el.style.color = color
+        el.style.backgroundImage = ''
+        el.style.backgroundClip = ''
+        el.style.webkitBackgroundClip = ''
+    }
+}
+
 // hca stuff part 9 (live server really hates me)
 const session = (() => {
     const hash = new URLSearchParams(window.location.hash.slice(1))
@@ -153,7 +176,7 @@ socket.on('history', (messages) => {
         const color = data.color || getNameColor(ausername)
         const namespan = document.createElement('span')
         const time = new Date(data.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        namespan.style.color = color
+        applyFlagColor(namespan,color)
         if (data.isToken) {
            const tag = document.createElement('span')
            tag.textContent = '♛ '
@@ -163,7 +186,7 @@ socket.on('history', (messages) => {
         namespan.appendChild(document.createTextNode(`[${time}] ${ausername}: `))
         li.appendChild(namespan)
         if (data.text) {
-           li.appendChild(functioninglinks(data.text, color))
+           li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
         }
         if (data.image) {
             const img = document.createElement('img')
@@ -259,8 +282,8 @@ socket.on("message", (data) => {
     const color = data.color || getNameColor(ausername)
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const namespan = document.createElement('span')
-        namespan.style.color = color
-        if (data.isToken) {
+    applyFlagColor(namespan,color)
+    if (data.isToken) {
         const tag = document.createElement('span')
         tag.textContent = '♛ '
         tag.style.color = 'hotpink'
@@ -269,7 +292,7 @@ socket.on("message", (data) => {
     namespan.appendChild(document.createTextNode(`[${time}] ${ausername}: `))
     li.appendChild(namespan)
     if (data.text) {
-        li.appendChild(functioninglinks(data.text, color))
+        li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
     }
     if (data.image) {
         const img = document.createElement('img')
@@ -436,7 +459,7 @@ socket.on('userlist', (users) => {
     users.forEach(u => {
         const span = document.createElement('div')
         span.textContent = u.username
-        span.style.color = u.color || getNameColor(u.username)
+        applyFlagColor(span, u.color || getNameColor(u.username))
         ul.appendChild(span)
     })
 })
@@ -460,7 +483,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat", "/color [color]"]
+const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]"]
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
@@ -543,7 +566,8 @@ socket.on('status', (status) => {
 
 // color status
 socket.on('colorChanged', (color) => {
-    showStatus(`name color changed to ${color.toString()}`, 'pink')
+    const display = color.startsWith('flag:') ? color.slice(5) : color
+    showStatus(`name color changed to ${display}`, 'pink')
     setTimeout(hideStatus, 3000)
 })
 }
