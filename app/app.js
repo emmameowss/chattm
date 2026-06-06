@@ -495,7 +495,7 @@ socket.on('connect_error', (err) => {
 // user list client side stuff
 socket.on('userlist', (users) => {
     const ul = document.querySelector('#userlist')
-    ul.innerHTML = '<strong>online</strong><br>'
+    ul.innerHTML = `<strong>online (${users.length})</strong><br>`
     users.forEach(u => {
         const div = document.createElement('div')
         const inner = document.createElement('span')
