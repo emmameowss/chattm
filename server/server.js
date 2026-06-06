@@ -129,7 +129,8 @@ io.on('connection', socket => {
         socket.username = name
         const isGuest = socket.userEmail.endsWith('@guest')
         if (prevUser && prevUser !== name && !isGuest) {
-            socket.broadcast.emit('userRenamed', { from: prevUser, to: name }, guest)
+            socket.broadcast.emit('userRenamedSys', {from: prevUser, to: name}, guest)
+            socket.emit('userRenamed', { from: prevUser, to: name }, guest)
         }
         emitUserList()
     })

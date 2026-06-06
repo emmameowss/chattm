@@ -323,9 +323,18 @@ socket.on('userRenamed', ({from, to}, guest) => {
     if (guest) {
         return
     } else {
-        systemMessage(`${from} changed their username to ${to}`)
+        showStatus(`changed username to ${to}`, 'hotpink')
+        setTimeout(hideStatus, 3000)
     }
 })
+
+socket.on('userRenamedSys', ({from, to}, guest) => {
+    if (guest) {
+        return
+    } else {
+        systemMessage(`${from} changed their username to ${to}`)
+    }
+}) 
 
 // cdn/image stuff
 async function uploadImage(file) {
