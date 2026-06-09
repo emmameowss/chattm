@@ -381,7 +381,7 @@ httpServer.on('request', async (req, res) => {
     }
 
     if (url.pathname === '/privacy') {
-        const content = await readFile('./app/privacy.html') // privacy.html is not included in this repo or project in general as it's mostly ai generated so it's not fair to include it in both this project or time stats
+        const content = await readFile('../app/privacy.html') // privacy.html is not included in this repo or project in general as it's mostly ai generated so it's not fair to include it in both this project or time stats
         res.writeHead(200, {"content-type": 'text/html'})
         res.end(content)
         return
