@@ -15,8 +15,9 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 5. in server/server.js, change "const url = new URL(req.url, '**https://chat.emmameowss.gay**')" to your domain
 6. copy .env.example to .env
 7. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and your hack club CDN api key, preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
-8. run npm i in server
-9. do npm run start or npm run dev
+8. add a privacy.html file in /app (needs to exist otherwise eeverything crashes)
+9. run npm i in server
+10. do npm run start or npm run dev
 
 ## current features
 - usernames
