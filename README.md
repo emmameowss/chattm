@@ -1,4 +1,5 @@
 # chat™
+prounounced however you want to pronounce it
 
 ### an incredibly simple chat app
 
