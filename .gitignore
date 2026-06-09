@@ -3,6 +3,7 @@ logs
 *.log
 bans.txt
 PRIVACY.md
+privacy.html
 colors.json
 sessions.json
 npm-debug.log*
