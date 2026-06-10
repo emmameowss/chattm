@@ -302,6 +302,12 @@ input:disabled {
   cursor: not-allowed;
 }
 
+#color-btn:disabled {
+  pointer-events: none;
+  opacity: 0.4;
+  cursor: not-allowed
+}
+
 .divider {
     width: 1px;
     height: 28px;
