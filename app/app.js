@@ -507,7 +507,7 @@ function systemMessage(text) {
 // nuke session and reload if unauthenticated, updated for maintenance
 socket.on('connect_error', (err) => {
     if (err.message === 'maintenance') {
-        showMaintenance()
+        showMaintenance(maintenanceCheck.reason)
         return
     }
     localStorage.removeItem('session')
