@@ -42,6 +42,12 @@ try {
 } catch (e) {}
 let maintenance = false
 let reason = ''
+try {
+    const data = await readFile('maintenance.json', 'utf8')
+    const saved = JSON.parse(data)
+    maintenance = saved.maintenance || false
+    reason = saved.reason || ''
+} catch (e) {}
 
 
 const types = {
@@ -67,6 +73,10 @@ async function saveBans() {
 async function saveSession(id, data) {
     sessions[id] = data
     await writeFile('sessions.json', JSON.stringify(sessions))
+}
+
+async function saveMaintenance() {
+    await writeFile('maintenance.json', JSON.stringify({maintenance, reason}))
 }
 
 
@@ -231,6 +241,7 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/maintenance') && socket.userEmail === process.env.OWNER_EMAIL) {
             maintenance = !maintenance
             reason = maintenance ? data.text.slice(12).trim() : ''
+            await saveMaintenance()
             for (const [id,s ] of io.sockets.sockets) {
                 if (s.userEmail !== process.env.OWNER_EMAIL) {
                     s.emit('maintenance', maintenance, reason)

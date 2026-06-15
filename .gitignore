@@ -4,6 +4,7 @@ logs
 bans.txt
 PRIVACY.md
 privacy.html
+maintenance.json
 colors.json
 sessions.json
 npm-debug.log*
