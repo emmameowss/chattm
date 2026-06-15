@@ -18,6 +18,7 @@ if (localStorage.getItem('banned')) {
     document.body.innerHTML = `
         <h1>chat™</h1>
         <p style="color: var(--pink)">you have been banned</p>
+        <p>reason: ${localStorage.getItem('banned')}</p>
     `
     devInstanceBanner()
     throw new Error('banned')
@@ -527,8 +528,8 @@ document.querySelector('#signout').addEventListener('click', () => {
 })
 
 // banned
-socket.on('banned', () => {
-    localStorage.setItem('banned', '1') // lazy and shit ass way of doing it but it's just for the ban ui they're stiull banned serverside idot care
+socket.on('banned', (reason) => {
+    localStorage.setItem('banned', reason || 'no reason given')
     location.reload()
 })
 // handle announcement command
@@ -621,7 +622,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]"]
+const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value

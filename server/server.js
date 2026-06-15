@@ -32,7 +32,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance']
+const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip']
 
 let sessions = {}
 let chatMuted = false
@@ -137,6 +137,8 @@ io.use((socket, next) => {
     const user = sessions[sessionId]
     if (!user) return next(new Error('not authenticated'))
     if (banlist.has(user.email)) return next(new Error('banned'))
+    const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
+    if (ipbanlist.has(ip)) return next(new Error('banned'))
     
     // guest expiry stuff
     if (user.guest) {
@@ -234,15 +236,19 @@ io.on('connection', socket => {
 }
         // /ban command
         if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
-            const targetEmail = data.text.slice(5).trim()
+            const args = data.text.slice(5).trim()
+            const [targetEmail, ...reasonParts] = args.split(' ')
+            const reason = reasonParts.join(' ') || 'no reason given'
             banlist.add(targetEmail)
             await saveBans()
-            await appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail}\n`)
-            let targetUsername = targetEmail
+            await appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${reason}\n`)
             for (const [id, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {
-                    targetUsername = s.username || targetEmail
-                    s.emit('banned')
+                    ipbanlist.add(s.userIP)
+                    await saveIpBans()
+                    await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
+                    s.emit('banned', reason)
+                    socket.emit('commandError', `banned ${targetEmail}`)
                     s.disconnect()
                 }
             }
@@ -253,6 +259,14 @@ io.on('connection', socket => {
             const targetEmail = data.text.slice(7).trim()
             banlist.delete(targetEmail)
             await saveBans()
+            socket.emit('commandError', `unbanned ${targetEmail}, use /unbanip for IP`)
+            return
+        }
+        if (data.text?.startsWith('/unbanip ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetIP = data.text.slice(9).trim()
+            ipbanlist.delete(targetIP)
+            await saveIpBans()
+            socket.emit('commandError', `unbanned ${targetIP}`)
             return
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {

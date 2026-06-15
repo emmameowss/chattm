@@ -4,6 +4,7 @@ logs
 bans.txt
 PRIVACY.md
 privacy.html
+ipbans.txt
 maintenance.json
 colors.json
 sessions.json
