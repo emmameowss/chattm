@@ -41,6 +41,7 @@ try {
     sessions = JSON.parse(data)
 } catch (e) {}
 let maintenance = false
+let reason = ''
 
 
 const types = {
@@ -229,13 +230,14 @@ io.on('connection', socket => {
         // maintenance cmd
         if (data.text?.startsWith('/maintenance') && socket.userEmail === process.env.OWNER_EMAIL) {
             maintenance = !maintenance
+            reason = maintenance ? data.text.slice(12).trim() : ''
             for (const [id,s ] of io.sockets.sockets) {
                 if (s.userEmail !== process.env.OWNER_EMAIL) {
-                    s.emit('maintenance', maintenance)
+                    s.emit('maintenance', maintenance, reason)
                     if (maintenance) s.disconnect()
                 }
             }
-            socket.emit('commandError', maintenance ? 'under maintenance' : 'not under maintenance')
+            socket.emit('commandError', maintenance ? 'maintenance enabled' : 'maintenance disabled')
             return
         } 
         if (data.text?.startsWith('/status ') && socket.userEmail === process.env.OWNER_EMAIL) {
@@ -415,7 +417,7 @@ httpServer.on('request', async (req, res) => {
 
     if (url.pathname === '/maintenance') {
         res.writeHead(200, {'content-type': 'application/json'})
-        res.end(JSON.stringify({maintenance: maintenance}))
+        res.end(JSON.stringify({maintenance: maintenance, reason: reason}))
         return
     }
 

@@ -35,11 +35,12 @@ function lightbox(src) {
 }
 
 // clientside maintenance stuff
-function showMaintenance() {
+function showMaintenance(reason) {
     document.body.className = 'login-page'
     document.body.innerHTML = `
         <h1>chat™</h1>
         <p style="color: #F5A9B8;">chat™ is under maintenance</p>
+        ${reason ? `<p>${reason}</p>` : ''}
     `
     throw new Error('maintenance')
 }
@@ -88,7 +89,7 @@ const session = (() => {
 })()
 
 if (!session) {
-    if (maintenanceCheck.maintenance) showMaintenance()
+    if (maintenanceCheck.maintenance) showMaintenance(maintenance.reason)
     document.body.className = 'login-page'
     document.body.innerHTML = `
         <h1>chat™</h1>
@@ -513,8 +514,12 @@ socket.on('connect_error', (err) => {
     location.reload()
 })
 
-socket.on('maintenance', (enabled) => {
-    if (enabled) showMaintenance()
+socket.on('maintenance', (enabled, reason) => {
+    if (enabled) {
+        try {
+            showMaintenance(reason)
+        } catch (e) {}
+    }
 })
 
 // user list client side stuff
