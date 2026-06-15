@@ -48,7 +48,7 @@ try {
     maintenance = saved.maintenance || false
     reason = saved.reason || ''
 } catch (e) {}
-const port = process.env.PORT || 3000
+const PORT = process.env.PORT || 3000
 
 
 const types = {
