@@ -648,14 +648,10 @@ document.querySelector('#message-input').addEventListener('keydown', (e) => {
     }
 })
 // guest sign in stuff
-socket.on('guestUsername', (name, guest) => {
+socket.on('guestUsername', (name) => {
     username = name
-    guest = true
     document.querySelector('#username-input').value = name
-    socket.emit('setUsername', name, guest)
-
-    document.querySelector('#username-input').disabled = true
-    document.querySelector('#username-form button[type="submit"]').disabled = true
+    socket.emit('setUsername', name)
 })
 
 socket.on('commandError', (msg) => {
