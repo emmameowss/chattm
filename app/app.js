@@ -71,7 +71,7 @@ function applyFlagColor(el, color) {
 const maintenanceCheck = await fetch(
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:3000'
-        : window.location.origin) + '/maintenance-status'
+        : window.location.origin) + '/maintenance'
 ).then(r => r.json()).catch(() => ({ maintenance: false }))
 
 // hca stuff part 9 (live server really hates me)
