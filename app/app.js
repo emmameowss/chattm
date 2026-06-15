@@ -117,7 +117,7 @@ if (!session) {
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
         <a href="/login"><button><i class="ti ti-login-2"></i> login with Hack Club</button></a>
-        <a href="/guest"><button><i class="ti ti-login-2"></i> continue as guest</button></a>
+        <a href="/guest"><button><i class="ti ti-user"></i> continue as guest</button></a>
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
     `
     devInstanceBanner()
