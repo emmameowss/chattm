@@ -88,6 +88,7 @@ const session = (() => {
 })()
 
 if (!session) {
+    if (maintenanceCheck.maintenance) showMaintenance()
     document.body.className = 'login-page'
     document.body.innerHTML = `
         <h1>chat™</h1>
@@ -502,10 +503,18 @@ function systemMessage(text) {
     }
 }
 
-// nuke session and reload if unauthenticated
+// nuke session and reload if unauthenticated, updated for maintenance
 socket.on('connect_error', (err) => {
+    if (err.message === 'maintenance') {
+        showMaintenance()
+        return
+    }
     localStorage.removeItem('session')
     location.reload()
+})
+
+socket.on('maintenance', (enabled) => {
+    if (enabled) showMaintenance()
 })
 
 // user list client side stuff

@@ -9,11 +9,12 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 
 ## Setup Instructions
 1. clone the repository
-2. copy .env.example to .env
-3. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and your hack club CDN api key, preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
-4. add a privacy.html file in /app (needs to exist otherwise eeverything crashes)
-5. run npm i in server
-6. do npm run start or npm run dev
+2. add your domain to cors allowed origins in server.js
+3. copy .env.example to .env
+4. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and your hack club CDN api key, preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
+5. add a privacy.html file in /app (needs to exist otherwise eeverything crashes)
+6. run npm i in server
+7. do npm run start or npm run dev
 
 ## current features
 - usernames
