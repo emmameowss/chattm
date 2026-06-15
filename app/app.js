@@ -418,12 +418,8 @@ socket.on("message", (data) => {
     })
 // user renamed status
 socket.on('userRenamed', ({from, to}, guest) => {
-    if (guest) {
-        return
-    } else {
-        showStatus(`changed username to ${to}`, 'hotpink')
-        setTimeout(hideStatus, 3000)
-    }
+    showStatus(`changed username to ${to}`, 'hotpink')
+    setTimeout(hideStatus, 3000)
 })
 
 // user renamed system message
@@ -648,10 +644,11 @@ document.querySelector('#message-input').addEventListener('keydown', (e) => {
     }
 })
 // guest sign in stuff
-socket.on('guestUsername', (name) => {
+socket.on('guestUsername', (name, guest) => {
     username = name
+    guest = true
     document.querySelector('#username-input').value = name
-    socket.emit('setUsername', name)
+    socket.emit('setUsername', name, guest)
 })
 
 socket.on('commandError', (msg) => {
