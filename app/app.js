@@ -42,6 +42,7 @@ function showMaintenance(reason) {
         <p style="color: #F5A9B8;">chat™ is under maintenance</p>
         ${reason ? `<p>${reason}</p>` : ''}
     `
+    setTimeout(() => location.reload(), 15000)
     throw new Error('maintenance')
 }
 
