@@ -54,7 +54,7 @@ function showMaintenance(reason) {
         ${reason ? `<p>${reason}</p>` : ''}
     `
     devInstanceBanner()
-    setTimeout(() => location.reload(), 15000)
+    // setTimeout(() => location.reload(), 15000)
     throw new Error('maintenance')
 }
 
