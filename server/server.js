@@ -318,7 +318,7 @@ io.on('connection', socket => {
                 }
             }
             if (found) {
-                socket.emit('commandError', `${targetUsername}: ${found.userEmail} (IP: ${found.userIP})`)
+                socket.emit('commandError', `${targetUsername}: ${found.userEmail}`)
             } else {
                 socket.emit('commandError', `no user found with username "${targetUsername}"`)
             }
