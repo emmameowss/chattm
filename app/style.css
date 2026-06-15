@@ -391,6 +391,10 @@ body:has(#dev-banner) #version-status {
     top: 10px;
     left: 12px;
   }
+  #version-status {
+    top: 10px;
+    padding-left: 65px;
+  }
   #username-form {
     top: auto;
     bottom: 60px;
