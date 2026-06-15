@@ -350,7 +350,7 @@ input:disabled {
 body:has(#dev-banner) h1,
 body:has(#dev-banner) #username-form,
 body:has(#dev-banner) #userlist {
-    top: 40px;
+    top: 76px;
 }
 
 body:has(#dev-banner) ul {
