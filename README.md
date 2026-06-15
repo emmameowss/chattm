@@ -9,15 +9,14 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 
 ## Setup Instructions
 1. clone the repository
-2. in app/app.js, change const socket = io("wss://domainnotverified.emmameowss.gay) to your domain (good luck with this, for example: ws://randomdomain.com:3000 only add port if not reverse proxied)
-3. in app/app.js, "change const res = await fetch('**https://chat.emmameowss.gay/upload**', {" to your domain
-4. in server/server.js, add your domain to the cors allowed origins
-5. in server/server.js, change "const url = new URL(req.url, '**https://chat.emmameowss.gay**')" to your domain
-6. copy .env.example to .env
-7. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and your hack club CDN api key, preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
-8. add a privacy.html file in /app (needs to exist otherwise eeverything crashes)
-9. run npm i in server
-10. do npm run start or npm run dev
+2. in app/app.js, "change const res = await fetch('**https://chat.emmameowss.gay/upload**', {" to your domain
+3. in server/server.js, add your domain to the cors allowed origins
+4. in server/server.js, change "const url = new URL(req.url, '**https://chat.emmameowss.gay**')" to your domain
+5. copy .env.example to .env
+6. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and your hack club CDN api key, preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
+7. add a privacy.html file in /app (needs to exist otherwise eeverything crashes)
+8. run npm i in server
+9. do npm run start or npm run dev
 
 ## current features
 - usernames

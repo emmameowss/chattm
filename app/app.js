@@ -34,6 +34,16 @@ function lightbox(src) {
     document.body.appendChild(overlay)
 }
 
+// clientside maintenance stuff
+function showMaintenance() {
+    document.body.className = 'login-page'
+    document.body.innerHTML = `
+        <h1>chat™</h1>
+        <p>chat™ is under maintenance</p>
+    `
+    throw new Error('maintenance')
+}
+
 const flags = {
     'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
     'flag:trans':       'linear-gradient(90deg,#55cdfc,#f7a8b8,#fff,#f7a8b8,#55cdfc)',
@@ -56,6 +66,13 @@ function applyFlagColor(el, color) {
         el.style.webkitBackgroundClip = ''
     }
 }
+
+// clientside maintrnance stuf paet 2
+const maintenanceCheck = await fetch(
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:3000'
+        : window.location.origin) + '/maintenance-status'
+).then(r => r.json()).catch(() => ({ maintenance: false }))
 
 // hca stuff part 9 (live server really hates me)
 const session = (() => {
@@ -99,8 +116,8 @@ if (localStorage.getItem('banned')) {
 
 const socket = io(
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'ws://localhost:3000'
-        : 'wss://chat.emmameowss.gay', // set this to the ip/url of the site/proxy you're using for the backend server thing
+        ? 'http://localhost:3000'
+        : window.location.origin, // set this to the ip/url of the site/proxy you're using for the backend server thing
     {
         auth: { session: localStorage.getItem('session') }
     }
@@ -613,6 +630,8 @@ socket.on('colorChanged', (color) => {
     setTimeout(hideStatus, 3000)
 })
 
+/* useless
+
 // color picker stuff
 const colorBtn = document.querySelector('#color-btn')
 const colorInput = document.querySelector('#color-input')
@@ -630,5 +649,7 @@ colorBtn.addEventListener('click', () => {
 colorInput.addEventListener('change', (e) => {
     socket.emit('message', { text: `/color ${e.target.value}` })
 })
+
+*/
 
 }
