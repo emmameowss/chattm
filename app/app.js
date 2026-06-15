@@ -39,7 +39,7 @@ function showMaintenance() {
     document.body.className = 'login-page'
     document.body.innerHTML = `
         <h1>chat™</h1>
-        <p>chat™ is under maintenance</p>
+        <p style="color: #F5A9B8;">chat™ is under maintenance</p>
     `
     throw new Error('maintenance')
 }
