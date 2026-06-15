@@ -255,13 +255,13 @@ socket.on('history', (messages) => {
         if (data.isToken) {
            const tag = document.createElement('span')
            tag.textContent = '♛'
-           tag.style.cssText = 'color:hotpink;margin-right:12px'
+           tag.style.cssText = 'color:hotpink;margin-right:8px'
            namespan.appendChild(tag)
         }
         if (data.isGuest) {
             const badge = document.createElement('i')
             badge.className = 'ti ti-user'
-            badge.style.cssText = `font-size:10px;margin-right:12px`
+            badge.style.cssText = `font-size:10px;margin-right:8px`
             applyFlagColor(badge, color)
             namespan.appendChild(badge)
         }
@@ -375,13 +375,13 @@ socket.on("message", (data) => {
     if (data.isToken) {
         const tag = document.createElement('span')
         tag.textContent = '♛'
-        tag.style.cssText = 'color:hotpink;margin-right:12px'
+        tag.style.cssText = 'color:hotpink;margin-right:8px'
         namespan.appendChild(tag)
     }
     if (data.isGuest) {
         const badge = document.createElement('i')
         badge.className = 'ti ti-user'
-        badge.style.cssText = `font-size:10px;margin-right:12px`
+        badge.style.cssText = `font-size:10px;margin-right:8px`
         applyFlagColor(badge, color)
         namespan.appendChild(badge)
     }
