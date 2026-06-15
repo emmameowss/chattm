@@ -5,6 +5,7 @@ bans.txt
 PRIVACY.md
 privacy.html
 ipbans.txt
+banreasons.json
 maintenance.json
 colors.json
 sessions.json

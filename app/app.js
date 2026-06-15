@@ -19,6 +19,7 @@ if (localStorage.getItem('banned')) {
         <h1>chat™</h1>
         <p style="color: var(--pink)">you have been banned</p>
         <p>reason: ${localStorage.getItem('banned')}</p>
+        <p style="color: var(--muted)">to appeal, email <a href="mailto:emma@csarcade.wiki">emma@csarcade.wiki</a></p>
     `
     devInstanceBanner()
     throw new Error('banned')
@@ -562,6 +563,17 @@ function systemMessage(text) {
 socket.on('connect_error', (err) => {
     if (err.message === 'maintenance') {
         showMaintenance(maintenanceCheck.reason)
+        return
+    }
+    if (err.message === 'banned') {
+        document.body.className = 'login-page'
+        document.body.innerHTML = `
+            <h1>chat™</h1>
+            <p style="color: var(--pink)">you have been banned</p>
+            <p>reason: ${err.data?.reason || 'no reason given'}</p>
+            <p style="color: var(--muted)">to appeal, email <a href="mailto:emma@csarcade.wiki">emma@csarcade.wiki</a></p>
+        `
+        devInstanceBanner()
         return
     }
     localStorage.removeItem('session')

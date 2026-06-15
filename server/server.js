@@ -77,6 +77,16 @@ try {
     console.log(`loaded ${ipbanlist.size} ip bans`)
 } catch (e) {}
 
+const banReasons = {}
+try {
+    const data = await readFile('banreasons.json', 'utf-8')
+    Object.assign(banReasons, JSON.parse(data))
+} catch (e) {}
+
+async function saveBanReasons() {
+    await writeFile('banreasons.json', JSON.stringify(banReasons))
+}
+
 async function saveIpBans() {
     await writeFile('ipbans.txt', [...ipbanlist].join('\n'))
 }
@@ -136,9 +146,12 @@ io.use((socket, next) => {
     const sessionId = socket.handshake.auth.session
     const user = sessions[sessionId]
     if (!user) return next(new Error('not authenticated'))
-    if (banlist.has(user.email)) return next(new Error('banned'))
+    if (banlist.has(user.email)) {
+        return next(new Error('banned'))
+        err.data = { reason: banReasons[user.email] || 'no reason given' }
+    }
     const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
-    if (ipbanlist.has(ip)) return next(new Error('banned'))
+    // if (ipbanlist.has(ip)) return next(new Error('banned'))
     
     // guest expiry stuff
     if (user.guest) {
@@ -240,13 +253,16 @@ io.on('connection', socket => {
             const [targetEmail, ...reasonParts] = args.split(' ')
             const reason = reasonParts.join(' ') || 'no reason given'
             banlist.add(targetEmail)
+            banReasons[targetEmail] = reason
+            await saveBanReasons()
             await saveBans()
             await appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${reason}\n`)
             for (const [id, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {
-                    ipbanlist.add(s.userIP)
-                    await saveIpBans()
-                    await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
+                    // not sure if this is gonna work, commented out for now
+                    // ipbanlist.add(s.userIP)
+                    // await saveIpBans()
+                    // await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
                     s.emit('banned', reason)
                     socket.emit('commandError', `banned ${targetEmail}`)
                     s.disconnect()
