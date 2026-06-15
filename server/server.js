@@ -11,7 +11,7 @@ import { extname, normalize, resolve, sep } from 'path'
 const httpServer = createServer()
 const io = new Server(httpServer, {
     cors: {
-        origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "http://127.0.0.1:5500"]
+        origin: [window.location.origin]
     },
     maxHttpBufferSize: 1e6
 })
