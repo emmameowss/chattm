@@ -243,6 +243,23 @@ io.on('connection', socket => {
             emitUserList()
             return
         }
+        // different syntax
+        if (data.text?.startsWith('/colour ')) {
+            const colorinput = data.text.slice(7).trim().toLowerCase()
+            const flags = {
+                'pride':       'flag:pride', 'rainbow': 'flag:pride',
+                'trans':       'flag:trans', 'transgender': 'flag:trans',
+                'bi':          'flag:bi', 'bisexual': 'flag:bi',
+                'lesbian':     'flag:lesbian',
+                'nb':          'flag:nb', 'nonbinary': 'flag:nb'
+            }
+            const color = flags[colorinput] ?? colorinput
+            userColors[socket.userEmail] = color
+            await saveColors()
+            socket.emit('colorChanged', color)
+            emitUserList()
+            return
+        }
         const timestamp = new Date().toISOString()
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
         const message = {
