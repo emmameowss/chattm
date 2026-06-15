@@ -320,7 +320,7 @@ async function sendMessageNew(e) {
 
 // force enter to send message
 document.querySelector('#file-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' ** !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         document.querySelector('#message-form').requestSubmit()
     }
