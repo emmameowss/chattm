@@ -53,10 +53,12 @@ function showMaintenance(reason) {
         <p style="color: #F5A9B8;">chat™ is under maintenance</p>
         ${reason ? `<p>${reason}</p>` : ''}
     `
-    showDevBanner()
+    devInstanceBanner()
     setTimeout(() => location.reload(), 15000)
     throw new Error('maintenance')
 }
+
+devInstanceBanner()
 
 const flags = {
     'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
@@ -118,7 +120,7 @@ if (!session) {
         <a href="/guest"><button><i class="ti ti-login-2"></i> continue as guest</button></a>
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
     `
-    showDevBanner()
+    devInstanceBanner()
     sessionStorage.removeItem('authDenied')
     throw new Error('not authenticated')
 }
