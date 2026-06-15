@@ -332,6 +332,30 @@ input:disabled {
     pointer-events: none;
   }
 
+#dev-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--pink);
+    color: #1a1a1a;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-align: center;
+    padding: 4px;
+    z-index: 999;
+    letter-spacing: 0.05em;
+}
+
+body:has(#dev-banner) h1,
+body:has(#dev-banner) #username-form {
+    top: 28px;
+}
+
+body:has(#dev-banner) ul {
+    padding-top: 80px;
+}
+
 @media (max-width: 600px) {
   h1 {
     font-size: 12px;

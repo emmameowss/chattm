@@ -78,6 +78,13 @@ const maintenanceCheck = await fetch(
         : window.location.origin) + '/maintenance'
 ).then(r => r.json()).catch(() => ({ maintenance: false }))
 
+if (window.location.hostname === 'dev.chat.emmameowss.gay') {
+    const banner = document.createElement('div')
+    banner.id = 'dev-banner'
+    banner.textContent = 'this is a dev instance of chat™: things may not be stable and may break often'
+    document.body.appendChild(banner)
+}
+
 // hca stuff part 9 (live server really hates me)
 const session = (() => {
     const hash = new URLSearchParams(window.location.hash.slice(1))
