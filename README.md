@@ -40,6 +40,11 @@ available at: https://chat.emmameowss.gay, currently supports images and text, p
 - zooming images
 - timestamp hovering over
 - pride flag name colors
+- better banning people
+- whois command that lets you see people's email
+- guest badge in userlist and messages
+- banner for dev instances
+- maintenance
 
 ## planned features
 - ~~message history~~
