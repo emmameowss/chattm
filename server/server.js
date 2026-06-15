@@ -70,6 +70,17 @@ try {
     console.log(`loaded ${banlist.size} bans`)
 } catch (e) {}
 
+const ipbanlist = new Set()
+try { 
+    const data = await readFile('ipbans.txt', 'utf8')
+    data.split('\n').filter(Boolean).forEach(ip => ipbanlist.add(ip))
+    console.log(`loaded ${ipbanlist.size} ip bans`)
+} catch (e) {}
+
+async function saveIpBans() {
+    await writeFile('ipbans.txt', [...ipbanlist].join('\n'))
+}
+
 async function saveBans() {
     await writeFile('bans.txt', [...banlist].join('\n'))
 }
@@ -145,6 +156,7 @@ io.use((socket, next) => {
 })
 
 io.on('connection', socket => {
+    socket.userIP = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
     let lastMessage = 0
     console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)

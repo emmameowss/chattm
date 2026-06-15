@@ -13,6 +13,16 @@ let isOwner = false
 // fetch port
 const config = await fetch('/config').then(r => r.json()).catch(() => ({ port: 3000 }))
 
+if (localStorage.getItem('banned')) {
+    document.body.className = 'login-page'
+    document.body.innerHTML = `
+        <h1>chat™</h1>
+        <p style="color: var(--pink)">you have been banned</p>
+    `
+    devInstanceBanner()
+    throw new Error('banned')
+}
+
 // colors
 function getNameColor(name) {
     if (!name) return 'var(--muted)'
@@ -142,10 +152,7 @@ if (session) {
         showStatus('ui not optimised for mobile', 'pink')
     }
         */
-if (localStorage.getItem('banned')) {
-    // localStorage.removeItem('banned')
-    showStatus('you have been banned', 'red')
-} else if (sessionStorage.getItem('newlogin')) {
+if (sessionStorage.getItem('newlogin')) {
     sessionStorage.removeItem('newlogin')
     showStatus("welcome to chat™, set your username above if you haven't", 'pink')
     setTimeout(hideStatus, 3000)
