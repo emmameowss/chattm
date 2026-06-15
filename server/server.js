@@ -113,7 +113,9 @@ function emitUserList() {
         if (s.username) users.push({ 
             username: s.username, 
             email: s.userEmail,
-            color: userColors[s.userEmail] || null
+            color: userColors[s.userEmail] || null,
+            guest: s.userEmail.endsWith('@guest'),
+            isOwner: s.userEmail === process.env.OWNER_EMAIL
         })
     }
     io.emit('userlist', users)
@@ -322,6 +324,7 @@ io.on('connection', socket => {
             ...data,
             time: Date.now(),
             isToken: socket.userEmail === process.env.OWNER_EMAIL,
+            isGuest: socket.userEmail.endsWith('@guest'),
             color: userColors[socket.userEmail] || null
         }
         history.push(message)

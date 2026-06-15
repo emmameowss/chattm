@@ -248,16 +248,23 @@ socket.on('history', (messages) => {
         timespan.className = 'msg-time'
         timespan.textContent = `[${new Date(Number(data.time)).toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
         applyFlagColor(timespan, color)
-        if (data.isToken) {
-           const tag = document.createElement('span')
-           tag.textContent = '♛ '
-           tag.style.color = 'hotpink'
-           namespan.appendChild(tag)
-        }
         li.appendChild(timespan)
         li.appendChild(namespan)
         const nametext = document.createElement('span')
         nametext.textContent = ausername
+        if (data.isToken) {
+           const tag = document.createElement('span')
+           tag.textContent = '♛'
+           tag.style.cssText = 'color:hotpink;margin-right:12px'
+           namespan.appendChild(tag)
+        }
+        if (data.isGuest) {
+            const badge = document.createElement('i')
+            badge.className = 'ti ti-user'
+            badge.style.cssText = `font-size:10px;margin-right:12px`
+            applyFlagColor(badge, color)
+            namespan.appendChild(badge)
+        }
         applyFlagColor(nametext, color)
         nametext.style.display = 'inline-block'
         namespan.appendChild(nametext)
@@ -361,16 +368,23 @@ socket.on("message", (data) => {
     timespan.textContent = `[${new Date().toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
     const namespan = document.createElement('span')
     applyFlagColor(timespan, color)
-    if (data.isToken) {
-        const tag = document.createElement('span')
-        tag.textContent = '♛ '
-        tag.style.color = 'hotpink'
-        namespan.appendChild(tag)
-        }
     li.appendChild(timespan)
     li.appendChild(namespan)
     const nametext = document.createElement('span')
     nametext.textContent = ausername
+    if (data.isToken) {
+        const tag = document.createElement('span')
+        tag.textContent = '♛'
+        tag.style.cssText = 'color:hotpink;margin-right:12px'
+        namespan.appendChild(tag)
+    }
+    if (data.isGuest) {
+        const badge = document.createElement('i')
+        badge.className = 'ti ti-user'
+        badge.style.cssText = `font-size:10px;margin-right:12px`
+        applyFlagColor(badge, color)
+        namespan.appendChild(badge)
+    }
     applyFlagColor(nametext, color)
     nametext.style.display = 'inline-block'
     namespan.appendChild(nametext)
@@ -569,6 +583,18 @@ socket.on('userlist', (users) => {
         inner.style.display = 'inline-block'
         applyFlagColor(inner, u.color || getNameColor(u.username))
         div.appendChild(inner)
+        if (u.guest) {
+            const badge = document.createElement('span')
+            badge.className = 'ti ti-user'
+            badge.style.cssText = 'font-size:10px;color:var(--pink);margin-right:8px'
+            div.insertBefore(badge,inner)
+        }
+        if (u.isOwner) {
+            const crown = document.createElement('span')
+            crown.textContent = '♛'
+            crown.style.cssText = 'color:hotpink;margin-right:8px;font-size:10px'
+            div.insertBefore(crown, inner)
+}
         ul.appendChild(div)
     })
 })
