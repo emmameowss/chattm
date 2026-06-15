@@ -48,6 +48,7 @@ try {
     maintenance = saved.maintenance || false
     reason = saved.reason || ''
 } catch (e) {}
+const port = process.env.PORT || 3000
 
 
 const types = {
@@ -437,6 +438,12 @@ httpServer.on('request', async (req, res) => {
         return
     }
 
+    if (url.pathname === '/config') {
+        res.writeHead(200, {"content-type": "application/json"})
+        res.end(JSON.stringify({port: PORT}))
+        return
+    }
+
     if (url.pathname === '/privacy') {
         const content = await readFile('../app/privacy.html') // privacy.html is not included in this repo or project in general as it's mostly ai generated so it's not fair to include it in both this project or time stats
         res.writeHead(200, {"content-type": 'text/html'})
@@ -468,4 +475,4 @@ httpServer.on('request', async (req, res) => {
     }
 })
 
-httpServer.listen(3000, () => console.log("Server listening on port 3000"))
+httpServer.listen(PORT, () => console.log(`Server listening on port ${PORT}"`))

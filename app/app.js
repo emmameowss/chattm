@@ -10,6 +10,8 @@ let activity = false
 let username = localStorage.getItem('username') || userId.slice(0,5)
 let audioctx = null
 let isOwner = false
+// fetch port
+const config = await fetch('/config').then(r => r.json()).catch(() => ({ port: 3000 }))
 
 // colors
 function getNameColor(name) {
@@ -72,7 +74,7 @@ function applyFlagColor(el, color) {
 // clientside maintrnance stuf paet 2
 const maintenanceCheck = await fetch(
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:3000'
+        ? `http://localhost:${config.port}`
         : window.location.origin) + '/maintenance'
 ).then(r => r.json()).catch(() => ({ maintenance: false }))
 
