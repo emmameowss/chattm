@@ -246,7 +246,7 @@ socket.on('history', (messages) => {
         const namespan = document.createElement('span')
         const timespan = document.createElement('span')
         timespan.className = 'msg-time'
-        timespan.textContent = `[${new Date(Number(data.time)).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}]`
+        timespan.textContent = `[${new Date(Number(data.time)).toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
         applyFlagColor(timespan, color)
         if (data.isToken) {
            const tag = document.createElement('span')
@@ -358,7 +358,7 @@ socket.on("message", (data) => {
     const color = data.color || getNameColor(ausername)
     const timespan = document.createElement('span')
     timespan.className = 'msg-time'
-    timespan.textContent = `[${new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}]`
+    timespan.textContent = `[${new Date().toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
     const namespan = document.createElement('span')
     applyFlagColor(timespan, color)
     if (data.isToken) {
