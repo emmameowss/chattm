@@ -33,6 +33,17 @@ function devInstanceBanner() {
     document.body.appendChild(banner)
 }
 
+fetch('/version').then(r => r.json()).then(v => {
+    if (v.upToDate === null) return
+    const el = document.createElement('div')
+    el.id = 'version-status'
+    el.textContent = v.upToDate
+        ? 'up to date'
+        : `${v.behind} commit${v.behind === 1 ? '' : 's'} behind`
+    if (!v.upToDate) el.classList.add('outdated')
+    document.body.appendChild(el)
+}).catch(() => {})
+
 // lightbox
 function lightbox(src) {
     const overlay = document.createElement('div')

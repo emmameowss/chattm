@@ -364,6 +364,26 @@ body:has(#dev-banner) ul {
 body:has(#dev-banner).login-page {
     padding-top: 28px;
 }
+body:has(#dev-banner) #version-status {
+    top: 40px;
+}
+
+#version-status {
+    position: fixed;
+    top: 12px;
+    left: 16px;
+    padding-left: 60px; 
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.5;
+    z-index: 201; 
+    line-height: 28px;
+}
+
+#version-status.outdated {
+    color: var(--pink);
+    opacity: 1;
+}
 
 @media (max-width: 600px) {
   h1 {

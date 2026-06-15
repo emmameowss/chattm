@@ -7,6 +7,7 @@ import fetch from 'node-fetch'
 import { randomBytes } from 'crypto'
 import { readFile, appendFile, writeFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
+import { execSync } from 'child_process'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -49,6 +50,8 @@ try {
     reason = saved.reason || ''
 } catch (e) {}
 const PORT = process.env.PORT || 3000
+let versionCache = null
+let versionCacheTime = 0
 
 
 const types = {
@@ -78,6 +81,29 @@ async function saveSession(id, data) {
 
 async function saveMaintenance() {
     await writeFile('maintenance.json', JSON.stringify({maintenance, reason}))
+}
+
+async function getVersionStatus() {
+    if (versionCache && Date.now() - versionCacheTime < 10 * 60 * 1000) {
+        return versionCache
+    }
+    let result
+    try {
+        const localCommit = execSync('git rev-parse HEAD', { cwd: '..' }).toString().trim()
+        const res = await fetch('https://api.github.com/repos/emmameowss/chattm/commits?per_page=50')
+        const commits = await res.json()
+        const localIndex = commits.findIndex(c => c.sha === localCommit)
+        if (localIndex === -1) {
+            result = { upToDate: false, behind: '50+', latestCommit: commits[0]?.sha?.slice(0,7) }
+        } else {
+            result = { upToDate: localIndex === 0, behind: localIndex, latestCommit: commits[0]?.sha?.slice(0,7) }
+        }
+    } catch (e) {
+        result = { upToDate: null, behind: null, error: e.message }
+    }
+    versionCache = result
+    versionCacheTime = Date.now()
+    return result
 }
 
 
@@ -441,6 +467,13 @@ httpServer.on('request', async (req, res) => {
     if (url.pathname === '/config') {
         res.writeHead(200, {"content-type": "application/json"})
         res.end(JSON.stringify({port: PORT}))
+        return
+    }
+
+    if (url.pathname === '/version') {
+        const status = await getVersionStatus()
+        res.writeHead(200, {"content-type": "application/json"})
+        res.end(JSON.stringify(status))
         return
     }
 
