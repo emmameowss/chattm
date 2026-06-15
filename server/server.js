@@ -32,7 +32,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip']
+const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
 
 let sessions = {}
 let chatMuted = false
@@ -306,6 +306,22 @@ io.on('connection', socket => {
             const ann = "chat has been unmuted"
             chatMuted = false
             io.emit('unmutechat', ann)
+            return
+        }
+        if (data.text?.startsWith('/whois ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetUsername = data.text.slice(7).trim()
+            let found = null
+            for (const [id, s] of io.sockets.sockets) {
+                if (s.username === targetUsername) {
+                found = s
+                break
+                }
+            }
+            if (found) {
+                socket.emit('commandError', `${targetUsername}: ${found.userEmail} (IP: ${found.userIP})`)
+            } else {
+                socket.emit('commandError', `no user found with username "${targetUsername}"`)
+            }
             return
         }
         if (data.text?.startsWith('/nick ')) {
