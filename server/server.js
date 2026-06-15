@@ -31,7 +31,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat']
+const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance']
 
 let sessions = {}
 let chatMuted = false
@@ -40,6 +40,7 @@ try {
     const data = await readFile('sessions.json', 'utf8')
     sessions = JSON.parse(data)
 } catch (e) {}
+let maintenance = false
 
 
 const types = {
@@ -97,6 +98,9 @@ io.use((socket, next) => {
     }
     socket.userEmail = user.email
     socket.username = null
+    if (maintenance && socket.userEmail !== process.env.OWNER_EMAIL) {
+        return next(new Error('maintenance'))
+    }
     next()
 })
 
@@ -222,6 +226,18 @@ io.on('connection', socket => {
             io.emit('unmutechat', ann)
             return
         }
+        // maintenance cmd
+        if (data.text?.startsWith('/maintenance') && socket.userEmail === process.env.OWNER_EMAIL) {
+            maintenance = !maintenance
+            for (const [id,s ] of io.sockets.sockets) {
+                if (s.userEmail !== process.env.OWNER_EMAIL) {
+                    s.emit('maintenance', maintenance)
+                    if (maintenance) s.disconnect()
+                }
+            }
+            socket.emit('commandError', maintenance ? 'under maintenance' : 'not under maintenance')
+            return
+        } 
         if (data.text?.startsWith('/status ') && socket.userEmail === process.env.OWNER_EMAIL) {
             status = data.text.slice(8).trim()
             socket.emit('status', status)
@@ -394,6 +410,12 @@ httpServer.on('request', async (req, res) => {
         const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
         res.writeHead(302, {Location: redirectUrl})
         res.end()
+        return
+    }
+
+    if (url.pathname === '/maintenance') {
+        res.writeHead(200, {'content-type': 'application/json'})
+        res.end(JSON.stringify({maintenance: maintenance}))
         return
     }
 
