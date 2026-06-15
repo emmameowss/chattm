@@ -475,4 +475,4 @@ httpServer.on('request', async (req, res) => {
     }
 })
 
-httpServer.listen(PORT, () => console.log(`Server listening on port ${PORT}"`))
+httpServer.listen(PORT, () => console.log(`Server listening on port ${PORT}`))
