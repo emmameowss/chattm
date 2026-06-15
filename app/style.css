@@ -348,12 +348,17 @@ input:disabled {
 }
 
 body:has(#dev-banner) h1,
-body:has(#dev-banner) #username-form {
-    top: 28px;
+body:has(#dev-banner) #username-form,
+body:has(#dev-banner) #userlist {
+    top: 40px;
 }
 
 body:has(#dev-banner) ul {
-    padding-top: 80px;
+    padding-top: 92px;
+}
+
+body:has(#dev-banner).login-page {
+    padding-top: 28px;
 }
 
 @media (max-width: 600px) {

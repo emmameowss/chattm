@@ -24,6 +24,15 @@ function getNameColor(name) {
     return `hsl(${hash % 360}, 70%, 65%)`
 }
 
+function devInstanceBanner() {
+    if (window.location.hostname !== 'dev.chat.emmameowss.gay') return
+    if (document.querySelector('#dev-banner')) return
+    const banner = document.createElement('div')
+    banner.id = 'dev-banner'
+    banner.textContent = 'this is a dev instance of chat™: things may not be stable and may break often'
+    document.body.appendChild(banner)
+}
+
 // lightbox
 function lightbox(src) {
     const overlay = document.createElement('div')
@@ -44,6 +53,7 @@ function showMaintenance(reason) {
         <p style="color: #F5A9B8;">chat™ is under maintenance</p>
         ${reason ? `<p>${reason}</p>` : ''}
     `
+    showDevBanner()
     setTimeout(() => location.reload(), 15000)
     throw new Error('maintenance')
 }
@@ -78,12 +88,6 @@ const maintenanceCheck = await fetch(
         : window.location.origin) + '/maintenance'
 ).then(r => r.json()).catch(() => ({ maintenance: false }))
 
-if (window.location.hostname === 'dev.chat.emmameowss.gay') {
-    const banner = document.createElement('div')
-    banner.id = 'dev-banner'
-    banner.textContent = 'this is a dev instance of chat™: things may not be stable and may break often'
-    document.body.appendChild(banner)
-}
 
 // hca stuff part 9 (live server really hates me)
 const session = (() => {
@@ -114,6 +118,7 @@ if (!session) {
         <a href="/guest"><button><i class="ti ti-login-2"></i> continue as guest</button></a>
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
     `
+    showDevBanner()
     sessionStorage.removeItem('authDenied')
     throw new Error('not authenticated')
 }
