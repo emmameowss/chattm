@@ -309,7 +309,7 @@ httpServer.on('request', async (req, res) => {
     const url = new URL(req.url, `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`)
 
     if (url.pathname === '/login') {
-        const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=profile+email+name`
+        const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=email`
         res.writeHead(302, { location: authUrl })
         res.end()
         return
@@ -334,6 +334,11 @@ httpServer.on('request', async (req, res) => {
             headers: { Authorization: `Bearer ${access_token}` }
         })
         const user = await userRes.json()
+        if (!user.identity?.primary_email) {
+            res.writeHead(302, {Location: '/?error=auth_denied'})
+            res.end()
+            return
+        }
         const { primary_email } = user.identity
         await appendFile('login.log', `${new Date().toISOString()}: ${primary_email} signed in\n`)
         const sessionid = randomBytes(32).toString('hex')
