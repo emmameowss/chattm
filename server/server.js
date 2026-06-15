@@ -266,6 +266,18 @@ io.on('connection', socket => {
             io.emit('unmutechat', ann)
             return
         }
+        if (data.text?.startsWith('/nick ')) {
+            const nick = data.text.slice(6).trim()
+            const prevUser = socket.username
+            socket.username = nick
+            const isGuest = socket.userEmail.endsWith('@guest')
+            if (prevUser && prevUser !== nick) {
+               socket.broadcast.emit('userRenamedSys', {from: prevUser, to: nick}, isGuest)
+               socket.emit('userRenamed', { from: prevUser, to: nick })
+            }
+            emitUserList()
+            return
+        }
         // maintenance cmd
         if (data.text?.startsWith('/maintenance') && socket.userEmail === process.env.OWNER_EMAIL) {
             maintenance = !maintenance
@@ -322,6 +334,7 @@ io.on('connection', socket => {
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
         const message = {
             ...data,
+            username: socket.username,
             time: Date.now(),
             isToken: socket.userEmail === process.env.OWNER_EMAIL,
             isGuest: socket.userEmail.endsWith('@guest'),

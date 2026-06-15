@@ -614,7 +614,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]"]
+const commands = ["/clear", "/announce ", "/mutechat", "/status", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]"]
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
