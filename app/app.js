@@ -29,7 +29,7 @@ function devInstanceBanner() {
     if (document.querySelector('#dev-banner')) return
     const banner = document.createElement('div')
     banner.id = 'dev-banner'
-    banner.textContent = 'this is a dev instance of chat™: things may not be stable and may break often'
+    banner.textContent = 'this is a dev instance of chat™ - things may not be stable and may break often'
     document.body.appendChild(banner)
 }
 
