@@ -17,8 +17,18 @@ const io = new Server(httpServer, {
     maxHttpBufferSize: 1e6
 })
 
-const history = []
+let history = []
 const maxhistory = 20
+// message history saving stuff
+try {
+    const data = await readFile('history.json', 'utf8')
+    history = JSON.parse(data)
+} catch (e) {}
+
+async function saveHistory() {
+    await writeFile('history.json', JSON.stringify(history))
+}
+
 const msgcooldown = 1000
 const lastmessage = {}
 const CDN_API_KEY = process.env.CDN_API_KEY
@@ -210,6 +220,7 @@ function systemMessage(text) {
     if (history.length > maxhistory) {
         history.shift()
     }
+    saveHistory()
     io.emit('message', message)
 
     /* old
@@ -547,6 +558,7 @@ io.on('connection', socket => {
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             history.length = 0
+            await saveHistory()
             io.emit('clear')
             return
         }
@@ -672,6 +684,7 @@ io.on('connection', socket => {
         }
         history.push(message)
         if (history.length > maxhistory) history.shift()
+        await saveHistory()
         io.emit('message', message)
     })
 })
