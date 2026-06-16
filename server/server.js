@@ -296,7 +296,7 @@ io.use((socket, next) => {
         err.data = { reason: banReasons[user.email] || 'no reason given' }
     }
     const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
-    // if (ipbanlist.has(ip)) return next(new Error('banned'))
+    if (ipbanlist.has(ip)) return next(new Error('banned'))
     
     // guest expiry stuff
     if (user.guest) {
@@ -404,6 +404,9 @@ io.on('connection', socket => {
                     banReasons[socket.userEmail] = reason
                     await saveBans()
                     await saveBanReasons()
+                    ipbanlist.add(s.userIP)
+                    await saveIpBans()
+                    await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
                     await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) auto-banned, 5th strike triggered by "${hit}" — message: ${data.text}\n`)
                     socket.emit('banned', reason)
                     socket.disconnect()
@@ -451,10 +454,9 @@ io.on('connection', socket => {
             await appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${reason}\n`)
             for (const [id, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {
-                    // not sure if this is gonna work, commented out for now
-                    // ipbanlist.add(s.userIP)
-                    // await saveIpBans()
-                    // await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
+                    ipbanlist.add(s.userIP)
+                    await saveIpBans()
+                    await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
                     s.emit('banned', reason)
                     socket.emit('commandError', `banned ${targetEmail}`)
                     s.disconnect()
