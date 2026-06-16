@@ -9,6 +9,7 @@ banreasons.json
 uploads.log
 mutes.json
 filter.txt
+strikes.json
 maintenance.json
 colors.json
 sessions.json

@@ -348,10 +348,10 @@ io.on('connection', socket => {
                 const durationMs = 10 * 60 * 1000
                 muted[socket.userEmail] = {
                     until: Date.now() + durationMs,
-                    reason: `muted by server: word filter (strike ${filterStrikes[socket.userEmail]}/5)`
+                    reason: `muted by server: word filter (strike ${strikes[socket.userEmail]}/5)`
                 }
                 await saveMutes()
-                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, strike ${filterStrikes[socket.userEmail]}/5, triggered by "${hit}" - message: ${data.text}\n`)
+                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, strike ${strikes[socket.userEmail]}/5, triggered by "${hit}" - message: ${data.text}\n`)
                 socket.emit('muted', {reason: muted[socket.userEmail].reason, until: muted[socket.userEmail].until})
                 return
             }
