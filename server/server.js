@@ -490,6 +490,7 @@ io.on('connection', socket => {
             delete strikes[targetEmail]
             await saveStrikes()
             socket.emit('commandError', `reset filter strikes for ${targetUsername}`)
+            return
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             history.length = 0
