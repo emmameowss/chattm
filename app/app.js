@@ -686,6 +686,11 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
         document.querySelector('#message-form button[type="submit"]').disabled = true
         document.querySelector('#attach-btn').disabled = true
     }
+    if (uMuted) {
+        document.querySelector('#message-input').disabled = true
+        document.querySelector('#message-form button[type="submit"]').disabled = true
+        showStatus(`you are muted${uMuted.until ? ' until ' + new Date(uMuted.until).toLocaleString() : ''} — ${uMuted.reason}`, 'pink')
+    }
 
     if (color) userColor = color
 })
