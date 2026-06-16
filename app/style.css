@@ -384,6 +384,10 @@ body:has(#dev-banner) #version-status {
     color: var(--pink);
     opacity: 1;
 }
+#sysmsg-btn.hidden-active {
+    border-color: var(--pink);
+    color: var(--pink);
+}
 
 @media (max-width: 600px) {
   h1 {
