@@ -149,7 +149,7 @@ function isMuted(email) {
     return true
 }
 
-function parseDuration() {
+function parseDuration(str) {
     const match = str.match(/^(\d+)(s|m|h|d)$/)
     if (!match) return null
     const num = parseInt(match[1])
