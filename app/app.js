@@ -444,6 +444,8 @@ socket.on('userRenamedSys', ({from, to}, guest) => {
 async function uploadFile(file) {
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('username', username)
+    formData.append('session', localStorage.getItem('session'))
     const res = await fetch(`${window.location.origin}/upload`, {
         method: 'POST',
         body: formData

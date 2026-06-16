@@ -506,6 +506,10 @@ httpServer.on('request', async (req, res) => {
                     body: formData
                 })
                 const json = await response.json()
+                const sessionId = fields.session?.[0]
+                const userEmail = sessions[sessionId]?.email || 'unknown'
+                const uUsername = fields.username?.[0] || 'unknown'
+                await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${json.url}\n`)
                 res.writeHead(200, { 'Content-Type': 'application/json' })
                 res.end(JSON.stringify({ url: json.url }))
             } catch (e) {
