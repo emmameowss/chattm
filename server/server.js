@@ -157,6 +157,24 @@ function parseDuration(str) {
     return num * unit
 }
 
+setInterval(async () => {
+    const now = Date.now()
+    let changed = false
+    for (const email of Object.keys(muted)) {
+        const m = muted[email]
+        if (m.until && now > m.until) {
+            delete muted[email]
+            changed = true
+            for (const [id, s] of io.sockets.sockets) {
+                if (s.userEmail === email) {
+                    s.emit('youAreUnmuted')
+                }
+            }
+        }
+    }
+    if (changed) await saveMutes()
+}, 10 * 1000)
+
 
 function emitUserList() {
     const users = []
