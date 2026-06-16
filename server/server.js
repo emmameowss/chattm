@@ -356,6 +356,7 @@ io.on('connection', socket => {
             }
             if (!targetEmail) {
                 socket.emit('commandError', `no user found with username ${targetUsername}`)
+                return
             }
             const durationMs = durationStr ? parseDuration(durationStr) : null
             if (durationStr && !durationMs) {
@@ -389,6 +390,7 @@ io.on('connection', socket => {
             }
             if (!targetEmail || !muted[targetEmail]) {
                 socket.emit('commandError', `${targetUsername} is not muted`)
+                return
             }
             delete muted[targetEmail]
             await saveMutes()
