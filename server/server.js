@@ -349,7 +349,7 @@ io.on('connection', socket => {
                 reason
             }
             await saveMutes()
-            await appendFile('mutes.log', `${new Date.toISOString()}: ${socket.userEmail}`)
+            await appendFile('mutes.log', `${new Date().toISOString()}: ${socket.userEmail}`)
 
             for (const [id,s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {

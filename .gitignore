@@ -7,6 +7,7 @@ privacy.html
 ipbans.txt
 banreasons.json
 uploads.log
+mutes.json
 maintenance.json
 colors.json
 sessions.json
