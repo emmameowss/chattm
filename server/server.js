@@ -209,7 +209,7 @@ io.on('connection', socket => {
     socket.emit('init', { 
         isOwner: socket.userEmail === process.env.OWNER_EMAIL,
         chatMuted,
-        muted: isMuted(socket.userEmail) ? muted[socket.userEmail] : null
+        uMuted: isMuted(socket.userEmail) ? muted[socket.userEmail] : null
     })
     if (status) socket.emit('status', status)
 

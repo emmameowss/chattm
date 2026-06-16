@@ -678,7 +678,7 @@ socket.on('commandError', (msg) => {
 })
 
 // check owner status and mute chat status on connect
-socket.on('init', ({isOwner: owner, chatMuted: muted, color}) => {
+socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
     isOwner = owner
     if (muted && !isOwner) {
         showStatus('chat has been muted', 'pink')
@@ -686,6 +686,7 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color}) => {
         document.querySelector('#message-form button[type="submit"]').disabled = true
         document.querySelector('#attach-btn').disabled = true
     }
+
     if (color) userColor = color
 })
 
@@ -719,6 +720,18 @@ socket.on('colorChanged', (color) => {
     const display = color.startsWith('flag:') ? color.slice(5) : color
     showStatus(`name color changed to ${display}`, 'pink')
     setTimeout(hideStatus, 3000)
+})
+
+// muteded stuff
+socket.on('muted', ({reason, until}) => {
+    document.querySelector('#message-input').disabled = true
+    document.querySelector('#message-form button[type="submit"]').disabled = true
+    showStatus(`you are muted${until ? ' until ' + new Date(until).toLocaleString : ''} - reason: ${reason}`, 'pink')
+})
+socket.on('unmuted', () => {
+    document.querySelector('#message-input').disabled = true
+    document.querySelector('#message-form button[type="submit"]').disabled = true
+    hideStatus()
 })
 
 /* useless
