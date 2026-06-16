@@ -605,9 +605,10 @@ httpServer.on('request', async (req, res) => {
             return
         }
         const { primary_email } = user.identity
-        await appendFile('login.log', `${new Date().toISOString()}: ${primary_email} signed in\n`)
+        const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        await appendFile('login.log', `${new Date().toISOString()}: ${primary_email} signed in from ${ip}\n`)
         const sessionid = randomBytes(32).toString('hex')
-        await saveSession(sessionid, { email: primary_email })
+        await saveSession(sessionid, { email: primary_email, ip })
         const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
         res.writeHead(302, { Location: redirectUrl })
         res.end()
@@ -689,10 +690,13 @@ httpServer.on('request', async (req, res) => {
         const today = new Date().toISOString().slice(0,10)
         const sessionid = randomBytes(32).toString('hex')
         const guestUsername = `guest-${guestId}`
+        const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        await appendFile('login.log', `${new Date().toISOString()}: guest-${guestId} signed in from ${ip}\n`)
         await saveSession(sessionid, {
             email: `guest-${guestId}@guest`,
             guest: true,
-            expires: today
+            expires: today,
+            ip
         })
         const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
         res.writeHead(302, {Location: redirectUrl})
