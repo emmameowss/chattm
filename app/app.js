@@ -36,6 +36,9 @@ function getNameColor(name) {
     return `hsl(${hash % 360}, 70%, 65%)`
 }
 
+function isSystemMessage(data) {
+    return data.username === 'SYSTEM' && data.system
+}
 function devInstanceBanner() {
     if (window.location.hostname !== 'dev.chat.emmameowss.gay') return
     if (document.querySelector('#dev-banner')) return
@@ -268,6 +271,15 @@ function activitya() {
 // message history
 socket.on('history', (messages) => {
     messages.forEach(data => {
+        if (isSystemMessage(data)) {
+            if (hideSysMsg) return
+            const li = document.createElement('li')
+            li.textContent = data.text
+            li.style.color = 'gray'
+            li.style.fontStyle = 'italic'
+            appendMessage(li)
+            return
+        }
         const li = document.createElement('li')
         const ausername = data.username
         const color = data.color || getNameColor(ausername)
@@ -388,6 +400,15 @@ document.addEventListener('visibilitychange', () => {
     if (!document.hidden) activitya()
 })
 socket.on("message", (data) => {
+    if (isSystemMessage(data)) {
+        if (hideSysMsg) return
+        const li = document.createElement('li')
+        li.textContent = data.text
+        li.style.color = 'gray'
+        li.style.fontStyle = 'italic'
+        appendMessage(li)
+        return
+    }
     const li = document.createElement('li')
     const ausername = data.username
     const color = data.color || getNameColor(ausername)
