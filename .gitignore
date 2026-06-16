@@ -10,6 +10,7 @@ uploads.log
 mutes.json
 filter.txt
 strikes.json
+history.json
 maintenance.json
 colors.json
 sessions.json
