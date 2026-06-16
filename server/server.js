@@ -32,7 +32,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/unban', '/mute', '/unmute', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
+const ownercmds = ['/ban', '/unban', '/mute', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
 
 let sessions = {}
 let chatMuted = false
@@ -106,6 +106,17 @@ function containsFilteredWord(text) {
     const lower = text.toLowerCase()
     return filteredwords.find(w => lower.includes(w)) || null
 }
+
+const strikes = {}
+try {
+    const data = await readFile('strikes.json', 'utf8')
+    Object.assign(strikes, JSON.parse(data))
+} catch (e) {}
+
+async function saveStrikes() {
+    await writeFile('strikes.json'), JSON.stringify(strikes)
+}
+
 async function saveMutes() {
     await writeFile('mutes.json', JSON.stringify(muted))
 }
@@ -320,14 +331,28 @@ io.on('connection', socket => {
         if (socket.userEmail !== process.env.OWNER_EMAIL) {
             const hit = containsFilteredWord(data.text)
             if (hit) {
+                strikes[socket.userEmail] = (strikes[socket.userEmail] || 0 ) + 1
+                await saveStrikes()
+
+                if (strikes[socket.userEmail] > 5) {
+                    const reason = 'banned by server - too many automatic mutes'
+                    banlist.add(socket.userEmail)
+                    banReasons[socket.userEmail] = reason
+                    await saveBans()
+                    await saveBanReasons()
+                    await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) auto-banned, 5th strike triggered by "${hit}" — message: ${data.text}\n`)
+                    socket.emit('banned', reason)
+                    socket.disconnect()
+                    return
+                }
                 const durationMs = 10 * 60 * 1000
                 muted[socket.userEmail] = {
                     until: Date.now() + durationMs,
-                    reason: 'muted by server: word filter'
+                    reason: `muted by server: word filter (strike ${filterStrikes[socket.userEmail]}/5)`
                 }
                 await saveMutes()
-                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, triggered by "${hit}" — message: ${data.text}\n`)
-                socket.emit('muted', {reason: 'muted by server: word filter', until: muted[socket.userEmail].until})
+                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, strike ${filterStrikes[socket.userEmail]}/5, triggered by "${hit}" - message: ${data.text}\n`)
+                socket.emit('muted', {reason: muted[socket.userEmail].reason, until: muted[socket.userEmail].until})
                 return
             }
         }
@@ -448,6 +473,23 @@ io.on('connection', socket => {
             }
             socket.emit('commandError', `unmuted ${targetUsername}`)
             return
+        }
+        if (data.text?.startsWIth('/resetstrikes ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetUsername = data.text.slice(14).trim()
+            let targetEmail = null
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.username === targetUsername) {
+                    targetEmail = s.userEmail
+                    break
+                }
+            }
+            if (!targetEmail) {
+                socket.emit('commandError', `no user found with username ${targetUsername}`)
+                return
+            }
+            delete strikes[targetEmail]
+            await saveStrikes()
+            socket.emit('commandError', `reset filter strikes for ${targetUsername}`)
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             history.length = 0
