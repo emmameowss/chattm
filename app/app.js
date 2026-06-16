@@ -194,11 +194,14 @@ document.querySelector('#username-input').value = username
 document.querySelector('#username-form').addEventListener('submit', (e) => {
     e.preventDefault()
     const input = document.querySelector('#username-input')
-    if (input.value.trim()) {
-        username = input.value.trim()
-        localStorage.setItem('username', username)
-        socket.emit('setUsername', username)
+    const value = input.value.trim()
+    if (!/^[a-zA-Z0-9]{1,20}$/.test(value)) {
+        showError("invalid username, make sure it's within the character limit and uses only letters and numbers")
+        return
     }
+    username = input.value.trim()
+    localStorage.setItem('username', username)
+    socket.emit('setUsername', username)
 })
 
 // move socket joined/left stuff after intialiing socket

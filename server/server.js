@@ -199,6 +199,10 @@ function parseDuration(str) {
     return num * unit
 }
 
+function isValidUsername(name) {
+    return /^[a-zA-Z0-9]{1,20}$/.test(name)
+}
+
 setInterval(async () => {
     const now = Date.now()
     let changed = false
@@ -287,6 +291,10 @@ io.on('connection', socket => {
     }
 
     socket.on('setUsername', (name, guest) => {
+        if (!isValidUsername(name)) {
+            socket.emit('commandError', "invalid username, make sure it's within the character limit and uses only letters and numbers")
+            return
+        }
         const prevUser = socket.username
         socket.username = name
         const isGuest = socket.userEmail.endsWith('@guest')
@@ -533,6 +541,10 @@ io.on('connection', socket => {
         }
         if (data.text?.startsWith('/nick ')) {
             const nick = data.text.slice(6).trim()
+            if (!isValidUsername(nick)) {
+                socket.emit('commandError', "invalid username, make sure it's within the character limit and uses only letters and numbers")
+                return
+            }
             const prevUser = socket.username
             socket.username = nick
             const isGuest = socket.userEmail.endsWith('@guest')
