@@ -113,6 +113,12 @@ try {
     Object.assign(strikes, JSON.parse(data))
 } catch (e) {}
 
+const blockedColors = ['#0e0e0e', '#161616', '#242424', '#e8e8e8']
+
+function isBlockedColor() {
+    return blockedColors.includes(color.toLowerCase())
+}
+
 async function saveStrikes() {
     await writeFile('strikes.json', JSON.stringify(strikes))
 }
@@ -584,6 +590,10 @@ io.on('connection', socket => {
                 'nb':          'flag:nb', 'nonbinary': 'flag:nb'
             }
             const color = flags[colorinput] ?? colorinput
+            if (isBlockedColor(color)) {
+                socket.emit('commandError', 'please choose a different color')
+                return
+            }
             userColors[socket.userEmail] = color
             await saveColors()
             socket.emit('colorChanged', color)
@@ -601,6 +611,10 @@ io.on('connection', socket => {
                 'nb':          'flag:nb', 'nonbinary': 'flag:nb'
             }
             const color = flags[colorinput] ?? colorinput
+            if (isBlockedColor(color)) {
+                socket.emit('commandError', 'please choose a different color')
+                return
+            }
             userColors[socket.userEmail] = color
             await saveColors()
             socket.emit('colorChanged', color)
