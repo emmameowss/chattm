@@ -205,12 +205,14 @@ document.querySelector('#username-form').addEventListener('submit', (e) => {
 })
 
 // move socket joined/left stuff after intialiing socket
+/* unneeded
 socket.on('userJoined', (name) => { 
     systemMessage(`${name} joined`)
 })
 socket.on('userLeft', (name) =>  {
     systemMessage(`${name} left`)
 })
+*/
 // mute button
 let notifymuted = localStorage.getItem('notifymuted') === 'true'
 const mutebtn = document.querySelector('#mute-btn')
@@ -411,6 +413,10 @@ socket.on("message", (data) => {
         applyFlagColor(badge, color)
         namespan.appendChild(badge)
     }
+    if (data.username === 'SYSTEM') {
+        socket.emit('commandError', 'invalid username')
+        return
+    }
     applyFlagColor(nametext, color)
     nametext.style.display = 'inline-block'
     namespan.appendChild(nametext)
@@ -559,23 +565,6 @@ socket.on('announcement', (ann) => {
 })
 // an iq too high?
 // join/leave messages/system messages
-function systemMessage(text) {
-    console.log(text)
-    if (announce) {
-        const li = document.createElement('li')
-        li.textContent = text
-        li.style.color = 'pink'
-        li.style.fontStyle = 'italic'
-        appendMessage(li)
-        announce = false
-    } 
-    if (hideSysMsg) return
-    const li = document.createElement('li')
-    li.textContent = text
-    li.style.color = 'gray'
-    li.style.fontStyle = 'italic'
-    appendMessage(li)
-}
 
 // nuke session and reload if unauthenticated, updated for maintenance
 socket.on('connect_error', (err) => {

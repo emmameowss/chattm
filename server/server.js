@@ -197,6 +197,40 @@ function isMuted(email) {
     return true
 }
 
+// sys message
+function systemMessage(text) {
+
+    const message = {
+        username: 'SYSTEM',
+        text,
+        time: Date.now(),
+        system: true
+    }
+    history.push(message)
+    if (history.length > maxhistory) {
+        history.shift()
+    }
+    io.emit('message', message)
+
+    /* old
+    console.log(text)
+    if (announce) {
+        const li = document.createElement('li')
+        li.textContent = text
+        li.style.color = 'pink'
+        li.style.fontStyle = 'italic'
+        appendMessage(li)
+        announce = false
+    } 
+    if (hideSysMsg) return
+    const li = document.createElement('li')
+    li.textContent = text
+    li.style.color = 'gray'
+    li.style.fontStyle = 'italic'
+    appendMessage(li)
+    */
+}
+
 function parseDuration(str) {
     const match = str.match(/^(\d+)(s|m|h|d)$/)
     if (!match) return null
@@ -282,6 +316,11 @@ io.on('connection', socket => {
         uMuted: isMuted(socket.userEmail) ? muted[socket.userEmail] : null
     })
     if (status) socket.emit('status', status)
+    // check blocked colors on connect
+    if (userColors[socket.userEmail] && isBlockedColor(userColors[socket.userEmail])) {
+        delete userColors[socket.userEmail]
+        saveColors()
+    }
 
 
     if (chatMuted) {
@@ -305,7 +344,7 @@ io.on('connection', socket => {
         socket.username = name
         const isGuest = socket.userEmail.endsWith('@guest')
         if (prevUser && prevUser !== name) {
-            socket.broadcast.emit('userRenamedSys', {from: prevUser, to: name}, guest)
+            systemMessage(`${prevUser} changed their username to ${name}`)
             socket.emit('userRenamed', { from: prevUser, to: name })
         }
         emitUserList()
@@ -322,13 +361,13 @@ io.on('connection', socket => {
     socket.on('userActive', () => {
         if (socket.username && !socket.hasJoined) {
             socket.hasJoined = true
-            socket.broadcast.emit('userJoined', socket.username)
+            systemMessage(`${socket.username} joined`)
         }
     })
 
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
-        if (socket.username) io.emit('userLeft', socket.username)
+        if (socket.username) systemMessage(`${socket.username} left`)
         emitUserList()
     })
 
