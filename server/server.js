@@ -115,7 +115,7 @@ try {
 
 const blockedColors = ['#0e0e0e', '#161616', '#242424', '#e8e8e8']
 
-function isBlockedColor() {
+function isBlockedColor(color) {
     return blockedColors.includes(color.toLowerCase())
 }
 
