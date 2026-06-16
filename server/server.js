@@ -121,13 +121,27 @@ async function getVersionStatus() {
     let result
     try {
         const localCommit = execSync('git rev-parse HEAD', { cwd: '..' }).toString().trim()
+        const localCommitDate = execSync('git show -s --format=%cI HEAD', { cwd: '..' }).toString().trim()
         const res = await fetch('https://api.github.com/repos/emmameowss/chattm/commits?per_page=50')
         const commits = await res.json()
         const localIndex = commits.findIndex(c => c.sha === localCommit)
+        const currentCommit = localCommit.slice(0,7)
+
         if (localIndex === -1) {
-            result = { upToDate: false, behind: '50+', latestCommit: commits[0]?.sha?.slice(0,7) }
+            const latestRemoteDate = commits[0]?.commit?.committer?.date
+            if (latestRemoteDate && new Date(localCommitDate) > new Date(latestRemoteDate)) {
+                let ahead = 0
+                try {
+                    ahead = parseInt(execSync(`git rev-list --count origin/main..HEAD`, { cwd: '..' }).toString().trim())
+                } catch (e) {
+                    ahead = '1+'
+                }
+                result = { upToDate: false, ahead, latestCommit: commits[0]?.sha?.slice(0,7), currentCommit }
+            } else {
+                result = { upToDate: false, behind: '50+', latestCommit: commits[0]?.sha?.slice(0,7), currentCommit }
+            }
         } else {
-            result = { upToDate: localIndex === 0, behind: localIndex, latestCommit: commits[0]?.sha?.slice(0,7) }
+            result = { upToDate: localIndex === 0, behind: localIndex, latestCommit: commits[0]?.sha?.slice(0,7), currentCommit }
         }
     } catch (e) {
         result = { upToDate: null, behind: null, error: e.message }

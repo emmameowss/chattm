@@ -49,10 +49,14 @@ fetch('/version').then(r => r.json()).then(v => {
     if (v.upToDate === null) return
     const el = document.createElement('div')
     el.id = 'version-status'
-    el.textContent = v.upToDate
-        ? 'up to date'
-        : `${v.behind} commit${v.behind === 1 ? '' : 's'} behind`
-    if (!v.upToDate) el.classList.add('outdated')
+    if (v.upToDate) {
+        el.textContent = `up to date (${v.currentCommit})`
+    } else if (v.ahead) {
+        el.textContent = `${v.ahead} commit${v.ahead === 1 ? '' : 's'} ahead (${v.currentCommit})`
+    } else {
+        el.textContent = `${v.behind} commit${v.behind === 1 ? '' : 's'} behind (${v.currentCommit})`
+        el.classList.add('outdated')
+    }
     document.body.appendChild(el)
 }).catch(() => {})
 
