@@ -734,8 +734,8 @@ socket.on('muted', ({reason, until}) => {
     showStatus(`you are muted${until ? ' until ' + new Date(until).toLocaleString() : ''} - reason: ${reason}`, 'pink')
 })
 socket.on('unmuted', () => {
-    document.querySelector('#message-input').disabled = true
-    document.querySelector('#message-form button[type="submit"]').disabled = true
+    document.querySelector('#message-input').disabled = false
+    document.querySelector('#message-form button[type="submit"]').disabled = false
     hideStatus()
 })
 

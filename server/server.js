@@ -167,7 +167,7 @@ setInterval(async () => {
             changed = true
             for (const [id, s] of io.sockets.sockets) {
                 if (s.userEmail === email) {
-                    s.emit('youAreUnmuted')
+                    s.emit('unmuted')
                 }
             }
         }
