@@ -32,7 +32,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/unban', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
+const ownercmds = ['/ban', '/unban', '/mute', '/unmute', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
 
 let sessions = {}
 let chatMuted = false
@@ -83,6 +83,16 @@ try {
     Object.assign(banReasons, JSON.parse(data))
 } catch (e) {}
 
+const mutes = {}
+try {
+    const data = await readFile('mutes.json', 'utf8')
+    Object.assign(mutes, JSON.parse(data))
+} catch (e) {}
+
+async function saveMutes() {
+    await writeFile('mutes.json', JSON.stringify(mutes))
+}
+
 async function saveBanReasons() {
     await writeFile('banreasons.json', JSON.stringify(banReasons))
 }
@@ -125,6 +135,26 @@ async function getVersionStatus() {
     versionCache = result
     versionCacheTime = Date.now()
     return result
+}
+
+// mutes
+function isMuted(email) {
+    const m = muted[email]
+    if (!m) return false
+    if (m.until && Date.now() > m.until) {
+        delete muted[email]
+        saveMutes()
+        return false
+    }
+    return true
+}
+
+function parseDuration() {
+    const match = str.match(/^(\d+)(s|m|h|d)$/)
+    if (!match) return null
+    const num = parseInt(match[1])
+    const unit = {s: 1000, m: 60000, h: 3600000, d: 86400000}[match[2]]
+    return num * unit
 }
 
 
@@ -178,7 +208,8 @@ io.on('connection', socket => {
     socket.emit('history', history)
     socket.emit('init', { 
         isOwner: socket.userEmail === process.env.OWNER_EMAIL,
-        chatMuted
+        chatMuted,
+        muted: isMuted(socket.userEmail) ? muted[socket.userEmail] : null
     })
     if (status) socket.emit('status', status)
 
@@ -228,6 +259,13 @@ io.on('connection', socket => {
     })
 
     socket.on('message', async (data) => {
+
+        // check if muted
+        if (isMuted(socket.userEmail) && socket.userEmail !== process.env.OWNER_EMAIL) {
+            const m = muted[socket.userEmail]
+            socket.emit('commandError', `you are muted${m.until ? ' until ' + new Date(m.until).toLocaleString() : ''} - reason: ${m.reason}`)
+            return
+        }
 
         const now = Date.now()
         if (lastmessage[socket.userEmail] && now - lastmessage[socket.userEmail] < msgcooldown) {
@@ -283,6 +321,65 @@ io.on('connection', socket => {
             ipbanlist.delete(targetIP)
             await saveIpBans()
             socket.emit('commandError', `unbanned ${targetIP}`)
+            return
+        }
+        if (data.text?.startsWith('/mute ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const args = data.text.slice(6).trim().split(' ')
+            const targetUsername = args[0]
+            const durationStr = args[1]
+            const reason = args.slice(2).join(' ') || 'no reason given'
+
+            let targetEmail = null
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.username === targetUsername) {
+                    targetEmail = s.userEmail
+                    break
+                }
+            }
+            if (!targetEmail) {
+                socket.emit('commandError', `no user found with username ${targetUsername}`)
+            }
+            const durationMs = durationStr ? parseDuration(durationStr) : null
+            if (durationStr && !durationMs) {
+                socket.emit('commandError', 'invalid duration format')
+                return
+            }
+            muted[targetEmail] = {
+                until: durationMs ? Date.now() + durationMs : null,
+                reason
+            }
+            await saveMutes()
+            await appendFile('mutes.log', `${new Date.toISOString()}: ${socket.userEmail}`)
+
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.userEmail === targetEmail) {
+                    s.emit('muted', {reason, until: muted[targetEmail].until})
+                }
+            }
+            // i don't understand why this function/call is still called commandError, it's not used for just errors anymor
+            socket.emit('commandError', `muted ${targetUsername}${durationStr ? ' for ' + durationStr : ''}`)
+            return
+        }
+        if (data.text?.startsWith('/unmute ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetUsername = data.text.slice(8).trim()
+            let targetEmail = null
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.username === targetUsername) {
+                    targetEmail = s.userEmail
+                    break
+                }
+            }
+            if (!targetEmail || !muted[targetEmail]) {
+                socket.emit('commandError', `${targetUsername} is not muted`)
+            }
+            delete muted[targetEmail]
+            await saveMutes()
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.userEmail === targetEmail) {
+                    s.emit('unmuted')
+                }
+            }
+            socket.emit('commandError', `unmuted ${targetUsername}`)
             return
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
