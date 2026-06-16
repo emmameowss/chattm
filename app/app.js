@@ -576,7 +576,7 @@ document.querySelector('#signout').addEventListener('click', () => {
 
 // banned
 socket.on('banned', (reason) => {
-    localStorage.setItem('banned', reason || 'no reason given')
+    // useless localStorage.setItem('banned', reason || 'no reason given')
     location.reload()
 })
 // handle announcement command
