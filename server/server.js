@@ -83,14 +83,14 @@ try {
     Object.assign(banReasons, JSON.parse(data))
 } catch (e) {}
 
-const mutes = {}
+const muted = {}
 try {
     const data = await readFile('mutes.json', 'utf8')
-    Object.assign(mutes, JSON.parse(data))
+    Object.assign(muted, JSON.parse(data))
 } catch (e) {}
 
 async function saveMutes() {
-    await writeFile('mutes.json', JSON.stringify(mutes))
+    await writeFile('mutes.json', JSON.stringify(muted))
 }
 
 async function saveBanReasons() {
