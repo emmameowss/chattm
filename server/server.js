@@ -474,7 +474,7 @@ io.on('connection', socket => {
             socket.emit('commandError', `unmuted ${targetUsername}`)
             return
         }
-        if (data.text?.startsWIth('/resetstrikes ') && socket.userEmail === process.env.OWNER_EMAIL) {
+        if (data.text?.startsWith('/resetstrikes ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetUsername = data.text.slice(14).trim()
             let targetEmail = null
             for (const [id,s] of io.sockets.sockets) {
