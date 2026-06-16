@@ -89,6 +89,23 @@ try {
     Object.assign(muted, JSON.parse(data))
 } catch (e) {}
 
+const filteredwords = []
+async function loadFilterWords() {
+    try {
+        const data = await readFile('filter.txt', 'utf8')
+        filteredwords.length = 0
+        data.split('\n').map(w => w.trim().toLowerCase()).filter(Boolean).forEach(w => filteredwords.push(w))
+        console.log(`loaded ${filteredwords.length} filter words`)
+    } catch (e) {
+        console.log('no filter.txt found, filter disabled')
+    }
+}
+await loadFilterWords()
+function containsFilteredWord(text) {
+    if (!text) return null
+    const lower = text.toLowerCase()
+    return filteredwords.find(w => lower.includes(w)) || null
+}
 async function saveMutes() {
     await writeFile('mutes.json', JSON.stringify(muted))
 }
@@ -297,6 +314,22 @@ io.on('connection', socket => {
             const m = muted[socket.userEmail]
             socket.emit('commandError', `you are muted${m.until ? ' until ' + new Date(m.until).toLocaleString() : ''} - reason: ${m.reason}`)
             return
+        }
+
+        // filter
+        if (socket.userEmail !== process.env.OWNER_EMAIL) {
+            const hit = containsFilteredWord(data.text)
+            if (hit) {
+                const durationMs = 10 * 60 * 1000
+                muted[socket.userEmail] = {
+                    until: Date.now() + durationMs,
+                    reason: 'muted by server: word filter'
+                }
+                await saveMutes()
+                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, triggered by "${hit}" — message: ${data.text}\n`)
+                socket.emit('muted', {reason: 'muted by server: word filter', until: muted[socket.userEmail].until})
+                return
+            }
         }
 
         const now = Date.now()

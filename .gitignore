@@ -8,6 +8,7 @@ ipbans.txt
 banreasons.json
 uploads.log
 mutes.json
+filter.txt
 maintenance.json
 colors.json
 sessions.json
