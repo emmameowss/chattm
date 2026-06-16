@@ -114,7 +114,7 @@ try {
 } catch (e) {}
 
 async function saveStrikes() {
-    await writeFile('strikes.json'), JSON.stringify(strikes)
+    await writeFile('strikes.json', JSON.stringify(strikes))
 }
 
 async function saveMutes() {
