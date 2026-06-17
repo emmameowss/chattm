@@ -551,10 +551,12 @@ body:has(#dev-banner) #version-status {
   }
 
   #more-menu {
-    position: absolute;
-    bottom: 100%;
+    position: fixed;
+    bottom: 116px;
     right: 12px;
-    margin-bottom: 8px;
+    top: auto;
+    left: auto;
+    margin-bottom: 0;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -562,6 +564,7 @@ body:has(#dev-banner) #version-status {
     padding: 6px;
     gap: 4px;
     min-width: 140px;
+    z-index: 300;
   }
 
   #more-menu.open {
