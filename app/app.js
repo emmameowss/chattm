@@ -75,12 +75,17 @@ function devInstanceBanner() {
     if (!devHosts.includes(window.location.hostname)) return
     if (document.querySelector('#dev-banner')) return
 
-    const banner = document.createElement('div')
-    banner.id = 'dev-banner'
-    banner.textContent =
-        'this is a dev instance of chat™ - things may not be stable and may break often'
-
-    document.body.appendChild(banner)
+    if (devHosts.startsWith('https://dev.chat.emmameowss.gay')) {
+        const banner = document.createElement('div')
+        banner.id = 'dev-banner'
+        banner.textContent = 'this is a beta instance of chat™ - things may not be stable, data is wiped every 24 hours'
+        document.body.appendChild(banner)
+    } else {
+        const banner = document.createElement('div')
+        banner.id = 'dev-banner'
+        banner.textContent = 'this is a dev instance of chat™ - things may not be stableand may break often'
+        document.body.appendChild(banner)
+    }
 }
 
 fetch('/version').then(r => r.json()).then(v => {
