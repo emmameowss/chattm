@@ -208,7 +208,9 @@ function isMuted(email) {
 }
 
 // sys message
-function systemMessage(text) {
+function systemMessage(text, options = {}) {
+
+    const { excludeUserEmail = null, saveToHistory = true } = options
 
     const message = {
         username: 'SYSTEM',
@@ -216,12 +218,22 @@ function systemMessage(text) {
         time: Date.now(),
         system: true
     }
-    history.push(message)
-    if (history.length > maxhistory) {
-        history.shift()
+    if (saveToHistory) {
+        history.push(message)
+        if (history.length > maxhistory) {
+            history.shift()
+        }
+        saveHistory()
     }
-    saveHistory()
-    io.emit('message', message)
+    if (!excludeUserEmail) {
+        io.emit('message', message)
+        return
+    }
+
+    for (const [id, s] of io.sockets.sockets) {
+        if (s.userEmail === excludeUserEmail) continue
+        s.emit('message', message)
+    }
 
     /* old
     console.log(text)
@@ -370,13 +382,15 @@ io.on('connection', socket => {
     socket.on('userActive', () => {
         if (socket.username && !socket.hasJoined) {
             socket.hasJoined = true
-            systemMessage(`${socket.username} joined`)
+            systemMessage(`${socket.username} joined`, { excludeUserEmail: socket.userEmail, saveToHistory: false })
         }
     })
 
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
-        if (socket.username && !socket.skipLeaveMessage) systemMessage(`${socket.username} left`)
+        if (socket.username && !socket.skipLeaveMessage) {
+            systemMessage(`${socket.username} left`, { excludeUserEmail: socket.userEmail, saveToHistory: false })
+        }
         emitUserList()
     })
 
