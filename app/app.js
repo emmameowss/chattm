@@ -75,7 +75,7 @@ function devInstanceBanner() {
     if (!devHosts.includes(window.location.hostname)) return
     if (document.querySelector('#dev-banner')) return
 
-    if (devHosts.startsWith('https://dev.chat.emmameowss.gay')) {
+    if (devHosts.includes('https://dev.chat.emmameowss.gay')) {
         const banner = document.createElement('div')
         banner.id = 'dev-banner'
         banner.textContent = 'this is a beta instance of chat™ - things may not be stable, data is wiped every 24 hours'
