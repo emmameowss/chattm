@@ -712,6 +712,7 @@ io.on('connection', socket => {
             }
             emitUserList()
             socket.emit('commandError', `set ${targetUsername}'s color to ${color.startsWith('flag:') ? color.slice(5) : color}`)
+            return
         }
         const timestamp = new Date().toISOString()
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
