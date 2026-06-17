@@ -68,6 +68,7 @@ document.addEventListener('click', (e) => {
 function devInstanceBanner() {
     const devHosts = [
         'dev.chat.emmameowss.gay',
+        'beta.chattm.app',
         'localhost',
         '127.0.0.1'
     ]
@@ -75,7 +76,7 @@ function devInstanceBanner() {
     if (!devHosts.includes(window.location.hostname)) return
     if (document.querySelector('#dev-banner')) return
 
-    if (devHosts.includes('https://dev.chat.emmameowss.gay')) {
+    if (devHosts.includes('https://dev.chat.emmameowss.gay') || devHosts.includes('https://beta.chattm.app')) {
         const banner = document.createElement('div')
         banner.id = 'dev-banner'
         banner.textContent = 'this is a beta instance of chat™ - things may not be stable, data is wiped every 24 hours'
