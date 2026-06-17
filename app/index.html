@@ -19,15 +19,18 @@
     <form id="username-form">
         <input type="text" id="username-input" placeholder="set a username" maxlength="20">
         <button type="submit" title="set username"><i class="ti ti-check"></i><span class="btn-label"> set</span></button>
-        <div class="divider"></div>
-        <button type="button" title="mute notification sound" id="mute-btn"><i class="ti ti-bell"></i></button>
-        <button id="sysmsg-btn" title="hide some system messages"><i class="ti ti-message-off"></i></button>
-        <button type="button" id="email-btn" title="email me" onclick="window.location.href='mailto:emma@csarcade.wiki'"><i class="ti ti-mail-forward"></i></button>
         <!-- <input type="color" id="color-input" style="display: none;">
         <button type="button" id="color-btn" disabled="true" title="pick name color"><i class="ti ti-palette"></i></button> -->
         <div class="divider"></div>
-        <button type="button" id="privacy-btn" title="privacy policy" onclick="window.location.href='/privacy'"><i class="ti ti-shield"></i><span class="btn-label"> privacy</span></button>
-        <button type="button" id="signout" title="log out"><i class="ti ti-logout"></i><span class="btn-label"> log out</span></button>
+        <button type="button" id="more-btn"><i class="ti ti-dots-vertical"></i></button>
+        <div id="more-menu">
+           <button type="button" title="mute notification sound" id="mute-btn"><span class="mute-label">mute sound</span></button>
+           <button type="button" id="sysmsg-btn" title="hide some system messages"><i class="ti ti-message-off"></i> hide system msgs</button>
+           <!-- <button type="button" id="email-btn" title="email me" onclick="window.location.href='mailto:emma@csarcade.wiki'"><i class="ti ti-mail-forward"></i> email me</button> -->
+            <div class="menu-divider"></div>
+           <a href="/privacy" target="_blank"><button type="button"><i class="ti ti-shield"></i> privacy</button></a>
+           <button type="button" id="signout"><i class="ti ti-logout"></i> sign out</button>
+        </div>
     </form>
     <div id="userlist"></div>
     <p id="command-suggestion" style="display:none;"></p>

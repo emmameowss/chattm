@@ -234,6 +234,7 @@ a:hover {
   text-align: right;
   font-size: 12px;
   color: var(--muted);
+  z-index: 1;
 }
 
 #userlist strong {
@@ -251,6 +252,9 @@ a:hover {
   font-size: 12px;
   display: block;
   clear: both;
+}
+#userlist.menu-open {
+  top: 280px; 
 }
 
 ::-webkit-scrollbar { width: 4px; }
@@ -309,42 +313,33 @@ input:disabled {
 }
 
 .divider {
-    width: 1px;
-    height: 28px;
-    background: var(--border);
-    flex-shrink: 0;
-    margin: 0 8px;
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
+  margin: 0 8px;
 }
-
-#mute-btn::before {
-    font-family: 'tabler-icons';
-    content: '\ea35';
+color-input {
+  position: fixed;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
-
-#mute-btn.muted::before {
-    content: '\ece9'; /* ti-bell-off */
-}
-  #color-input {
-    position: fixed;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    pointer-events: none;
-  }
 
 #dev-banner {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: var(--pink);
-    color: #1a1a1a;
-    font-size: 11px;
-    font-family: var(--font-mono);
-    text-align: center;
-    padding: 4px;
-    z-index: 999;
-    letter-spacing: 0.05em;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--pink);
+  color: #1a1a1a;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  text-align: center;
+  padding: 4px;
+  z-index: 999;
+  letter-spacing: 0.05em;
 }
 
 body:has(#dev-banner) h1 {
@@ -389,6 +384,67 @@ body:has(#dev-banner) #version-status {
     color: var(--pink);
 }
 
+#more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#more-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex-direction: column;
+  padding: 6px;
+  gap: 4px;
+  min-width: 160px;
+  z-index: 300;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+#more-menu.open {
+  display: flex;
+}
+
+#more-menu button,
+#more-menu a button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+#more-menu .menu-divider {
+  height: 9px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+#more-menu .menu-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border);
+  transform: translateY(-50%);
+}
+
+#mute-btn::before {
+  font-family: 'tabler-icons';
+  content: '\ea35';
+  margin-right: 6px;
+}
+
+#mute-btn.muted::before {
+  content: '\ece9';
+}
+
 @media (max-width: 600px) {
   h1 {
     font-size: 12px;
@@ -410,6 +466,7 @@ body:has(#dev-banner) #version-status {
     display: flex;
     gap: 6px;
     z-index: 101;
+    position: fixed;
   }
   #username-form input[type="text"] {
     flex: 1;
@@ -481,5 +538,66 @@ body:has(#dev-banner) #version-status {
   }
   #color-btn {
     display: none;
+  }
+  #username-form > a,
+  #username-form > #signout {
+    display: none;
+  }
+
+  #more-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #more-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 12px;
+    margin-bottom: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex-direction: column;
+    padding: 6px;
+    gap: 4px;
+    min-width: 140px;
+  }
+
+  #more-menu.open {
+    display: flex;
+  }
+
+  #more-menu button,
+  #more-menu a button {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  #more-menu .menu-divider {
+    height: 9px;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  #more-menu .menu-divider::before {
+    content: '';
+    position: absolute;
+    top: 50% !important;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--border);
+    transform: translateY(-50%) !important;
+  }
+  #mute-btn::before {
+    font-family: 'tabler-icons';
+    content: '\ea35';
+    margin-right: 6px;
+  }
+
+  #mute-btn.muted::before {
+    content: '\ece9';
   }
 }

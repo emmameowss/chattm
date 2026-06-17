@@ -39,6 +39,28 @@ function getNameColor(name) {
 function isSystemMessage(data) {
     return data.username === 'SYSTEM' && data.system
 }
+
+// more button
+const moreBtn = document.querySelector('#more-btn')
+const moreMenu = document.querySelector('#more-menu')
+
+moreBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    const isOpen = moreMenu.classList.toggle('open')
+    if (isOpen) {
+        const menuRect = moreMenu.getBoundingClientRect()
+        userlist.style.top = `${menuRect.bottom + 12}px`
+    } else {
+        userlist.style.top = ''
+    }
+})
+
+document.addEventListener('click', (e) => {
+    if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
+        moreMenu.classList.remove('open')
+        userlist.classList.remove('menu-open')
+    }
+})
 function devInstanceBanner() {
     if (window.location.hostname !== 'dev.chat.emmameowss.gay') return
     if (document.querySelector('#dev-banner')) return
@@ -218,8 +240,7 @@ socket.on('userLeft', (name) =>  {
 */
 // mute button
 let notifymuted = localStorage.getItem('notifymuted') === 'true'
-const mutebtn = document.querySelector('#mute-btn')
-mutebtn.innerHTML = ''
+const mutebtn = document.querySelector('#mute-btn') 
 mutebtn.classList.toggle('muted', notifymuted)
 
 

@@ -351,9 +351,12 @@ io.on('connection', socket => {
             socket.emit('commandError', "invalid username, make sure it's within the character limit and uses only letters and numbers")
             return
         }
+        const isGuest = socket.userEmail.endsWith('@guest')
+        if (isGuest && socket.username) {
+            socket.emit('commandError', 'guests cannot change their username')
+        }
         const prevUser = socket.username
         socket.username = name
-        const isGuest = socket.userEmail.endsWith('@guest')
         if (prevUser && prevUser !== name) {
             systemMessage(`${prevUser} changed their username to ${name}`)
             socket.emit('userRenamed', { from: prevUser, to: name })
