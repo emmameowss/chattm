@@ -364,21 +364,18 @@ body:has(#dev-banner) #version-status {
 }
 
 #version-status {
-    position: fixed;
-    top: 12px;
-    left: 16px;
-    padding-left: 60px; 
     font-size: 10px;
     color: var(--muted);
     opacity: 0.5;
-    z-index: 201; 
-    line-height: 28px;
+    padding: 4px 10px;
+    text-align: center;
 }
 
 #version-status.outdated {
     color: var(--pink);
     opacity: 1;
 }
+
 #sysmsg-btn.hidden-active {
     border-color: var(--pink);
     color: var(--pink);

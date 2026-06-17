@@ -76,8 +76,7 @@ function devInstanceBanner() {
 
 fetch('/version').then(r => r.json()).then(v => {
     if (v.upToDate === null) return
-    const el = document.createElement('div')
-    el.id = 'version-status'
+    const el = document.querySelector('#version-status')
     if (v.upToDate) {
         el.textContent = `up to date (${v.currentCommit})`
     } else if (v.ahead) {
@@ -86,7 +85,6 @@ fetch('/version').then(r => r.json()).then(v => {
         el.textContent = `${v.behind} commit${v.behind === 1 ? '' : 's'} behind (${v.currentCommit})`
         el.classList.add('outdated')
     }
-    document.body.appendChild(el)
 }).catch(() => {})
 
 // lightbox
