@@ -42,7 +42,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/unban', '/mute', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
+const ownercmds = ['/ban', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
 
 let sessions = {}
 let chatMuted = false
@@ -675,6 +675,36 @@ io.on('connection', socket => {
             socket.emit('colorChanged', color)
             emitUserList()
             return
+        }
+        if (data.text?.startsWith('/setcolor ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const args = data.text.slice(10).trim().split(' ')
+            const targetUsername = args[0]
+            const colorInput = args.slice(1).join(' ').toLowerCase()
+
+            let targetEmail = null
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.username === targetUsername) {
+                    targetEmail = s.userEmail
+                    break
+                }
+            }
+            if (!targetEmail) {
+                socket.emit('commandError', `no user found with username ${targetUsername}`)
+            }
+            const color = flags[colorInput] ?? colorInput
+            if (isBlockedColor(color)) {
+                socket.emit('commandError', 'please choose a different color')
+                return
+            }
+            userColors[targetEmail] = color
+            await saveColors()
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.userEmail === targetEmail) {
+                    s.emit('colorChanged', color)
+                }
+            }
+            emitUserList()
+            socket.emit('commandError', `set ${targetUsername}'s color to ${color.startsWith('flag:') ? color.slice(5) : color}`)
         }
         const timestamp = new Date().toISOString()
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
