@@ -251,7 +251,7 @@ function parseDuration(str) {
 }
 
 function isValidUsername(name) {
-    return /^[a-zA-Z0-9]{1,20}$/.test(name)
+    return /^[a-zA-Z0-9-]{1,20}$/.test(name)
 }
 
 setInterval(async () => {
