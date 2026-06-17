@@ -158,8 +158,8 @@ async function saveMaintenance() {
     await writeFile('maintenance.json', JSON.stringify({maintenance, reason}))
 }
 
-async function getVersionStatus() {
-    if (versionCache && Date.now() - versionCacheTime < 10 * 60 * 1000) {
+async function getVersionStatus(forceRefresh = false) {
+    if (!forceRefresh && versionCache && Date.now() - versionCacheTime < 10 * 60 * 1000) {
         return versionCache
     }
     let result
@@ -880,6 +880,7 @@ httpServer.on('request', async (req, res) => {
     }
 
     if (url.pathname === '/version') {
+        const forceRefresh = url.searchParams.get('refresh') === '1'
         const status = await getVersionStatus()
         res.writeHead(200, {"content-type": "application/json"})
         res.end(JSON.stringify(status))

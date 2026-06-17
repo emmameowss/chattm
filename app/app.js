@@ -89,18 +89,22 @@ function devInstanceBanner() {
     }
 }
 
-fetch('/version').then(r => r.json()).then(v => {
-    if (v.upToDate === null) return
-    const el = document.querySelector('#version-status')
-    if (v.upToDate) {
-        el.textContent = `up to date (${v.currentCommit})`
-    } else if (v.ahead) {
-        el.textContent = `${v.ahead} commit${v.ahead === 1 ? '' : 's'} ahead (${v.currentCommit})`
-    } else {
-        el.textContent = `${v.behind} commit${v.behind === 1 ? '' : 's'} behind (${v.currentCommit})`
-        el.classList.add('outdated')
-    }
-}).catch(() => {})
+function loadVersionStatus(forceRefresh = false) {
+    fetch(`/version${forceRefresh ? '?refresh=1' : ''}`).then(r => r.json()).then(v => {
+        if (v.upToDate === null) return
+        const el = document.querySelector('#version-status')
+        el.classList.remove('outdated')
+        if (v.upToDate) {
+            el.textContent = `up to date (${v.currentCommit})`
+        } else if (v.ahead) {
+            el.textContent = `${v.ahead} commit${v.ahead === 1 ? '' : 's'} ahead (${v.currentCommit})`
+        } else {
+            el.textContent = `${v.behind} commit${v.behind === 1 ? '' : 's'} behind (${v.currentCommit})`
+            el.classList.add('outdated')
+        }
+    }).catch(() => {})
+}
+loadVersionStatus()
 
 // lightbox
 function lightbox(src) {
@@ -788,6 +792,11 @@ document.querySelector('#owner-clear-btn').addEventListener('click', async () =>
     if (confirmed) {
         socket.emit('message', {text: '/clear'})
     }
+})
+document.querySelector('#owner-refresh-version-btn').addEventListener('click', () => {
+    loadVersionStatus(true)
+    showStatus('refreshing version status...', 'pink')
+    setTimeout(hideStatus, 1500)
 })
 
 // mute chat
