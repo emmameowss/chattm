@@ -409,6 +409,9 @@ socket.on('connect', () => {
     localStorage.removeItem('banned')
     const token = localStorage.getItem('token')
     socket.emit('setUsername', username, token)
+    if (!username.startsWith('guest-') && !localStorage.getItem('isGuest')) {
+        socket.emit('setUsername', username, token)
+    }
 })
 
 
@@ -492,8 +495,12 @@ socket.on("message", (data) => {
     })
 // user renamed status
 socket.on('userRenamed', ({from, to}, guest) => {
-    showStatus(`changed username to ${to}`, 'hotpink')
-    setTimeout(hideStatus, 3000)
+    if (guest) {
+        return
+    } else {
+        showStatus(`changed username to ${to}`, 'hotpink')
+        setTimeout(hideStatus, 3000)
+    }
 })
 
 // user renamed system message
@@ -718,6 +725,9 @@ socket.on('guestUsername', (name, guest) => {
     guest = true
     document.querySelector('#username-input').value = name
     socket.emit('setUsername', name, guest)
+
+    document.querySelector('#username-input').disabled = true
+    document.querySelector('#username-form button[type="submit"]').disabled = true
 })
 
 socket.on('commandError', (msg) => {

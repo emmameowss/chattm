@@ -332,8 +332,6 @@ io.on('connection', socket => {
         delete userColors[socket.userEmail]
         saveColors()
     }
-
-
     if (chatMuted) {
         const ann = 'chat is currently muted'
         socket.emit('chatmuted', ann)
@@ -351,15 +349,12 @@ io.on('connection', socket => {
             socket.emit('commandError', "invalid username, make sure it's within the character limit and uses only letters and numbers")
             return
         }
-        const isGuest = socket.userEmail.endsWith('@guest')
-        if (isGuest && socket.username) {
-            socket.emit('commandError', 'guests cannot change their username')
-        }
         const prevUser = socket.username
         socket.username = name
-        if (prevUser && prevUser !== name) {
-            systemMessage(`${prevUser} changed their username to ${name}`)
-            socket.emit('userRenamed', { from: prevUser, to: name })
+        const isGuest = socket.userEmail.endsWith('@guest')
+        if (prevUser && prevUser !== name && !isGuest) {
+            socket.broadcast.emit('userRenamedSys', {from: prevUser, to: name}, guest)
+            socket.emit('userRenamed', { from: prevUser, to: name }, guest)
         }
         emitUserList()
     })
@@ -605,6 +600,10 @@ io.on('connection', socket => {
             const nick = data.text.slice(6).trim()
             if (!isValidUsername(nick)) {
                 socket.emit('commandError', "invalid username, make sure it's within the character limit and uses only letters and numbers")
+                return
+            }
+            if (socket.userEmail.endsWith('@guest')) {
+                socket.emit('commandError', 'guests cannot change their username')
                 return
             }
             const prevUser = socket.username
