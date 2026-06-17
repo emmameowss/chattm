@@ -334,7 +334,7 @@ io.on('connection', socket => {
     }
     if (chatMuted) {
         const ann = 'chat is currently muted'
-        socket.emit('chatmuted', ann)
+        systemMessage(ann)
     }
 
     if (socket.userEmail.endsWith('@guest')) {

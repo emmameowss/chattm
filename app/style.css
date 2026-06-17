@@ -13,6 +13,8 @@
   --radius: 6px;
   --font-mono: 'DM Mono', monospace;
   --font-sans: 'DM Sans', sans-serif;
+  --danger: #d97a7a;
+  --danger-dim: rgba(217, 122, 122, 0.1);
 }
 
 html, body {
@@ -440,6 +442,18 @@ body:has(#dev-banner) #version-status {
 
 #mute-btn.muted::before {
   content: '\ece9';
+}
+#owner-tools {
+  flex-direction: column;
+  gap: 4px;
+}
+#owner-tools button {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+#owner-tools button:hover {
+  background: var(--danger-dim);
 }
 
 @media (max-width: 600px) {

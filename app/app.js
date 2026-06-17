@@ -736,6 +736,8 @@ socket.on('commandError', (msg) => {
     showError(msg)
 })
 
+let chatMutedb = false
+
 // check owner status and mute chat status on connect
 socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
     isOwner = owner
@@ -750,8 +752,26 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
         document.querySelector('#message-form button[type="submit"]').disabled = true
         showStatus(`you are muted${uMuted.until ? ' until ' + new Date(uMuted.until).toLocaleString() : ''} — ${uMuted.reason}`, 'pink')
     }
+    if (isOwner) {
+        document.querySelector('#owner-divider').style.display = 'block'
+        document.querySelector('#owner-tools').style.display = 'flex'
+    }
 
     if (color) userColor = color
+})
+
+document.querySelector('#owner-mutechat-btn').addEventListener('click', () => {
+    socket.emit('message', {text: chatMutedb ? '/unmutechat' : '/mutechat'})
+})
+document.querySelector('#owner-maintenance-btn').addEventListener('click', () => {
+    const reason = prompt('maintenance reason (leave blank to turn off):')
+    if (reason === null) return
+    socket.emit('message', {text: `/maintenance ${reason}`})
+})
+document.querySelector('#owner-clear-btn').addEventListener('click', () => {
+    if (confirm("clear chat history? this can't be undone")) {
+        socket.emit('message', {text: '/clear'})
+    }
 })
 
 // mute chat
@@ -761,17 +781,17 @@ socket.on('mutechat', (ann) => {
     document.querySelector('#message-form button[type="submit"]').disabled = true
     document.querySelector('#attach-btn').disabled = false
     }
-    systemMessage(ann)
+    chatMutedb = true
     showStatus(ann, 'pink')
 })
 
 // unmute chat
 socket.on('unmutechat', (ann) => {
-    systemMessage(ann)
     hideStatus()
     document.querySelector('#message-input').disabled = false
     document.querySelector('#message-form button[type="submit"]').disabled = false
     document.querySelector('#attach-btn').disabled = false
+    chatMutedb = false
 })
 
 // status
