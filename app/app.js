@@ -58,11 +58,11 @@ moreBtn.addEventListener('click', (e) => {
 })
 
 document.addEventListener('click', (e) => {
+    const modalOverlay = document.querySelector('#modal-overlay')
+    if (modalOverlay.contains(e.target)) return
     if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
         moreMenu.classList.remove('open')
-        if (window.innerWidth > 600) {
-            userlist.style.top = ''
-        }
+        userlist.style.top = ''
     }
 })
 function devInstanceBanner() {
@@ -763,13 +763,14 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
 document.querySelector('#owner-mutechat-btn').addEventListener('click', () => {
     socket.emit('message', {text: chatMutedb ? '/unmutechat' : '/mutechat'})
 })
-document.querySelector('#owner-maintenance-btn').addEventListener('click', () => {
-    const reason = prompt('maintenance reason (leave blank to turn off):')
+document.querySelector('#owner-maintenance-btn').addEventListener('click', async () => {
+    const reason = await showModal({message: "maintenance reason (leave blank to turn off):", withInput: true})
     if (reason === null) return
     socket.emit('message', {text: `/maintenance ${reason}`})
 })
-document.querySelector('#owner-clear-btn').addEventListener('click', () => {
-    if (confirm("clear chat history? this can't be undone")) {
+document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
+    const confirmed = await showModal({message: "clear all chat history? this can't be reversed"})
+    if (confirmed) {
         socket.emit('message', {text: '/clear'})
     }
 })
@@ -817,6 +818,38 @@ socket.on('unmuted', () => {
     document.querySelector('#message-form button[type="submit"]').disabled = false
     hideStatus()
 })
+
+// modal
+function showModal({message, withInput = false, defaultValue = ''}) {
+    return new Promise((resolve) => {
+        const overlay = document.querySelector('#modal-overlay')
+        const msgEl = document.querySelector('#modal-message')
+        const inputEl = document.querySelector('#modal-input')
+        const confirmBtn = document.querySelector('#modal-confirm')
+        const cancelBtn = document.querySelector('#modal-cancel')
+
+        msgEl.textContent = message
+        inputEl.style.display = withInput ? 'block' : 'none'
+        inputEl.value = defaultValue
+        overlay.style.display = 'flex'
+        if (withInput) inputEl.focus()
+
+        function cleanUp(result) {
+            overlay.style.display = 'none'
+            confirmBtn.removeEventListener('click', onConfirm)
+            cancelBtn.removeEventListener('click', onCancel)
+            resolve(result)
+        }
+        function onConfirm() {
+            cleanUp(withInput ? inputEl.value : true)
+        }
+        function onCancel() {
+            cleanUp(withInput ? null : false)
+        }
+        confirmBtn.addEventListener('click', onConfirm)
+        cancelBtn.addEventListener('click', onCancel)
+    })
+}
 
 /* useless
 
