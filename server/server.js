@@ -882,7 +882,7 @@ httpServer.on('request', async (req, res) => {
     if (url.pathname === '/version') {
         const forceRefresh = url.searchParams.get('refresh') === '1'
         const status = await getVersionStatus()
-        res.writeHead(200, {"content-type": "application/json"})
+        res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"})
         res.end(JSON.stringify(status))
         return
     }
