@@ -66,11 +66,20 @@ document.addEventListener('click', (e) => {
     }
 })
 function devInstanceBanner() {
-    if (window.location.hostname !== 'dev.chat.emmameowss.gay') return
+    const devHosts = [
+        'dev.chat.emmameowss.gay',
+        'localhost',
+        '127.0.0.1'
+    ]
+
+    if (!devHosts.includes(window.location.hostname)) return
     if (document.querySelector('#dev-banner')) return
+
     const banner = document.createElement('div')
     banner.id = 'dev-banner'
-    banner.textContent = 'this is a dev instance of chat™ - things may not be stable and may break often'
+    banner.textContent =
+        'this is a dev instance of chat™ - things may not be stable and may break often'
+
     document.body.appendChild(banner)
 }
 
