@@ -194,6 +194,7 @@ if (new URLSearchParams(window.location.search).get('error') === 'auth_denied') 
 }
 
 if (!session) {
+    const kickedReason = sessionStorage.getItem('kickedReason')
     if (maintenanceCheck.maintenance) showMaintenance(maintenanceCheck.reason)
     document.body.className = 'login-page'
     document.body.innerHTML = `
@@ -201,9 +202,11 @@ if (!session) {
         <p>you need to sign in to chat</p>
         <a href="/login"><button><i class="ti ti-login-2"></i> login with Hack Club</button></a>
         <a href="/guest"><button><i class="ti ti-user"></i> continue as guest</button></a>
+        ${kickedReason ? `<p style="color: var(--pink)">you've been kicked: ${kickedReason}</p>` : ''}
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
     `
     devInstanceBanner()
+    sessionStorage.removeItem('kickedReason')
     sessionStorage.removeItem('authDenied')
     throw new Error('not authenticated')
 }
@@ -628,6 +631,13 @@ socket.on('banned', (reason) => {
     // useless localStorage.setItem('banned', reason || 'no reason given')
     location.reload()
 })
+
+socket.on('kicked', (reason) => {
+    localStorage.removeItem('session')
+    sessionStorage.setItem('kickedReason', reason || 'no reason given')
+    window.location.href = '/'
+})
+
 // handle announcement command
 socket.on('announcement', (ann) => {
     announce = true
@@ -711,7 +721,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
+const commands = ["/whois [username]", "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value

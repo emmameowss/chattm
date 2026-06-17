@@ -42,7 +42,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois']
+const ownercmds = ['/ban', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick']
 
 let sessions = {}
 let chatMuted = false
@@ -460,6 +460,37 @@ io.on('connection', socket => {
                     s.disconnect()
                 }
             }
+            return
+        }
+
+        if (data.text?.startsWith('/kick ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const args = data.text.slice(6).trim()
+            const [targetUsername, ...reasonParts] = args.split(' ')
+            const reason = reasonParts.join(' ') || 'kicked by server'
+
+            if (!targetUsername) {
+                socket.emit('commandError', 'usage: /kick <username> [reason]')
+                return
+            }
+
+            let kicked = false
+            for (const [id, s] of io.sockets.sockets) {
+                if (s.username === targetUsername) {
+                    s.emit('kicked', reason)
+                    s.disconnect()
+                    systemMessage(`${targetUsername} was kicked for ${reason}`)
+                    kicked = true
+                    break
+                }
+            }
+
+            if (!kicked) {
+                socket.emit('commandError', `no user found with username ${targetUsername}`)
+                return
+            }
+
+            socket.emit('commandError', `kicked ${targetUsername}`)
+            await appendFile('kicks.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${reason}\n`)
             return
         }
 
