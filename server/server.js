@@ -376,7 +376,7 @@ io.on('connection', socket => {
 
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
-        if (socket.username) systemMessage(`${socket.username} left`)
+        if (socket.username && !socket.skipLeaveMessage) systemMessage(`${socket.username} left`)
         emitUserList()
     })
 
@@ -407,6 +407,7 @@ io.on('connection', socket => {
                     await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
                     await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) auto-banned, 5th strike triggered by "${hit}" — message: ${data.text}\n`)
                     socket.emit('banned', reason)
+                    socket.skipLeaveMessage = true
                     socket.disconnect()
                     return
                 }
@@ -457,6 +458,7 @@ io.on('connection', socket => {
                     await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
                     s.emit('banned', reason)
                     socket.emit('commandError', `banned ${targetEmail}`)
+                    s.skipLeaveMessage = true
                     s.disconnect()
                 }
             }
@@ -477,6 +479,7 @@ io.on('connection', socket => {
             for (const [id, s] of io.sockets.sockets) {
                 if (s.username === targetUsername) {
                     s.emit('kicked', reason)
+                    s.skipLeaveMessage = true
                     s.disconnect()
                     systemMessage(`${targetUsername} was kicked for ${reason}`)
                     kicked = true
