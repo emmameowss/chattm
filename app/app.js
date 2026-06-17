@@ -47,18 +47,22 @@ const moreMenu = document.querySelector('#more-menu')
 moreBtn.addEventListener('click', (e) => {
     e.stopPropagation()
     const isOpen = moreMenu.classList.toggle('open')
-    if (isOpen) {
-        const menuRect = moreMenu.getBoundingClientRect()
-        userlist.style.top = `${menuRect.bottom + 12}px`
-    } else {
-        userlist.style.top = ''
+    if (window.innerWidth > 600) {
+        if (isOpen) {
+            const menuRect = moreMenu.getBoundingClientRect()
+            userlist.style.top = `${menuRect.bottom + 12}px`
+        } else {
+            userlist.style.top = ''
+        }
     }
 })
 
 document.addEventListener('click', (e) => {
     if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
         moreMenu.classList.remove('open')
-        userlist.style.top = ''
+        if (window.innerWidth > 600) {
+            userlist.style.top = ''
+        }
     }
 })
 function devInstanceBanner() {
