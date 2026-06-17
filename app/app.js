@@ -58,7 +58,7 @@ moreBtn.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
     if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
         moreMenu.classList.remove('open')
-        userlist.classList.remove('menu-open')
+        userlist.style.top = ''
     }
 })
 function devInstanceBanner() {
