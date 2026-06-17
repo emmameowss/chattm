@@ -691,6 +691,13 @@ io.on('connection', socket => {
             if (!targetEmail) {
                 socket.emit('commandError', `no user found with username ${targetUsername}`)
             }
+            const flags = {
+                'flag:pride': 'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
+                'flag:trans': 'linear-gradient(90deg,#55cdfc,#f7a8b8,#fff,#f7a8b8,#55cdfc)',
+                'flag:bi': 'linear-gradient(90deg,#d60270,#d60270,#9b4f96,#0038a8,#0038a8)',
+                'flag:lesbian': 'linear-gradient(90deg,#d62900,#ff9b55,#fff,#d461a6,#a50062)',
+                'flag:nb': 'linear-gradient(90deg,#fcf434,#fff,#9c59d1,#2c2c2c)'
+            }
             const color = flags[colorInput] ?? colorInput
             if (isBlockedColor(color)) {
                 socket.emit('commandError', 'please choose a different color')
