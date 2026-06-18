@@ -12,6 +12,7 @@ filter.txt
 strikes.json
 history.json
 maintenance.json
+maintenance.html
 colors.json
 sessions.json
 npm-debug.log*
