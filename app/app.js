@@ -466,17 +466,18 @@ function renderMessage(data) {
     if (ausername === username || isOwner) {
         li.addEventListener('contextmenu', (e) => {
             e.preventDefault()
-            openMessageContextMenu(e.clientX, e.clientY, data.id)
+            openMessageContextMenu(li, data.id)
         })
     }
 
     appendMessage(li)
 }
 
-function openMessageContextMenu(x,y,messageId) {
+function openMessageContextMenu(li, messageId) {
     const menu = document.querySelector('#message-context-menu')
-    menu.style.left = `${x}px`
-    menu.style.top = `${y}px`
+    const rect = li.getBoundingClientRect()
+    menu.style.left = `${rect.left}px`
+    menu.style.top = `${rect.bottom + 4}px`
     menu.classList.add('open')
 
     const deleteBtn = document.querySelector('#ctx-delete-btn')
