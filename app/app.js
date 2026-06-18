@@ -676,7 +676,10 @@ socket.on('maintenance', (enabled, reason) => {
 })
 
 // user list client side stuff
+let onlineUsernames = []
+
 socket.on('userlist', (users) => {
+    onlineUsernames = users.map(u => u.username).filter(Boolean)
     const ul = document.querySelector('#userlist')
     ul.innerHTML = `<strong>online (${users.length})</strong><br>`
     users.forEach(u => {
@@ -726,6 +729,19 @@ const commands = ["/whois [username]", "/kick [username] [reason]", '/setcolor [
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
     const suggestion = document.querySelector('#command-suggestion')
+
+    const usernameCmdMatch = value.match(/^\/(kick|mute|unmute|whois|resetstrikes|setcolor)\s+([a-zA-Z0-9-]*)$/)
+    if (usernameCmdMatch) {
+        const [, cmd, partial] = usernameCmdMatch
+        const lower = partial.toLowerCase()
+        const userMatch = onlineUsernames.find(name => name.toLowerCase().startsWith(lower) && name.toLowerCase() !== lower)
+
+        if (userMatch) {
+            suggestion.textContent = `/${cmd} ${userMatch} `
+            suggestion.style.display = 'block'
+            return
+        }
+    }
 
     if (value.startsWith('/')) {
         const match = commands.find(c => c.startsWith(value))
