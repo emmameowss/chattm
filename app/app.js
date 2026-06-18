@@ -217,11 +217,11 @@ if (session) {
         showStatus('ui not optimised for mobile', 'pink')
     }
         */
-if (sessionStorage.getItem('newlogin')) {
-    sessionStorage.removeItem('newlogin')
-    showStatus("welcome to chat™, set your username above if you haven't", 'pink')
-    setTimeout(hideStatus, 3000)
-}
+    if (sessionStorage.getItem('newlogin')) {
+        sessionStorage.removeItem('newlogin')
+        showStatus("welcome to chat™, set your username above if you haven't", 'pink')
+        setTimeout(hideStatus, 3000)
+    }
 
 
 const socket = io(
@@ -315,57 +315,7 @@ function activitya() {
 
 // message history
 socket.on('history', (messages) => {
-    messages.forEach(data => {
-        if (isSystemMessage(data)) {
-            if (hideSysMsg) return
-            const li = document.createElement('li')
-            li.textContent = data.text
-            li.style.color = 'gray'
-            li.style.fontStyle = 'italic'
-            appendMessage(li)
-            return
-        }
-        const li = document.createElement('li')
-        const ausername = data.username
-        const color = data.color || getNameColor(ausername)
-        const namespan = document.createElement('span')
-        const timespan = document.createElement('span')
-        timespan.className = 'msg-time'
-        timespan.textContent = `[${new Date(Number(data.time)).toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
-        applyFlagColor(timespan, color)
-        li.appendChild(timespan)
-        li.appendChild(namespan)
-        const nametext = document.createElement('span')
-        nametext.textContent = ausername
-        if (data.isToken) {
-           const tag = document.createElement('span')
-           tag.textContent = '♛'
-           tag.style.cssText = 'color:hotpink;margin-right:8px'
-           namespan.appendChild(tag)
-        }
-        if (data.isGuest) {
-            const badge = document.createElement('i')
-            badge.className = 'ti ti-user'
-            badge.style.cssText = `font-size:10px;margin-right:8px`
-            applyFlagColor(badge, color)
-            namespan.appendChild(badge)
-        }
-        applyFlagColor(nametext, color)
-        nametext.style.display = 'inline-block'
-        namespan.appendChild(nametext)
-        namespan.appendChild(document.createTextNode(': '))
-        if (data.text) {
-           li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
-        }
-        if (data.image) {
-            const img = document.createElement('img')
-            img.src = data.image
-            img.style.cssText = 'max-width:300px;display:block;cursor:zoom-in'
-            img.addEventListener('click', () => lightbox(data.image))
-            li.appendChild(img)
-        }
-        appendMessage(li)
-    })
+    messages.forEach(data => renderMessage(data))
 })
 
 async function sendMessageNew(e) {
@@ -457,13 +407,29 @@ socket.on("message", (data) => {
         appendMessage(li)
         return
     }
+    renderMessage(data)
+    if (document.hidden && !notifymuted) beep()
+    if (document.hidden) {
+        unread++
+        document.title = `(${unread}) chat™`
+    }
+})
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        unread = 0
+        document.title = 'chat™'
+    }
+})
+
+function renderMessage(data) {
     const li = document.createElement('li')
+    li.dataset.id = data.id
     const ausername = data.username
     const color = data.color || getNameColor(ausername)
+    const namespan = document.createElement('span')
     const timespan = document.createElement('span')
     timespan.className = 'msg-time'
-    timespan.textContent = `[${new Date().toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
-    const namespan = document.createElement('span')
+    timespan.textContent = `[${new Date(Number(data.time)).toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
     applyFlagColor(timespan, color)
     li.appendChild(timespan)
     li.appendChild(namespan)
@@ -482,10 +448,6 @@ socket.on("message", (data) => {
         applyFlagColor(badge, color)
         namespan.appendChild(badge)
     }
-    if (data.username === 'SYSTEM') {
-        socket.emit('commandError', 'invalid username')
-        return
-    }
     applyFlagColor(nametext, color)
     nametext.style.display = 'inline-block'
     namespan.appendChild(nametext)
@@ -501,22 +463,24 @@ socket.on("message", (data) => {
         li.appendChild(img)
     }
 
-    appendMessage(li)
-    if (document.hidden && !notifymuted) {
-        beep()
+    if (ausername === username || isOwner) {
+        const delBtn = document.createElement('button')
+        delBtn.className = 'delete-msg-btn'
+        delBtn.innerHTML = '<i class="ti ti-trash"></i>'
+        delBtn.title = 'delete message'
+        delBtn.addEventListener('click', () => {
+            socket.emit('deleteMessage', data.id)
+        })
+        li.appendChild(delBtn)
     }
 
-    if (document.hidden) {
-        unread++
-        document.title = `(${unread}) chat™`
-    }
+    appendMessage(li)
+}
+
+socket.on('messageDeleted', (messageId) => {
+    const li = document.querySelector(`li[data-id="${messageId}"]`)
+    if (li) li.remove()
 })
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-            unread = 0
-            document.title = 'chat™'
-        }
-    })
 // user renamed status
 socket.on('userRenamed', ({from, to}, guest) => {
     if (guest) {
@@ -700,7 +664,7 @@ socket.on('userlist', (users) => {
             crown.textContent = '♛'
             crown.style.cssText = 'color:hotpink;margin-right:8px;font-size:10px'
             div.insertBefore(crown, inner)
-}
+        }
         ul.appendChild(div)
     })
 })

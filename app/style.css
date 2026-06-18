@@ -508,6 +508,19 @@ body:has(#dev-banner) #version-status {
   color: var(--pink);
 }
 
+.delete-msg-btn {
+  display: none;
+  margin-left: 8px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+li:hover .delete-msg-btn {
+  display: inline-block;
+}
+
 @media (max-width: 600px) {
   h1 {
     font-size: 12px;

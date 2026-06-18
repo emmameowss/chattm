@@ -8,6 +8,7 @@ import { randomBytes } from 'crypto'
 import { readFile, appendFile, writeFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
 import { execSync } from 'child_process'
+import { randomUUID } from 'crypto'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -394,6 +395,22 @@ io.on('connection', socket => {
         emitUserList()
     })
 
+    socket.on('deleteMessage', async (messageId) => {
+        const index = history.findIndex(m => m.id === messageId)
+        if (index === -1) return
+
+        const msg = history[index]
+        const isOwnerOfMsg = msg.ownerEmail === socket.userEmail
+        const isAdmin = socket.userEmail === process.env.OWNER_EMAIL
+
+        if (!isOwnerOfMsg && !isAdmin) {
+            socket.emit('commandError', 'you can only delete your own messages')
+        }
+        history.splice(index, 1)
+        await saveHistory()
+        io.emit('messageDeleted', messageId)
+     })
+
     socket.on('message', async (data) => {
 
         // check if muted
@@ -766,6 +783,8 @@ io.on('connection', socket => {
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
         const message = {
             ...data,
+            id: randomUUID(),
+            ownerEmail: socket.userEmail,
             username: socket.username,
             time: Date.now(),
             isToken: socket.userEmail === process.env.OWNER_EMAIL,
@@ -775,7 +794,8 @@ io.on('connection', socket => {
         history.push(message)
         if (history.length > maxhistory) history.shift()
         await saveHistory()
-        io.emit('message', message)
+        const {ownerEmail, ...publicMessage} = message
+        io.emit('message', publicMessage)
     })
 })
 
