@@ -624,8 +624,8 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             history.length = 0
             await saveHistory()
-            systemMessage('chat was cleared', { saveToHistory: false })
             io.emit('clear')
+            systemMessage('chat was cleared', { saveToHistory: false })
             return
         }
 
