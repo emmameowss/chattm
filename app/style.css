@@ -508,17 +508,28 @@ body:has(#dev-banner) #version-status {
   color: var(--pink);
 }
 
-.delete-msg-btn {
+#message-context-menu {
   display: none;
-  margin-left: 8px;
-  height: 20px;
-  padding: 0 6px;
-  font-size: 11px;
-  vertical-align: middle;
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex-direction: column;
+  padding: 6px;
+  gap: 4px;
+  min-width: 160px;
+  z-index: 300;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 
-li:hover .delete-msg-btn {
-  display: inline-block;
+#message-context-menu.open {
+  display: flex;
+}
+
+#message-context-menu button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 @media (max-width: 600px) {

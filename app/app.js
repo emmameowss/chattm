@@ -464,18 +464,40 @@ function renderMessage(data) {
     }
 
     if (ausername === username || isOwner) {
-        const delBtn = document.createElement('button')
-        delBtn.className = 'delete-msg-btn'
-        delBtn.innerHTML = '<i class="ti ti-trash"></i>'
-        delBtn.title = 'delete message'
-        delBtn.addEventListener('click', () => {
-            socket.emit('deleteMessage', data.id)
+        li.addEventListener('contextmenu', (e) => {
+            e.preventDefault()
+            openMessageContextMenu(e.clientX, e.clientY, data.id)
         })
-        li.appendChild(delBtn)
     }
 
     appendMessage(li)
 }
+
+function openMessageContextMenu(x,y,messageId) {
+    const menu = document.querySelector('#message-context-menu')
+    menu.style.left = `${x}px`
+    menu.style.top = `${y}px`
+    menu.classList.add('open')
+
+    const deleteBtn = document.querySelector('#ctx-delete-btn')
+    deleteBtn.onclick = () => {
+        socket.emit('deleteMessage', messageId)
+        menu.classList.remove('open')
+    }
+}
+
+document.addEventListener('click', (e) => {
+    const ctxMenu = document.querySelector('#message-context-menu')
+    if (!ctxMenu.contains(e.target)) {
+        ctxMenu.classList.remove('open')
+    }
+})
+
+document.addEventListener('contextmenu', (e) => {
+    if (!e.target.closest('li')) {
+        document.querySelector('#message-context-menu').classList.remove('open')
+    }
+})
 
 socket.on('messageDeleted', (messageId) => {
     const li = document.querySelector(`li[data-id="${messageId}"]`)
