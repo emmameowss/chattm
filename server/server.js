@@ -624,13 +624,14 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             history.length = 0
             await saveHistory()
+            systemMessage('chat was cleared', { saveToHistory: false })
             io.emit('clear')
             return
         }
 
         if (data.text?.startsWith('/announce ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const ann = data.text.slice(10).trim()
-            io.emit('announcement', ann)
+            systemMessage(ann)
             return
         }
         if (data.text?.startsWith('/mutechat') && socket.userEmail === process.env.OWNER_EMAIL) {

@@ -625,11 +625,6 @@ socket.on('kicked', (reason) => {
     window.location.href = '/'
 })
 
-// handle announcement command
-socket.on('announcement', (ann) => {
-    announce = true
-    systemMessage(ann)
-})
 // an iq too high?
 // join/leave messages/system messages
 
@@ -707,7 +702,6 @@ document.querySelector('#file-input').addEventListener('change', () => {
 // clear chat command
 socket.on('clear', () => {
     document.querySelector('ul').innerHTML = ''
-    systemMessage('chat was cleared')
 })
 
 // command autocomplete
