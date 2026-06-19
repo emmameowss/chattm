@@ -899,71 +899,83 @@ httpServer.on('request', async (req, res) => {
         return
     }
 
-    if (url.pathname === '/upload' && req.method === 'OPTIONS') {
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+if (url.pathname === '/upload') {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+    if (req.method === 'OPTIONS') {
         res.writeHead(204)
         res.end()
         return
     }
 
-    if (url.pathname === '/upload' && req.method === 'POST') {
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        const form = formidable({ maxFileSize: 50 * 1024 * 1024 })
-        form.parse(req, async (err, fields, files) => {
-            if (err) {
-                res.writeHead(500)
-                res.end(JSON.stringify({ error: err.message }))
-                return
-            }
-            try {
-                const file = files.file[0]
-                const allowedTypes = [
-                    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-                    'video/mp4', 'video/quicktime',
-                    'audio/mpeg', 'audio/ogg', 'audio/wav',
-                    'application/pdf', 'text/plain', 'text/markdown',
-                    'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-                    'application/x-tar', 'application/gzip',
-                    'application/json', 'text/csv',
-                    'image/vnd.adobe.photoshop', 'application/figma'
-                ]
-                if (!allowedTypes.includes(file.mimetype)) {
-                    res.writeHead(400)
-                    res.end(JSON.stringify({ error: 'file type not allowed' }))
-                    return
-                }
-
-                const fileBuffer = await readFile(file.filepath)
-                const ext = extname(file.originalFilename || '')
-                const key = `uploads/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
-
-                await s3.send(new PutObjectCommand({
-                    Bucket: process.env.AWS_S3_BUCKET,
-                    Key: key,
-                    Body: fileBuffer,
-                    ContentType: file.mimetype,
-                    // remove this line if you're using CloudFront or a private bucket policy instead
-                    ACL: 'public-read'
-                }))
-
-                const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${key}`
-
-                const sessionId = fields.session?.[0]
-                const userEmail = sessions[sessionId]?.email || 'unknown'
-                const uUsername = fields.username?.[0] || 'unknown'
-                await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${publicUrl}\n`)
-
-                res.writeHead(200, { 'Content-Type': 'application/json' })
-                res.end(JSON.stringify({ url: publicUrl }))
-            } catch (e) {
-                res.writeHead(500)
-                res.end(JSON.stringify({ error: e.message }))
-            }
-        })
+    if (req.method !== 'POST') {
+        res.writeHead(405)
+        res.end(JSON.stringify({ error: 'Method not allowed' }))
         return
     }
+
+    const form = formidable({ maxFileSize: 50 * 1024 * 1024 })
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            res.writeHead(500)
+            res.end(JSON.stringify({ error: err.message }))
+            return
+        }
+        try {
+            if (!files.file || !files.file[0]) {
+                res.writeHead(400)
+                res.end(JSON.stringify({ error: 'No file uploaded' }))
+                return
+            }
+
+            const file = files.file[0]
+            const allowedTypes = [
+                'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+                'video/mp4', 'video/quicktime',
+                'audio/mpeg', 'audio/ogg', 'audio/wav',
+                'application/pdf', 'text/plain', 'text/markdown',
+                'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+                'application/x-tar', 'application/gzip',
+                'application/json', 'text/csv',
+                'image/vnd.adobe.photoshop', 'application/figma'
+            ]
+            if (!allowedTypes.includes(file.mimetype)) {
+                res.writeHead(400)
+                res.end(JSON.stringify({ error: 'file type not allowed' }))
+                return
+            }
+
+            const fileBuffer = await readFile(file.filepath)
+            const ext = extname(file.originalFilename || '')
+            const key = `uploads/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
+
+            await s3.send(new PutObjectCommand({
+                Bucket: process.env.AWS_S3_BUCKET,
+                Key: key,
+                Body: fileBuffer,
+                ContentType: file.mimetype,
+                ACL: 'public-read'
+            }))
+
+            const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${key}`
+
+            const sessionId = fields.session?.[0]
+            const userEmail = sessions[sessionId]?.email || 'unknown'
+            const uUsername = fields.username?.[0] || 'unknown'
+            await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${publicUrl}\n`)
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ url: publicUrl }))
+        } catch (e) {
+            console.error('Upload error:', e)
+            res.writeHead(500)
+            res.end(JSON.stringify({ error: e.message }))
+        }
+    })
+    return
+}
 
     if (url.pathname === '/guest') {
         const guestId = randomBytes(3).toString('hex')
