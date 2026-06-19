@@ -43,7 +43,7 @@ async function saveColors() {
     await writeFile('colors.json', JSON.stringify(userColors))
 }
 
-const ownercmds = ['/ban', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick']
+const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick']
 
 let sessions = {}
 let chatMuted = false
@@ -759,6 +759,18 @@ io.on('connection', socket => {
             await loadFilterWords()
             socket.emit('commandError', `${filteredwords.length} words loaded`)
             return
+        }
+        if (data.text?.startsWith('/removefilter ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const word = data.text.slice(14).trim().toLowerCase()
+            const index = filteredwords.indexOf(word)
+            if (index === -1) {
+                socket.emit('commandError', `${word} is not in the filter`)
+                return
+            }
+            filteredwords.splice(index, 1)
+            const newContent = filteredwords.join('\n') + '\n'
+            await writeFile('filter.txt', newContent)
+            socket.emit('commandError', `removed ${word} from the filter`)
         }
         if (data.text?.startsWith('/setcolor ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const args = data.text.slice(10).trim().split(' ')

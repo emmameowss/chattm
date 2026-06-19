@@ -705,7 +705,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
+const commands = ["/whois [username]", '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
