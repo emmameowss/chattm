@@ -772,6 +772,7 @@ io.on('connection', socket => {
             await writeFile('filter.txt', newContent)
             await loadFilterWords()
             socket.emit('commandError', `removed ${word} from the filter`)
+            return
         }
         if (data.text?.startsWith('/setcolor ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const args = data.text.slice(10).trim().split(' ')
