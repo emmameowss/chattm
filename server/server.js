@@ -9,6 +9,8 @@ import { readFile, appendFile, writeFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
 import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { readFileSync } from 'fs'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -16,6 +18,13 @@ const io = new Server(httpServer, {
         origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "https://chattm.app", "https://dev.chat.emmameowss.gay", "https://beta.chattm.app"]
     },
     maxHttpBufferSize: 1e6
+})
+const s3 = new S3Client({
+    region = process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    }
 })
 
 let history = []
@@ -926,21 +935,24 @@ httpServer.on('request', async (req, res) => {
                     return
                 }
                 const fileBuffer = await readFile(file.filepath)
-                const blob = new Blob([fileBuffer])
-                const formData = new FormData()
-                formData.append('file', blob, file.originalFilename)
-                const response = await fetch('https://cdn.hackclub.com/api/v4/upload', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${CDN_API_KEY}` },
-                    body: formData
-                })
-                const json = await response.json()
+                const ext = extname(file.originalFilename || '')
+                const key = `uploads/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
+
+                await s3.send(new PutObjectCommand({
+                    Bucket: process.env.AWS_S3_BUCKET,
+                    Key: key,
+                    Body: fileBuffer,
+                    ContentType: file.mimetype,
+                    ACL: 'public-read'
+                }))
+
+                const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${key}`
                 const sessionId = fields.session?.[0]
                 const userEmail = sessions[sessionId]?.email || 'unknown'
                 const uUsername = fields.username?.[0] || 'unknown'
-                await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${json.url}\n`)
+                await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${publicUrl}\n`)
                 res.writeHead(200, { 'Content-Type': 'application/json' })
-                res.end(JSON.stringify({ url: json.url }))
+                res.end(JSON.stringify({ url:publicUrl }))
             } catch (e) {
                 res.writeHead(500)
                 res.end(JSON.stringify({ error: e.message }))
