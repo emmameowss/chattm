@@ -76,10 +76,10 @@ function devInstanceBanner() {
     if (!devHosts.includes(window.location.hostname)) return
     if (document.querySelector('#dev-banner')) return
 
-    if (devHosts.includes('https://dev.chat.emmameowss.gay') || devHosts.includes('https://beta.chattm.app')) {
+    if (window.location.hostname.includes('https://dev.chat.emmameowss.gay') || window.location.hostname.includes('https://beta.chattm.app')) {
         const banner = document.createElement('div')
         banner.id = 'dev-banner'
-        banner.textContent = 'this is a beta instance of chat™ - things may not be stable, data is wiped every 24 hours'
+        banner.textContent = 'this is a beta instance of chat™ - things may not be very stable'
         document.body.appendChild(banner)
     } else {
         const banner = document.createElement('div')
