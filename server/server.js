@@ -20,7 +20,7 @@ const io = new Server(httpServer, {
     maxHttpBufferSize: 1e6
 })
 const s3 = new S3Client({
-    region = process.env.AWS_REGION,
+    region: process.env.AWS_REGION,
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
@@ -910,7 +910,7 @@ httpServer.on('request', async (req, res) => {
 
     if (url.pathname === '/upload' && req.method === 'POST') {
         res.setHeader('Access-Control-Allow-Origin', '*')
-        const form = formidable({ maxFileSize: 10 * 1024 * 1024 })
+        const form = formidable({ maxFileSize: 50 * 1024 * 1024 })
         form.parse(req, async (err, fields, files) => {
             if (err) {
                 res.writeHead(500)
@@ -928,12 +928,13 @@ httpServer.on('request', async (req, res) => {
                     'application/x-tar', 'application/gzip',
                     'application/json', 'text/csv',
                     'image/vnd.adobe.photoshop', 'application/figma'
-               ]
+                ]
                 if (!allowedTypes.includes(file.mimetype)) {
                     res.writeHead(400)
-                    res.end(JSON.stringify({error: "file type not allowed"}))
+                    res.end(JSON.stringify({ error: 'file type not allowed' }))
                     return
                 }
+
                 const fileBuffer = await readFile(file.filepath)
                 const ext = extname(file.originalFilename || '')
                 const key = `uploads/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
@@ -943,16 +944,19 @@ httpServer.on('request', async (req, res) => {
                     Key: key,
                     Body: fileBuffer,
                     ContentType: file.mimetype,
+                    // remove this line if you're using CloudFront or a private bucket policy instead
                     ACL: 'public-read'
                 }))
 
                 const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${key}`
+
                 const sessionId = fields.session?.[0]
                 const userEmail = sessions[sessionId]?.email || 'unknown'
                 const uUsername = fields.username?.[0] || 'unknown'
                 await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${publicUrl}\n`)
+
                 res.writeHead(200, { 'Content-Type': 'application/json' })
-                res.end(JSON.stringify({ url:publicUrl }))
+                res.end(JSON.stringify({ url: publicUrl }))
             } catch (e) {
                 res.writeHead(500)
                 res.end(JSON.stringify({ error: e.message }))
