@@ -756,7 +756,7 @@ io.on('connection', socket => {
         }
         if (data.text?.startsWith('/reloadfilter') && socket.userEmail === process.env.OWNER_EMAIL) {
             await loadFilterWords()
-            socket.emit('commandError', `${filteredwords} words loaded`)
+            socket.emit('commandError', `${filteredwords.length} words loaded`)
             return
         }
         if (data.text?.startsWith('/setcolor ') && socket.userEmail === process.env.OWNER_EMAIL) {
