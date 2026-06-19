@@ -751,6 +751,7 @@ io.on('connection', socket => {
                 filteredwords.push(word)
                 await appendFile('filter.txt', `${word}\n`)
             }
+            await loadFilterWords()
             socket.emit('commandError', `added ${word} to filter list`)
             return
         }
