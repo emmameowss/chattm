@@ -5,11 +5,23 @@ import { createServer } from "http"
 import formidable from 'formidable'
 import fetch from 'node-fetch'
 import { randomBytes } from 'crypto'
-import { readFile, appendFile, writeFile } from 'fs/promises'
+import { readFile, appendFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
 import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import {
+    getHistory, addMessage, deleteMessage, clearMessages,
+    getSession, saveSession, deleteSession,
+    getColor, setColor, deleteColor,
+    getMute, setMute, deleteMute, getExpiredMutes,
+    getStrikes, setStrikes, deleteStrikes,
+    isBanned, getBanReason, addBan, removeBan,
+    isIpBanned, addIpBan, removeIpBan,
+    getFilterWords, addFilterWord, removeFilterWord, replaceFilterWords,
+    getSetting, setSetting,
+    migrateFromFiles
+} from './db.js'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -26,52 +38,22 @@ const s3 = new S3Client({
     }
 })
 
-let history = []
-const maxhistory = 20
-// message history saving stuff
-try {
-    const data = await readFile('history.json', 'utf8')
-    history = JSON.parse(data)
-} catch (e) {}
-
-async function saveHistory() {
-    await writeFile('history.json', JSON.stringify(history))
-}
+// migrate from legacy files on first run
+await migrateFromFiles()
 
 const msgcooldown = 1000
 const lastmessage = {}
 const CDN_API_KEY = process.env.CDN_API_KEY
-const userColors = {}
-try {
-    const data = await readFile('colors.json', 'utf-8')
-    Object.assign(userColors, JSON.parse(data))
-} catch (e) {}
-
-async function saveColors() {
-    await writeFile('colors.json', JSON.stringify(userColors))
-}
 
 const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick']
 
-let sessions = {}
 let chatMuted = false
 let status = ''
-try {
-    const data = await readFile('sessions.json', 'utf8')
-    sessions = JSON.parse(data)
-} catch (e) {}
-let maintenance = false
-let reason = ''
-try {
-    const data = await readFile('maintenance.json', 'utf8')
-    const saved = JSON.parse(data)
-    maintenance = saved.maintenance || false
-    reason = saved.reason || ''
-} catch (e) {}
+let maintenance = getSetting('maintenance') === '1'
+let reason = getSetting('maintenance_reason') ?? ''
 const PORT = process.env.PORT || 3000
 let versionCache = null
 let versionCacheTime = 0
-
 
 const types = {
     '.html': 'text/html',
@@ -82,90 +64,28 @@ const types = {
     '.ico': 'image/x-icon'
 }
 
-const banlist = new Set()
-try {
-    const data = await readFile('bans.txt', 'utf8')
-    data.split('\n').filter(Boolean).forEach(email => banlist.add(email))
-    console.log(`loaded ${banlist.size} bans`)
-} catch (e) {}
-
-const ipbanlist = new Set()
-try { 
-    const data = await readFile('ipbans.txt', 'utf8')
-    data.split('\n').filter(Boolean).forEach(ip => ipbanlist.add(ip))
-    console.log(`loaded ${ipbanlist.size} ip bans`)
-} catch (e) {}
-
-const banReasons = {}
-try {
-    const data = await readFile('banreasons.json', 'utf-8')
-    Object.assign(banReasons, JSON.parse(data))
-} catch (e) {}
-
-const muted = {}
-try {
-    const data = await readFile('mutes.json', 'utf8')
-    Object.assign(muted, JSON.parse(data))
-} catch (e) {}
-
-const filteredwords = []
-async function loadFilterWords() {
-    try {
-        const data = await readFile('filter.txt', 'utf8')
-        filteredwords.length = 0
-        data.split('\n').map(w => w.trim().toLowerCase()).filter(Boolean).forEach(w => filteredwords.push(w))
-        console.log(`loaded ${filteredwords.length} filter words`)
-    } catch (e) {
-        console.log('no filter.txt found, filter disabled')
-    }
-}
-await loadFilterWords()
-function containsFilteredWord(text) {
-    if (!text) return null
-    const lower = text.toLowerCase()
-    return filteredwords.find(w => lower.includes(w)) || null
-}
-
-const strikes = {}
-try {
-    const data = await readFile('strikes.json', 'utf8')
-    Object.assign(strikes, JSON.parse(data))
-} catch (e) {}
-
 const blockedColors = ['#0e0e0e', '#161616', '#242424', '#e8e8e8', '#000']
 
 function isBlockedColor(color) {
     return blockedColors.includes(color.toLowerCase())
 }
 
-async function saveStrikes() {
-    await writeFile('strikes.json', JSON.stringify(strikes))
+function loadFilterWordsIntoMemory() {
+    filteredwords.length = 0
+    getFilterWords().forEach(w => filteredwords.push(w))
+    console.log(`loaded ${filteredwords.length} filter words`)
 }
 
-async function saveMutes() {
-    await writeFile('mutes.json', JSON.stringify(muted))
+const filteredwords = []
+loadFilterWordsIntoMemory()
+
+function containsFilteredWord(text) {
+    if (!text) return null
+    const lower = text.toLowerCase()
+    return filteredwords.find(w => lower.includes(w)) || null
 }
 
-async function saveBanReasons() {
-    await writeFile('banreasons.json', JSON.stringify(banReasons))
-}
-
-async function saveIpBans() {
-    await writeFile('ipbans.txt', [...ipbanlist].join('\n'))
-}
-
-async function saveBans() {
-    await writeFile('bans.txt', [...banlist].join('\n'))
-}
-
-async function saveSession(id, data) {
-    sessions[id] = data
-    await writeFile('sessions.json', JSON.stringify(sessions))
-}
-
-async function saveMaintenance() {
-    await writeFile('maintenance.json', JSON.stringify({maintenance, reason}))
-}
+console.log(`loaded ${getHistory().length} messages in history`)
 
 async function getVersionStatus(forceRefresh = false) {
     if (!forceRefresh && versionCache && Date.now() - versionCacheTime < 10 * 60 * 1000) {
@@ -204,21 +124,17 @@ async function getVersionStatus(forceRefresh = false) {
     return result
 }
 
-// mutes
 function isMuted(email) {
-    const m = muted[email]
+    const m = getMute(email)
     if (!m) return false
     if (m.until && Date.now() > m.until) {
-        delete muted[email]
-        saveMutes()
+        deleteMute(email)
         return false
     }
     return true
 }
 
-// sys message
 function systemMessage(text, options = {}) {
-
     const { excludeUserEmail = null, saveToHistory = true } = options
 
     const message = {
@@ -228,11 +144,7 @@ function systemMessage(text, options = {}) {
         system: true
     }
     if (saveToHistory) {
-        history.push(message)
-        if (history.length > maxhistory) {
-            history.shift()
-        }
-        saveHistory()
+        addMessage({ ...message, id: randomUUID() })
     }
     if (!excludeUserEmail) {
         io.emit('message', message)
@@ -243,24 +155,6 @@ function systemMessage(text, options = {}) {
         if (s.userEmail === excludeUserEmail) continue
         s.emit('message', message)
     }
-
-    /* old
-    console.log(text)
-    if (announce) {
-        const li = document.createElement('li')
-        li.textContent = text
-        li.style.color = 'pink'
-        li.style.fontStyle = 'italic'
-        appendMessage(li)
-        announce = false
-    } 
-    if (hideSysMsg) return
-    const li = document.createElement('li')
-    li.textContent = text
-    li.style.color = 'gray'
-    li.style.fontStyle = 'italic'
-    appendMessage(li)
-    */
 }
 
 function parseDuration(str) {
@@ -275,32 +169,25 @@ function isValidUsername(name) {
     return /^[a-zA-Z0-9-]{1,20}$/.test(name)
 }
 
-setInterval(async () => {
-    const now = Date.now()
-    let changed = false
-    for (const email of Object.keys(muted)) {
-        const m = muted[email]
-        if (m.until && now > m.until) {
-            delete muted[email]
-            changed = true
-            for (const [id, s] of io.sockets.sockets) {
-                if (s.userEmail === email) {
-                    s.emit('unmuted')
-                }
+setInterval(() => {
+    const expired = getExpiredMutes(Date.now())
+    for (const email of expired) {
+        deleteMute(email)
+        for (const [id, s] of io.sockets.sockets) {
+            if (s.userEmail === email) {
+                s.emit('unmuted')
             }
         }
     }
-    if (changed) await saveMutes()
 }, 10 * 1000)
-
 
 function emitUserList() {
     const users = []
     for (const [id, s] of io.sockets.sockets) {
-        if (s.username) users.push({ 
-            username: s.username, 
+        if (s.username) users.push({
+            username: s.username,
             email: s.userEmail,
-            color: userColors[s.userEmail] || null,
+            color: getColor(s.userEmail),
             guest: s.userEmail.endsWith('@guest'),
             isOwner: s.userEmail === process.env.OWNER_EMAIL
         })
@@ -310,21 +197,21 @@ function emitUserList() {
 
 io.use((socket, next) => {
     const sessionId = socket.handshake.auth.session
-    const user = sessions[sessionId]
+    const user = getSession(sessionId)
     if (!user) return next(new Error('not authenticated'))
-    if (banlist.has(user.email)) {
-        return next(new Error('banned'))
-        err.data = { reason: banReasons[user.email] || 'no reason given' }
+    if (isBanned(user.email)) {
+        const err = new Error('banned')
+        err.data = { reason: getBanReason(user.email) || 'no reason given' }
+        return next(err)
     }
     const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
-    if (ipbanlist.has(ip)) return next(new Error('banned'))
-    
+    if (isIpBanned(ip)) return next(new Error('banned'))
+
     // guest expiry stuff
     if (user.guest) {
         const today = new Date().toISOString().slice(0,10)
         if (user.expires !== today) {
-            delete sessions[sessionId]
-            writeFile('sessions.json', JSON.stringify(sessions))
+            deleteSession(sessionId)
             return next(new Error('not authenticated'))
         }
     }
@@ -341,17 +228,18 @@ io.on('connection', socket => {
     let lastMessage = 0
     console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)
-    socket.emit('history', history)
-    socket.emit('init', { 
+    // strip ownerEmail before sending history to client
+    socket.emit('history', getHistory().map(({ ownerEmail, ...m }) => m))
+    socket.emit('init', {
         isOwner: socket.userEmail === process.env.OWNER_EMAIL,
         chatMuted,
-        uMuted: isMuted(socket.userEmail) ? muted[socket.userEmail] : null
+        uMuted: isMuted(socket.userEmail) ? getMute(socket.userEmail) : null
     })
     if (status) socket.emit('status', status)
     // check blocked colors on connect
-    if (userColors[socket.userEmail] && isBlockedColor(userColors[socket.userEmail])) {
-        delete userColors[socket.userEmail]
-        saveColors()
+    const currentColor = getColor(socket.userEmail)
+    if (currentColor && isBlockedColor(currentColor)) {
+        deleteColor(socket.userEmail)
     }
     if (chatMuted) {
         const ann = 'chat is currently muted'
@@ -403,27 +291,27 @@ io.on('connection', socket => {
         emitUserList()
     })
 
-    socket.on('deleteMessage', async (messageId) => {
-        const index = history.findIndex(m => m.id === messageId)
-        if (index === -1) return
+    socket.on('deleteMessage', (messageId) => {
+        const history = getHistory()
+        const msg = history.find(m => m.id === messageId)
+        if (!msg) return
 
-        const msg = history[index]
         const isOwnerOfMsg = msg.ownerEmail === socket.userEmail
         const isAdmin = socket.userEmail === process.env.OWNER_EMAIL
 
         if (!isOwnerOfMsg && !isAdmin) {
             socket.emit('commandError', 'you can only delete your own messages')
+            return
         }
-        history.splice(index, 1)
-        await saveHistory()
+        deleteMessage(messageId)
         io.emit('messageDeleted', messageId)
-     })
+    })
 
     socket.on('message', async (data) => {
 
         // check if muted
         if (isMuted(socket.userEmail) && socket.userEmail !== process.env.OWNER_EMAIL) {
-            const m = muted[socket.userEmail]
+            const m = getMute(socket.userEmail)
             socket.emit('commandError', `you are muted${m.until ? ' until ' + new Date(m.until).toLocaleString() : ''} - reason: ${m.reason}`)
             return
         }
@@ -432,32 +320,25 @@ io.on('connection', socket => {
         if (socket.userEmail !== process.env.OWNER_EMAIL) {
             const hit = containsFilteredWord(data.text)
             if (hit) {
-                strikes[socket.userEmail] = (strikes[socket.userEmail] || 0 ) + 1
-                await saveStrikes()
+                const count = getStrikes(socket.userEmail) + 1
+                setStrikes(socket.userEmail, count)
 
-                if (strikes[socket.userEmail] > 5) {
-                    const reason = 'banned by server - too many automatic mutes'
-                    banlist.add(socket.userEmail)
-                    banReasons[socket.userEmail] = reason
-                    await saveBans()
-                    await saveBanReasons()
-                    ipbanlist.add(s.userIP)
-                    await saveIpBans()
-                    await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
+                if (count > 5) {
+                    const banReason = 'banned by server - too many automatic mutes'
+                    addBan(socket.userEmail, banReason)
+                    addIpBan(socket.userIP)
+                    await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${socket.userIP}\n`)
                     await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) auto-banned, 5th strike triggered by "${hit}" — message: ${data.text}\n`)
-                    socket.emit('banned', reason)
+                    socket.emit('banned', banReason)
                     socket.skipLeaveMessage = true
                     socket.disconnect()
                     return
                 }
                 const durationMs = 10 * 60 * 1000
-                muted[socket.userEmail] = {
-                    until: Date.now() + durationMs,
-                    reason: `muted by server: word filter (strike ${strikes[socket.userEmail]}/5)`
-                }
-                await saveMutes()
-                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, strike ${strikes[socket.userEmail]}/5, triggered by "${hit}" - message: ${data.text}\n`)
-                socket.emit('muted', {reason: muted[socket.userEmail].reason, until: muted[socket.userEmail].until})
+                setMute(socket.userEmail, `muted by server: word filter (strike ${count}/5)`, Date.now() + durationMs)
+                const m = getMute(socket.userEmail)
+                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, strike ${count}/5, triggered by "${hit}" - message: ${data.text}\n`)
+                socket.emit('muted', { reason: m.reason, until: m.until })
                 return
             }
         }
@@ -470,7 +351,7 @@ io.on('connection', socket => {
         lastmessage[socket.userEmail] = now
 
         if (chatMuted && socket.userEmail !== process.env.OWNER_EMAIL) {
-            socket.emit('commandError', "chat is currently muted") // disabled input should prevent messages, this is in case it fails
+            socket.emit('commandError', "chat is currently muted")
             return
         }
 
@@ -478,24 +359,21 @@ io.on('connection', socket => {
             if (ownercmds.some(cmd => data.text.startsWith(cmd))) {
                 socket.emit('commandError', 'you do not have permission to use commands')
                 return
-    }
-}
+            }
+        }
+
         // /ban command
         if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const args = data.text.slice(5).trim()
             const [targetEmail, ...reasonParts] = args.split(' ')
-            const reason = reasonParts.join(' ') || 'no reason given'
-            banlist.add(targetEmail)
-            banReasons[targetEmail] = reason
-            await saveBanReasons()
-            await saveBans()
-            await appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${reason}\n`)
+            const banReason = reasonParts.join(' ') || 'no reason given'
+            addBan(targetEmail, banReason)
+            await appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${banReason}\n`)
             for (const [id, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {
-                    ipbanlist.add(s.userIP)
-                    await saveIpBans()
+                    addIpBan(s.userIP)
                     await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
-                    s.emit('banned', reason)
+                    s.emit('banned', banReason)
                     socket.emit('commandError', `banned ${targetEmail}`)
                     s.skipLeaveMessage = true
                     s.disconnect()
@@ -507,7 +385,7 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/kick ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const args = data.text.slice(6).trim()
             const [targetUsername, ...reasonParts] = args.split(' ')
-            const reason = reasonParts.join(' ') || 'kicked by server'
+            const kickReason = reasonParts.join(' ') || 'kicked by server'
 
             if (!targetUsername) {
                 socket.emit('commandError', 'usage: /kick <username> [reason]')
@@ -517,10 +395,10 @@ io.on('connection', socket => {
             let kicked = false
             for (const [id, s] of io.sockets.sockets) {
                 if (s.username === targetUsername) {
-                    s.emit('kicked', reason)
+                    s.emit('kicked', kickReason)
                     s.skipLeaveMessage = true
                     s.disconnect()
-                    systemMessage(`${targetUsername} was kicked for ${reason}`)
+                    systemMessage(`${targetUsername} was kicked for ${kickReason}`)
                     kicked = true
                     break
                 }
@@ -532,21 +410,19 @@ io.on('connection', socket => {
             }
 
             socket.emit('commandError', `kicked ${targetUsername}`)
-            await appendFile('kicks.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${reason}\n`)
+            await appendFile('kicks.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${kickReason}\n`)
             return
         }
 
         if (data.text?.startsWith('/unban ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetEmail = data.text.slice(7).trim()
-            banlist.delete(targetEmail)
-            await saveBans()
+            removeBan(targetEmail)
             socket.emit('commandError', `unbanned ${targetEmail}, use /unbanip for IP`)
             return
         }
         if (data.text?.startsWith('/unbanip ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetIP = data.text.slice(9).trim()
-            ipbanlist.delete(targetIP)
-            await saveIpBans()
+            removeIpBan(targetIP)
             socket.emit('commandError', `unbanned ${targetIP}`)
             return
         }
@@ -554,7 +430,7 @@ io.on('connection', socket => {
             const args = data.text.slice(6).trim().split(' ')
             const targetUsername = args[0]
             const durationStr = args[1]
-            const reason = args.slice(2).join(' ') || 'no reason given'
+            const muteReason = args.slice(2).join(' ') || 'no reason given'
 
             let targetEmail = null
             for (const [id,s] of io.sockets.sockets) {
@@ -572,19 +448,15 @@ io.on('connection', socket => {
                 socket.emit('commandError', 'invalid duration format')
                 return
             }
-            muted[targetEmail] = {
-                until: durationMs ? Date.now() + durationMs : null,
-                reason
-            }
-            await saveMutes()
+            setMute(targetEmail, muteReason, durationMs ? Date.now() + durationMs : null)
+            const m = getMute(targetEmail)
             await appendFile('mutes.log', `${new Date().toISOString()}: ${socket.userEmail}`)
 
             for (const [id,s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {
-                    s.emit('muted', {reason, until: muted[targetEmail].until})
+                    s.emit('muted', { reason: muteReason, until: m.until })
                 }
             }
-            // i don't understand why this function/call is still called commandError, it's not used for just errors anymor
             socket.emit('commandError', `muted ${targetUsername}${durationStr ? ' for ' + durationStr : ''}`)
             return
         }
@@ -597,12 +469,11 @@ io.on('connection', socket => {
                     break
                 }
             }
-            if (!targetEmail || !muted[targetEmail]) {
+            if (!targetEmail || !getMute(targetEmail)) {
                 socket.emit('commandError', `${targetUsername} is not muted`)
                 return
             }
-            delete muted[targetEmail]
-            await saveMutes()
+            deleteMute(targetEmail)
             for (const [id,s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {
                     s.emit('unmuted')
@@ -624,14 +495,12 @@ io.on('connection', socket => {
                 socket.emit('commandError', `no user found with username ${targetUsername}`)
                 return
             }
-            delete strikes[targetEmail]
-            await saveStrikes()
+            deleteStrikes(targetEmail)
             socket.emit('commandError', `reset filter strikes for ${targetUsername}`)
             return
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
-            history.length = 0
-            await saveHistory()
+            clearMessages()
             io.emit('clear')
             systemMessage('chat was cleared', { saveToHistory: false })
             return
@@ -659,8 +528,8 @@ io.on('connection', socket => {
             let found = null
             for (const [id, s] of io.sockets.sockets) {
                 if (s.username === targetUsername) {
-                found = s
-                break
+                    found = s
+                    break
                 }
             }
             if (found) {
@@ -694,8 +563,9 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/maintenance') && socket.userEmail === process.env.OWNER_EMAIL) {
             maintenance = !maintenance
             reason = maintenance ? data.text.slice(12).trim() : ''
-            await saveMaintenance()
-            for (const [id,s ] of io.sockets.sockets) {
+            setSetting('maintenance', maintenance ? '1' : '0')
+            setSetting('maintenance_reason', reason)
+            for (const [id,s] of io.sockets.sockets) {
                 if (s.userEmail !== process.env.OWNER_EMAIL) {
                     s.emit('maintenance', maintenance, reason)
                     if (maintenance) s.disconnect()
@@ -703,14 +573,15 @@ io.on('connection', socket => {
             }
             socket.emit('commandError', maintenance ? 'maintenance enabled' : 'maintenance disabled')
             return
-        } 
+        }
         if (data.text?.startsWith('/status ') && socket.userEmail === process.env.OWNER_EMAIL) {
             status = data.text.slice(8).trim()
             socket.emit('status', status)
             return
         }
-        if (data.text?.startsWith('/color ')) {
-            const colorinput = data.text.slice(7).trim().toLowerCase()
+        if (data.text?.startsWith('/color ') || data.text?.startsWith('/colour ')) {
+            const sliceAt = data.text.startsWith('/color ') ? 7 : 8
+            const colorinput = data.text.slice(sliceAt).trim().toLowerCase()
             const flags = {
                 'pride':       'flag:pride', 'rainbow': 'flag:pride',
                 'gay':         'flag:gay',
@@ -724,30 +595,7 @@ io.on('connection', socket => {
                 socket.emit('commandError', 'please choose a different color')
                 return
             }
-            userColors[socket.userEmail] = color
-            await saveColors()
-            socket.emit('colorChanged', color)
-            emitUserList()
-            return
-        }
-        // different syntax
-        if (data.text?.startsWith('/colour ')) {
-            const colorinput = data.text.slice(7).trim().toLowerCase()
-            const flags = {
-                'pride':       'flag:pride', 'rainbow': 'flag:pride',
-                'gay':         'flag:gay',
-                'trans':       'flag:trans', 'transgender': 'flag:trans',
-                'bi':          'flag:bi', 'bisexual': 'flag:bi',
-                'lesbian':     'flag:lesbian',
-                'nb':          'flag:nb', 'nonbinary': 'flag:nb'
-            }
-            const color = flags[colorinput] ?? colorinput
-            if (isBlockedColor(color)) {
-                socket.emit('commandError', 'please choose a different color')
-                return
-            }
-            userColors[socket.userEmail] = color
-            await saveColors()
+            setColor(socket.userEmail, color)
             socket.emit('colorChanged', color)
             emitUserList()
             return
@@ -756,31 +604,26 @@ io.on('connection', socket => {
             const word = data.text.slice(11).trim().toLowerCase()
             if (!word) {
                 socket.emit('commandError', 'you need to specify a word')
+                return
             }
-            if (!filteredwords.includes(word)) {
-                filteredwords.push(word)
-                await appendFile('filter.txt', `${word}\n`)
-            }
-            await loadFilterWords()
+            addFilterWord(word)
+            loadFilterWordsIntoMemory()
             socket.emit('commandError', `added ${word} to filter list`)
             return
         }
         if (data.text?.startsWith('/reloadfilter') && socket.userEmail === process.env.OWNER_EMAIL) {
-            await loadFilterWords()
+            loadFilterWordsIntoMemory()
             socket.emit('commandError', `${filteredwords.length} words loaded`)
             return
         }
         if (data.text?.startsWith('/removefilter ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const word = data.text.slice(14).trim().toLowerCase()
-            const index = filteredwords.indexOf(word)
-            if (index === -1) {
+            if (!filteredwords.includes(word)) {
                 socket.emit('commandError', `${word} is not in the filter`)
                 return
             }
-            filteredwords.splice(index, 1)
-            const newContent = filteredwords.join('\n') + '\n'
-            await writeFile('filter.txt', newContent)
-            await loadFilterWords()
+            removeFilterWord(word)
+            loadFilterWordsIntoMemory()
             socket.emit('commandError', `removed ${word} from the filter`)
             return
         }
@@ -798,21 +641,21 @@ io.on('connection', socket => {
             }
             if (!targetEmail) {
                 socket.emit('commandError', `no user found with username ${targetUsername}`)
+                return
             }
-            const flags = {
+            const flagColors = {
                 'flag:pride': 'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
                 'flag:trans': 'linear-gradient(90deg,#55cdfc,#f7a8b8,#fff,#f7a8b8,#55cdfc)',
                 'flag:bi': 'linear-gradient(90deg,#d60270,#d60270,#9b4f96,#0038a8,#0038a8)',
                 'flag:lesbian': 'linear-gradient(90deg,#d62900,#ff9b55,#fff,#d461a6,#a50062)',
                 'flag:nb': 'linear-gradient(90deg,#fcf434,#fff,#9c59d1,#2c2c2c)'
             }
-            const color = flags[colorInput] ?? colorInput
+            const color = flagColors[colorInput] ?? colorInput
             if (isBlockedColor(color)) {
                 socket.emit('commandError', 'please choose a different color')
                 return
             }
-            userColors[targetEmail] = color
-            await saveColors()
+            setColor(targetEmail, color)
             for (const [id,s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) {
                     s.emit('colorChanged', color)
@@ -832,11 +675,9 @@ io.on('connection', socket => {
             time: Date.now(),
             isToken: socket.userEmail === process.env.OWNER_EMAIL,
             isGuest: socket.userEmail.endsWith('@guest'),
-            color: userColors[socket.userEmail] || null
+            color: getColor(socket.userEmail) ?? null
         }
-        history.push(message)
-        if (history.length > maxhistory) history.shift()
-        await saveHistory()
+        addMessage(message)
         const {ownerEmail, ...publicMessage} = message
         io.emit('message', publicMessage)
     })
@@ -882,7 +723,7 @@ httpServer.on('request', async (req, res) => {
         const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
         await appendFile('login.log', `${new Date().toISOString()}: ${primary_email} signed in from ${ip}\n`)
         const sessionid = randomBytes(32).toString('hex')
-        await saveSession(sessionid, { email: primary_email, ip })
+        saveSession(sessionid, { email: primary_email, ip })
         const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
         res.writeHead(302, { Location: redirectUrl })
         res.end()
@@ -892,8 +733,7 @@ httpServer.on('request', async (req, res) => {
     if (url.pathname === '/signout') {
         const sessionId = url.searchParams.get('session')
         if (sessionId) {
-            delete sessions[sessionId]
-            await writeFile('sessions.json', JSON.stringify(sessions))
+            deleteSession(sessionId)
         }
         res.writeHead(302, { Location: '/' })
         res.end()
@@ -922,7 +762,8 @@ httpServer.on('request', async (req, res) => {
         }
 
         const uploadSessionId = url.searchParams.get('session')
-        if (!uploadSessionId || !sessions[uploadSessionId]) {
+        const uploadSession = uploadSessionId ? getSession(uploadSessionId) : null
+        if (!uploadSession) {
             res.writeHead(401)
             res.end(JSON.stringify({ error: 'Unauthorized' }))
             return
@@ -973,7 +814,7 @@ httpServer.on('request', async (req, res) => {
 
                 const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${key}`
 
-                const userEmail = sessions[uploadSessionId].email
+                const userEmail = uploadSession.email
                 const uUsername = fields.username?.[0] || 'unknown'
                 await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${publicUrl}\n`)
 
@@ -992,10 +833,9 @@ httpServer.on('request', async (req, res) => {
         const guestId = randomBytes(3).toString('hex')
         const today = new Date().toISOString().slice(0,10)
         const sessionid = randomBytes(32).toString('hex')
-        const guestUsername = `guest-${guestId}`
         const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
         await appendFile('login.log', `${new Date().toISOString()}: guest-${guestId} signed in from ${ip}\n`)
-        await saveSession(sessionid, {
+        saveSession(sessionid, {
             email: `guest-${guestId}@guest`,
             guest: true,
             expires: today,
@@ -1021,9 +861,9 @@ httpServer.on('request', async (req, res) => {
 
     if (url.pathname === '/version') {
         const forceRefresh = url.searchParams.get('refresh') === '1'
-        const status = await getVersionStatus(forceRefresh)
+        const vStatus = await getVersionStatus(forceRefresh)
         res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"})
-        res.end(JSON.stringify(status))
+        res.end(JSON.stringify(vStatus))
         return
     }
 
