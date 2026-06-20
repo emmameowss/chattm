@@ -532,6 +532,7 @@ socket.on('userRenamed', ({from, to}, guest) => {
     }
 })
 
+/*
 // user renamed system message
 socket.on('userRenamedSys', ({from, to}, guest) => {
     if (guest) {
@@ -540,6 +541,7 @@ socket.on('userRenamedSys', ({from, to}, guest) => {
         systemMessage(`${from} changed their username to ${to}`)
     }
 }) 
+    */
 
 // cdn/image stuff
 async function uploadFile(file) {
