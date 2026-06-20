@@ -9,13 +9,21 @@ import { readFile, appendFile, writeFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
 import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
     cors: {
-        origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "https://chattm.app", "https://dev.chat.emmameowss.gay", "https://beta.chattm.app"]
+        origin: ["http://localhost:3000", "https://chattm.app", "https://beta.chattm.app"]
     },
     maxHttpBufferSize: 1e6
+})
+const s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    }
 })
 
 let history = []
@@ -705,6 +713,7 @@ io.on('connection', socket => {
             const colorinput = data.text.slice(7).trim().toLowerCase()
             const flags = {
                 'pride':       'flag:pride', 'rainbow': 'flag:pride',
+                'gay':         'flag:gay',
                 'trans':       'flag:trans', 'transgender': 'flag:trans',
                 'bi':          'flag:bi', 'bisexual': 'flag:bi',
                 'lesbian':     'flag:lesbian',
@@ -726,6 +735,7 @@ io.on('connection', socket => {
             const colorinput = data.text.slice(7).trim().toLowerCase()
             const flags = {
                 'pride':       'flag:pride', 'rainbow': 'flag:pride',
+                'gay':         'flag:gay',
                 'trans':       'flag:trans', 'transgender': 'flag:trans',
                 'bi':          'flag:bi', 'bisexual': 'flag:bi',
                 'lesbian':     'flag:lesbian',
@@ -890,18 +900,35 @@ httpServer.on('request', async (req, res) => {
         return
     }
 
-    if (url.pathname === '/upload' && req.method === 'OPTIONS') {
-        res.setHeader('Access-Control-Allow-Origin', '*')
+    if (url.pathname === '/upload') {
+        const allowedOrigins = ["http://localhost:3000", "https://chattm.app", "https://beta.chattm.app"]
+        const origin = req.headers.origin
+        if (allowedOrigins.includes(origin)) {
+            res.setHeader('Access-Control-Allow-Origin', origin)
+        }
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-        res.writeHead(204)
-        res.end()
-        return
-    }
 
-    if (url.pathname === '/upload' && req.method === 'POST') {
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        const form = formidable({ maxFileSize: 10 * 1024 * 1024 })
+        if (req.method === 'OPTIONS') {
+            res.writeHead(204)
+            res.end()
+            return
+        }
+
+        if (req.method !== 'POST') {
+            res.writeHead(405)
+            res.end(JSON.stringify({ error: 'Method not allowed' }))
+            return
+        }
+
+        const uploadSessionId = url.searchParams.get('session')
+        if (!uploadSessionId || !sessions[uploadSessionId]) {
+            res.writeHead(401)
+            res.end(JSON.stringify({ error: 'Unauthorized' }))
+            return
+        }
+
+        const form = formidable({ maxFileSize: 50 * 1024 * 1024 })
         form.parse(req, async (err, fields, files) => {
             if (err) {
                 res.writeHead(500)
@@ -909,6 +936,12 @@ httpServer.on('request', async (req, res) => {
                 return
             }
             try {
+                if (!files.file || !files.file[0]) {
+                    res.writeHead(400)
+                    res.end(JSON.stringify({ error: 'No file uploaded' }))
+                    return
+                }
+
                 const file = files.file[0]
                 const allowedTypes = [
                     'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
@@ -919,29 +952,35 @@ httpServer.on('request', async (req, res) => {
                     'application/x-tar', 'application/gzip',
                     'application/json', 'text/csv',
                     'image/vnd.adobe.photoshop', 'application/figma'
-               ]
+                ]
                 if (!allowedTypes.includes(file.mimetype)) {
                     res.writeHead(400)
-                    res.end(JSON.stringify({error: "file type not allowed"}))
+                    res.end(JSON.stringify({ error: 'file type not allowed' }))
                     return
                 }
+
                 const fileBuffer = await readFile(file.filepath)
-                const blob = new Blob([fileBuffer])
-                const formData = new FormData()
-                formData.append('file', blob, file.originalFilename)
-                const response = await fetch('https://cdn.hackclub.com/api/v4/upload', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${CDN_API_KEY}` },
-                    body: formData
-                })
-                const json = await response.json()
-                const sessionId = fields.session?.[0]
-                const userEmail = sessions[sessionId]?.email || 'unknown'
+                const ext = extname(file.originalFilename || '')
+                const key = `uploads/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
+
+                await s3.send(new PutObjectCommand({
+                    Bucket: process.env.AWS_S3_BUCKET,
+                    Key: key,
+                    Body: fileBuffer,
+                    ContentType: file.mimetype,
+                    ACL: 'public-read'
+                }))
+
+                const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${key}`
+
+                const userEmail = sessions[uploadSessionId].email
                 const uUsername = fields.username?.[0] || 'unknown'
-                await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${json.url}\n`)
+                await appendFile('uploads.log', `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${publicUrl}\n`)
+
                 res.writeHead(200, { 'Content-Type': 'application/json' })
-                res.end(JSON.stringify({ url: json.url }))
+                res.end(JSON.stringify({ url: publicUrl }))
             } catch (e) {
+                console.error('Upload error:', e)
                 res.writeHead(500)
                 res.end(JSON.stringify({ error: e.message }))
             }

@@ -713,4 +713,25 @@ body:has(#dev-banner) #version-status {
   #mute-btn.muted::before {
     content: '\ece9';
   }
+
+  body:has(#dev-banner) h1 {
+    top: 56px;
+  }
+
+  body:has(#dev-banner) #version-status {
+    top: 56px;
+  }
+
+  body:has(#dev-banner) #userlist {
+    top: 56px;
+  }
+
+  body:has(#dev-banner) ul {
+    padding-top: 100px;
+  }
+
+  body:has(#dev-banner) #username-form {
+    top: auto;
+    bottom: 60px;
+  }
 }

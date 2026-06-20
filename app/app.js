@@ -67,7 +67,6 @@ document.addEventListener('click', (e) => {
 })
 function devInstanceBanner() {
     const devHosts = [
-        'dev.chat.emmameowss.gay',
         'beta.chattm.app',
         'localhost',
         '127.0.0.1'
@@ -76,7 +75,7 @@ function devInstanceBanner() {
     if (!devHosts.includes(window.location.hostname)) return
     if (document.querySelector('#dev-banner')) return
 
-    if (window.location.hostname.includes('https://dev.chat.emmameowss.gay') || window.location.hostname.includes('https://beta.chattm.app')) {
+    if (window.location.hostname === 'beta.chattm.app') {
         const banner = document.createElement('div')
         banner.id = 'dev-banner'
         banner.textContent = 'this is a beta instance of chat™ - things may not be very stable'
@@ -145,6 +144,7 @@ sysMsgBtn.addEventListener('click', () => {
 
 const flags = {
     'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
+    'flag:gay':         'linear-gradient(90deg,#078D70,#26CEAA,#98E8C1,#FFFFFF,#7BADE2,#5049CC)',
     'flag:trans':       'linear-gradient(90deg,#55cdfc,#f7a8b8,#fff,#f7a8b8,#55cdfc)',
     'flag:bi':          'linear-gradient(90deg,#d60270,#d60270,#9b4f96,#0038a8,#0038a8)',
     'flag:lesbian':     'linear-gradient(90deg,#d62900,#ff9b55,#fff,#d461a6,#a50062)',
@@ -528,8 +528,7 @@ async function uploadFile(file) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('username', username)
-    formData.append('session', localStorage.getItem('session'))
-    const res = await fetch(`${window.location.origin}/upload`, {
+    const res = await fetch(`${window.location.origin}/upload?session=${encodeURIComponent(localStorage.getItem('session'))}`, {
         method: 'POST',
         body: formData
     })
@@ -705,7 +704,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb]", "/colour [colour|pride|trans|bi|lesbian|nb]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
+const commands = ["/whois [username]", '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
