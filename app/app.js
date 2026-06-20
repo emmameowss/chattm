@@ -332,7 +332,7 @@ async function sendMessageNew(e) {
     if (file) {
         if (file.size > MAX_SIZE) {
             showError('file too big (max is 50mb)')
-            fileInput.value('')
+            fileInput.value = ''
             return
         }
         const isImage = file.type.startsWith('image/')
