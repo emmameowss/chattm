@@ -410,7 +410,7 @@ socket.on("message", (data) => {
         return
     }
     renderMessage(data)
-    if (document.hidden && !notifymuted) beep()
+    if (!notifymuted && data.mentions && data.mentions.some(m => m.toLowerCase() === username.toLowerCase())) beep()
     if (document.hidden) {
         unread++
         document.title = `(${unread}) chat™`
@@ -540,12 +540,13 @@ async function uploadFile(file) {
 
 // links show up as links in chat
 function functioninglinks(text, color) {
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    const parts = text.split(urlRegex)
+    const tokenRegex = /(https?:\/\/[^\s]+)|(@[a-zA-Z0-9_]+)/g
+    const parts = text.split(tokenRegex).filter(p => p !== undefined)
     const fragment = document.createDocumentFragment()
 
-    parts.forEach((part, i) => {
-        if (i % 2 === 1) {
+    for (const part of parts) {
+        if (!part) continue
+        if (/^https?:\/\//.test(part)) {
             const a = document.createElement('a')
             a.href = part
             a.textContent = part
@@ -553,10 +554,15 @@ function functioninglinks(text, color) {
             a.rel = 'noopener noreferer'
             a.style.color = color
             fragment.appendChild(a)
+        } else if (/^@[a-zA-Z0-9_]+$/.test(part)) {
+            const span = document.createElement('span')
+            span.className = 'mention'
+            span.textContent = part
+            fragment.appendChild(span)
         } else {
             fragment.appendChild(document.createTextNode(part))
         }
-    })
+    }
     return fragment
 }
 
@@ -720,6 +726,19 @@ document.querySelector('#message-input').addEventListener('input', (e) => {
 
         if (userMatch) {
             suggestion.textContent = `/${cmd} ${userMatch} `
+            suggestion.style.display = 'block'
+            return
+        }
+    }
+
+    const cursor = e.target.selectionStart
+    const before = value.slice(0, cursor)
+    const mentionMatch = before.match(/@([a-zA-Z0-9_]*)$/)
+    if (mentionMatch) {
+        const fragment = mentionMatch[1].toLowerCase()
+        const userMatch = onlineUsernames.find(name => name.toLowerCase().startsWith(fragment) && name.toLowerCase() !== fragment)
+        if (userMatch) {
+            suggestion.textContent = value.slice(0, cursor - mentionMatch[1].length) + userMatch + value.slice(cursor)
             suggestion.style.display = 'block'
             return
         }
