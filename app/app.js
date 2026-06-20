@@ -657,8 +657,9 @@ socket.on('connect_error', (err) => {
     }
     if (err.message === 'not authenticated') {
         localStorage.removeItem('session')
+        location.reload()
     }
-    location.reload()
+    // for transient errors, let socket.io reconnect automatically
 })
 
 socket.on('maintenance', (enabled, reason) => {

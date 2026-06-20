@@ -28,7 +28,9 @@ const io = new Server(httpServer, {
     cors: {
         origin: ["http://localhost:3000", "https://chattm.app", "https://beta.chattm.app"]
     },
-    maxHttpBufferSize: 1e6
+    maxHttpBufferSize: 1e6,
+    pingInterval: 10000,
+    pingTimeout: 60000
 })
 const s3 = new S3Client({
     region: process.env.AWS_REGION,
