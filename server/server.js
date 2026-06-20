@@ -66,7 +66,7 @@ const types = {
     '.ico': 'image/x-icon'
 }
 
-const blockedColors = ['#0e0e0e', '#161616', '#242424', '#e8e8e8', '#000']
+const blockedColors = ['#0e0e0e', '#161616', '#242424', '#e8e8e8', '#000', "#010101"]
 
 function isBlockedColor(color) {
     return blockedColors.includes(color.toLowerCase())
