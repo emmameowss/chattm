@@ -220,7 +220,8 @@ const socket = io(
         ? 'http://localhost:3000'
         : window.location.origin, // set this to the ip/url of the site/proxy you're using for the backend server thing
     {
-        auth: { session: localStorage.getItem('session') }
+        auth: { session: localStorage.getItem('session') },
+        transports: ['websocket']
     }
 )
 const resetId = document.querySelector("#resetid")
@@ -399,6 +400,11 @@ socket.on('connect', () => {
     if (!username.startsWith('guest-') && !localStorage.getItem('isGuest')) {
         socket.emit('setUsername', username, token)
     }
+    hideStatus()
+})
+
+socket.on('disconnect', () => {
+    showStatus('disconnected, reconnecting...', 'var(--muted)')
 })
 
 
