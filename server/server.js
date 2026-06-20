@@ -82,7 +82,7 @@ loadFilterWordsIntoMemory()
 function containsFilteredWord(text) {
     if (!text) return null
     const lower = text.toLowerCase()
-    return filteredwords.find(w => lower.includes(w)) || null
+    return filteredwords.find(w => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lower)) || null
 }
 
 console.log(`loaded ${getHistory().length} messages in history`)
