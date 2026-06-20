@@ -17,6 +17,11 @@
   --danger-dim: rgba(217, 122, 122, 0.1);
 }
 
+.mention {
+  color: var(--pink);
+  font-weight: 500;
+}
+
 html, body {
   background: var(--bg);
   color: var(--text);

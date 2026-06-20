@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 
 const db = new Database('chat.db')
 db.pragma('journal_mode = WAL')
+try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -16,7 +17,8 @@ db.exec(`
     is_token INTEGER DEFAULT 0,
     is_guest INTEGER DEFAULT 0,
     color TEXT,
-    system INTEGER DEFAULT 0
+    system INTEGER DEFAULT 0,
+    mentions TEXT DEFAULT '[]'
   );
 
   CREATE TABLE IF NOT EXISTS sessions (
@@ -68,8 +70,8 @@ const MAX_HISTORY = 20
 
 const stmts = {
   insertMessage: db.prepare(`
-    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system)
-    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system)
+    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions)
+    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions)
   `),
   getMessages: db.prepare(`SELECT * FROM messages ORDER BY time ASC`),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
@@ -136,6 +138,7 @@ export function getHistory() {
     isGuest: !!row.is_guest,
     color: row.color,
     system: !!row.system,
+    mentions: JSON.parse(row.mentions || '[]'),
   }))
 }
 
@@ -151,6 +154,7 @@ export function addMessage(msg) {
     is_guest: msg.isGuest ? 1 : 0,
     color: msg.color ?? null,
     system: msg.system ? 1 : 0,
+    mentions: JSON.stringify(msg.mentions ?? []),
   })
   // trim to max
   const { n } = stmts.countMessages.get()

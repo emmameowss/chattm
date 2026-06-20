@@ -677,6 +677,13 @@ io.on('connection', socket => {
             isGuest: socket.userEmail.endsWith('@guest'),
             color: getColor(socket.userEmail) ?? null
         }
+        const onlineNames = [...io.sockets.sockets.values()].map(s => s.username).filter(Boolean)
+        const mentions = [...new Set(
+            [...(data.text || '').matchAll(/@([a-zA-Z0-9_]+)/g)]
+                .map(m => m[1])
+                .filter(n => onlineNames.some(u => u.toLowerCase() === n.toLowerCase()))
+        )]
+        message.mentions = mentions
         addMessage(message)
         const {ownerEmail, ...publicMessage} = message
         io.emit('message', publicMessage)
