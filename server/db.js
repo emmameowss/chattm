@@ -320,6 +320,7 @@ export function setSetting(key, value) {
 // ─── Migration from legacy files ─────────────────────────────────────────────
 
 export async function migrateFromFiles() {
+  if (getSetting('migrated_from_files') === '1') return
   const migrated = []
 
   async function tryJSON(path) {
@@ -456,6 +457,7 @@ export async function migrateFromFiles() {
     }
   }
 
+  setSetting('migrated_from_files', '1')
   if (migrated.length) {
     console.log(`migrated from legacy files: ${migrated.join(', ')}`)
   }
