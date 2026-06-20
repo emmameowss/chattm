@@ -15,7 +15,7 @@ import { readFileSync } from 'fs'
 const httpServer = createServer()
 const io = new Server(httpServer, {
     cors: {
-        origin: ["https://chat.emmameowss.gay", "http://localhost:3000", "https://chattm.app", "https://dev.chat.emmameowss.gay", "https://beta.chattm.app"]
+        origin: ["http://localhost:3000", "https://chattm.app", "https://beta.chattm.app"]
     },
     maxHttpBufferSize: 1e6
 })

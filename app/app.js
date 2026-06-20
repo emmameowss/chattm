@@ -67,7 +67,6 @@ document.addEventListener('click', (e) => {
 })
 function devInstanceBanner() {
     const devHosts = [
-        'dev.chat.emmameowss.gay',
         'beta.chattm.app',
         'localhost',
         '127.0.0.1'
