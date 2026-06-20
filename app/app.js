@@ -309,8 +309,9 @@ function activitya() {
 
 // message history
 socket.on('history', (messages) => {
+    atBottom = false  // suppress per-message scrolls during batch render
     messages.forEach(data => renderMessage(data))
-    // jump to bottom instantly after loading history (no smooth scroll)
+    atBottom = true
     window.scrollTo({ top: document.body.scrollHeight })
 })
 
@@ -366,13 +367,17 @@ document.querySelector('#file-input').addEventListener('keydown', (e) => {
     }
 })
 let atBottom = true
+let scrolling = false
 window.addEventListener('scroll', () => {
+    if (scrolling) return
     atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 150
 }, { passive: true })
 
 function scrollToBottom() {
     atBottom = true
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    scrolling = true
+    window.scrollTo({ top: document.body.scrollHeight })
+    requestAnimationFrame(() => { scrolling = false })
 }
 
 function appendMessage(li) {
