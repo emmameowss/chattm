@@ -714,6 +714,7 @@ io.on('connection', socket => {
             const colorinput = data.text.slice(7).trim().toLowerCase()
             const flags = {
                 'pride':       'flag:pride', 'rainbow': 'flag:pride',
+                'gay':         'flag:gay', 'gay': 'flag:gay',
                 'trans':       'flag:trans', 'transgender': 'flag:trans',
                 'bi':          'flag:bi', 'bisexual': 'flag:bi',
                 'lesbian':     'flag:lesbian',

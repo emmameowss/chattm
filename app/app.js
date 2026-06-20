@@ -144,6 +144,7 @@ sysMsgBtn.addEventListener('click', () => {
 
 const flags = {
     'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
+    'flag:gay':         'linear-gradient(90deg,#078D70,#26CEAA,#98E8C1,#FFFFFF,#7BADE2,#5049CC)',
     'flag:trans':       'linear-gradient(90deg,#55cdfc,#f7a8b8,#fff,#f7a8b8,#55cdfc)',
     'flag:bi':          'linear-gradient(90deg,#d60270,#d60270,#9b4f96,#0038a8,#0038a8)',
     'flag:lesbian':     'linear-gradient(90deg,#d62900,#ff9b55,#fff,#d461a6,#a50062)',
