@@ -13,6 +13,9 @@ strikes.json
 history.json
 maintenance.json
 maintenance.html
+chat.db
+chat.db-shm
+chat.db-wal
 colors.json
 sessions.json
 npm-debug.log*
