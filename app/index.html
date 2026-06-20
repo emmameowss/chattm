@@ -41,7 +41,10 @@
         </div>
     </form>
     <div id="userlist"></div>
-    <p id="command-suggestion" style="display:none;"></p>
+    <div id="bottom-hints">
+      <p id="command-suggestion" style="display:none;"></p>
+      <p id="typing-indicator"></p>
+    </div>
     <form id="message-form">
         <input type="file" accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mov,.mp3,.ogg,.wav,.pdf,.txt,.md,.zip,.rar,.7z,.tar,.gz,.json,.csv,.psd,.fig" id="file-input" style="display:none">
         <button type="button" id="attach-btn"><i class="ti ti-paperclip"></i></button>
@@ -50,7 +53,6 @@
     </form>
     <p id="upload-error"></p>
     <p id="upload-status"></p>
-    <p id="typing-indicator"></p>
     <div id="modal-overlay" style="display:none">
   <div id="modal-box">
     <p id="modal-message"></p>

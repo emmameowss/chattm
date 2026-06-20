@@ -207,17 +207,23 @@ a:hover {
   text-decoration: underline;
 }
 
-#typing-indicator {
+#bottom-hints {
   position: fixed;
   bottom: 68px;
   left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  background: var(--bg);
+  padding: 0 4px;
+}
+
+#typing-indicator {
   font-size: 11px;
   color: var(--muted);
   font-style: italic;
   min-height: 1em;
-  pointer-events: none;
-  background: var(--bg);
-  padding: 0 4px;
 }
 
 #upload-error,
@@ -294,13 +300,9 @@ body.login-page a button:hover {
 }
 
 #command-suggestion {
-  position: fixed;
-  bottom: 88px;
-  left: 20px;
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
-  pointer-events: none;
 }
 
 input:disabled {
@@ -612,15 +614,13 @@ body:has(#dev-banner) #version-status {
     content: ' ';
   }
 
-  #typing-indicator {
+  #bottom-hints {
     bottom: 128px;
     left: 12px;
-    font-size: 10px;
   }
 
+  #typing-indicator,
   #command-suggestion {
-    bottom: 148px;
-    left: 12px;
     font-size: 10px;
   }
 
