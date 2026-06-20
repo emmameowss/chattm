@@ -10,7 +10,6 @@ import { extname, normalize, resolve, sep } from 'path'
 import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { readFileSync } from 'fs'
 
 const httpServer = createServer()
 const io = new Server(httpServer, {
@@ -714,7 +713,7 @@ io.on('connection', socket => {
             const colorinput = data.text.slice(7).trim().toLowerCase()
             const flags = {
                 'pride':       'flag:pride', 'rainbow': 'flag:pride',
-                'gay':         'flag:gay', 'gay': 'flag:gay',
+                'gay':         'flag:gay',
                 'trans':       'flag:trans', 'transgender': 'flag:trans',
                 'bi':          'flag:bi', 'bisexual': 'flag:bi',
                 'lesbian':     'flag:lesbian',
@@ -736,7 +735,7 @@ io.on('connection', socket => {
             const colorinput = data.text.slice(7).trim().toLowerCase()
             const flags = {
                 'pride':       'flag:pride', 'rainbow': 'flag:pride',
-                'gay':         'flag:gay', 'gay': 'flag:gay',
+                'gay':         'flag:gay',
                 'trans':       'flag:trans', 'transgender': 'flag:trans',
                 'bi':          'flag:bi', 'bisexual': 'flag:bi',
                 'lesbian':     'flag:lesbian',

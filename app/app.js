@@ -75,7 +75,7 @@ function devInstanceBanner() {
     if (!devHosts.includes(window.location.hostname)) return
     if (document.querySelector('#dev-banner')) return
 
-    if (window.location.hostname.includes('https://dev.chat.emmameowss.gay') || window.location.hostname.includes('https://beta.chattm.app')) {
+    if (window.location.hostname === 'beta.chattm.app') {
         const banner = document.createElement('div')
         banner.id = 'dev-banner'
         banner.textContent = 'this is a beta instance of chat™ - things may not be very stable'
