@@ -233,7 +233,7 @@ const socket = io(
     }
 )
 const resetId = document.querySelector("#resetid")
-const maxmessages = 20
+const maxmessages = 100
 let announce = false
 const MAX_SIZE = 50 * 1024 * 1024 // 10mb limit to images
 
