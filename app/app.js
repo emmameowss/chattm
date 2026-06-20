@@ -132,15 +132,6 @@ function showMaintenance(reason) {
 
 devInstanceBanner()
 
-let hideSysMsg = localStorage.getItem('hideSysMsg') === 'true'
-const sysMsgBtn = document.querySelector('#sysmsg-btn')
-sysMsgBtn.classList.toggle('hidden-active', hideSysMsg)
-
-sysMsgBtn.addEventListener('click', () => {
-    hideSysMsg = !hideSysMsg
-    localStorage.setItem('hideSysMsg', hideSysMsg)
-    sysMsgBtn.classList.toggle('hidden-active', hideSysMsg)
-})
 
 const flags = {
     'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
@@ -418,15 +409,7 @@ document.addEventListener('visibilitychange', () => {
     if (!document.hidden) activitya()
 })
 socket.on("message", (data) => {
-    if (isSystemMessage(data)) {
-        if (hideSysMsg) return
-        const li = document.createElement('li')
-        li.textContent = data.text
-        li.style.color = 'gray'
-        li.style.fontStyle = 'italic'
-        appendMessage(li)
-        return
-    }
+    if (isSystemMessage(data)) return
     renderMessage(data)
     if (!notifymuted && data.mentions && data.mentions.some(m => m.toLowerCase() === username.toLowerCase())) beep()
     if (document.hidden) {
