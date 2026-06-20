@@ -528,8 +528,7 @@ async function uploadFile(file) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('username', username)
-    formData.append('session', localStorage.getItem('session'))
-    const res = await fetch(`${window.location.origin}/upload`, {
+    const res = await fetch(`${window.location.origin}/upload?session=${encodeURIComponent(localStorage.getItem('session'))}`, {
         method: 'POST',
         body: formData
     })
