@@ -66,7 +66,7 @@ db.exec(`
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 
-const MAX_HISTORY = 20
+const MAX_HISTORY = 100
 
 const stmts = {
   insertMessage: db.prepare(`
