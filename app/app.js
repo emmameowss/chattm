@@ -333,6 +333,8 @@ async function sendMessageNew(e) {
         if (file.size > MAX_SIZE) {
             showError('file too big (max is 50mb)')
             fileInput.value = ''
+            document.querySelector('#attach-btn').style.borderColor = ''
+            document.querySelector('#attach-btn').style.color = ''
             return
         }
         const isImage = file.type.startsWith('image/')
