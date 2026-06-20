@@ -288,6 +288,8 @@ function updateTypingIndicator() {
     const ind = document.querySelector('#typing-indicator')
     if (typingUsers.size === 0) {
         ind.textContent = ''
+    } else if (typingUsers.size >= 3) {
+        ind.textContent = 'several people are typing...'
     } else {
         const names = [...typingUsers].join(', ')
         ind.textContent = `${names} ${typingUsers.size === 1 ? 'is' : 'are'} typing...`
