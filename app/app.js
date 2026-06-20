@@ -316,6 +316,8 @@ function activitya() {
 // message history
 socket.on('history', (messages) => {
     messages.forEach(data => renderMessage(data))
+    // jump to bottom instantly after loading history (no smooth scroll)
+    window.scrollTo({ top: document.body.scrollHeight })
 })
 
 async function sendMessageNew(e) {
@@ -369,16 +371,30 @@ document.querySelector('#file-input').addEventListener('keydown', (e) => {
         document.querySelector('#message-form').requestSubmit()
     }
 })
+function isNearBottom() {
+    return window.innerHeight + window.scrollY >= document.body.scrollHeight - 150
+}
+
+function scrollToBottom() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+}
+
 function appendMessage(li) {
     const ul = document.querySelector('ul')
+    const shouldScroll = isNearBottom()
     ul.appendChild(li)
-    li.scrollIntoView({behavior: 'smooth'})
+    if (shouldScroll) scrollToBottom()
+
+    // re-scroll after images load since they change page height
+    const img = li.querySelector('img')
+    if (img && !img.complete) {
+        img.addEventListener('load', () => { if (shouldScroll) scrollToBottom() }, { once: true })
+    }
 
     // nuke the oldest message because why not
     while (ul.children.length > maxmessages) {
         ul.removeChild(ul.firstChild)
     }
-
 }
 
 socket.on('connect', () => {
