@@ -548,7 +548,7 @@ async function uploadFile(file) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('username', username)
-    const res = await fetch(`${window.location.origin}/upload?session=${encodeURIComponent(localStorage.getItem('session'))}`, {
+    const res = await fetch(`${window.location.origin}/upload?session=${encodeURIComponent(session || '')}`, {
         method: 'POST',
         body: formData
     })
@@ -670,7 +670,9 @@ socket.on('connect_error', (err) => {
         devInstanceBanner()
         return
     }
-    localStorage.removeItem('session')
+    if (err.message === 'not authenticated') {
+        localStorage.removeItem('session')
+    }
     location.reload()
 })
 
