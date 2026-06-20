@@ -271,6 +271,7 @@ io.on('connection', socket => {
     })
 
     socket.on('typing', () => {
+        if (!socket.username) return
         socket.broadcast.emit('typing', socket.username)
     })
 

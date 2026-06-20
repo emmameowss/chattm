@@ -364,24 +364,26 @@ document.querySelector('#file-input').addEventListener('keydown', (e) => {
         document.querySelector('#message-form').requestSubmit()
     }
 })
-function isNearBottom() {
-    return window.innerHeight + window.scrollY >= document.body.scrollHeight - 150
-}
+let atBottom = true
+window.addEventListener('scroll', () => {
+    atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 150
+}, { passive: true })
 
 function scrollToBottom() {
+    atBottom = true
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
 }
 
 function appendMessage(li) {
     const ul = document.querySelector('ul')
-    const shouldScroll = isNearBottom()
+    const shouldScroll = atBottom
     ul.appendChild(li)
     if (shouldScroll) scrollToBottom()
 
     // re-scroll after images load since they change page height
     const img = li.querySelector('img')
     if (img && !img.complete) {
-        img.addEventListener('load', () => { if (shouldScroll) scrollToBottom() }, { once: true })
+        img.addEventListener('load', () => { if (atBottom) scrollToBottom() }, { once: true })
     }
 
     // nuke the oldest message because why not
