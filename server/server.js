@@ -66,10 +66,25 @@ const types = {
     '.ico': 'image/x-icon'
 }
 
-const blockedColors = ['#0e0e0e', '#161616', '#242424', '#e8e8e8', '#000', "#010101", "#020002", "#0F000F"]
-
 function isBlockedColor(color) {
-    return blockedColors.includes(color.toLowerCase())
+    const lower = color.toLowerCase()
+    // block near-white (unreadable on light surfaces)
+    if (lower === '#e8e8e8') return true
+    // block any hex color too dark to read on #0e0e0e background
+    const hex = lower.replace('#', '')
+    let r, g, b
+    if (/^[0-9a-f]{3}$/.test(hex)) {
+        r = parseInt(hex[0], 16) * 17
+        g = parseInt(hex[1], 16) * 17
+        b = parseInt(hex[2], 16) * 17
+    } else if (/^[0-9a-f]{6}$/.test(hex)) {
+        r = parseInt(hex.slice(0, 2), 16)
+        g = parseInt(hex.slice(2, 4), 16)
+        b = parseInt(hex.slice(4, 6), 16)
+    } else {
+        return false
+    }
+    return r < 55 && g < 55 && b < 55
 }
 
 function loadFilterWordsIntoMemory() {
