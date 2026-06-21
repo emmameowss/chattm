@@ -753,7 +753,7 @@ document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
     const suggestion = document.querySelector('#command-suggestion')
 
-    const usernameCmdMatch = value.match(/^\/(kick|mute|unmute|whois|resetstrikes|setcolor)\s+([a-zA-Z0-9-]*)$/)
+    const usernameCmdMatch = value.match(/^\/(kick|mute|unmute|whois|resetstrikes|setcolor|ban)\s+([a-zA-Z0-9-]*)$/)
     if (usernameCmdMatch) {
         const [, cmd, partial] = usernameCmdMatch
         const lower = partial.toLowerCase()
