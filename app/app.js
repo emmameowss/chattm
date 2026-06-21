@@ -26,14 +26,16 @@ if (localStorage.getItem('banned')) {
 }
 
 // colors
+function nameHash(name) {
+    let hash = 0
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    return hash
+}
+
 function getNameColor(name) {
     if (!name) return 'var(--muted)'
     if (name.toLowerCase() === 'emma') return 'hotpink'
-    let hash = 0
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    }
-    return `hsl(${hash % 360}, 70%, var(--name-lightness))`
+    return `hsl(${nameHash(name) % 360}, 70%, var(--name-lightness))`
 }
 
 function isSystemMessage(data) {
@@ -312,13 +314,11 @@ compactbtn.addEventListener('click', () => {
 })
 
 // avatar
-let myAvatar = null
 const avatarBtn = document.querySelector('#avatar-btn')
 const avatarRemoveBtn = document.querySelector('#avatar-remove-btn')
 const avatarInput = document.querySelector('#avatar-input')
 
 socket.on('savedAvatar', (url) => {
-    myAvatar = url
     avatarRemoveBtn.style.display = url ? '' : 'none'
 })
 
@@ -379,7 +379,10 @@ function renderEmojiPicker() {
 }
 
 socket.on('emoji', map => { customEmoji = map; renderEmojiPicker() })
-socket.on('emojiUpdate', map => { customEmoji = map; renderEmojiPicker() })
+socket.on('emojiUpdate', map => {
+    customEmoji = map
+    if (emojiPicker.style.display !== 'none') renderEmojiPicker()
+})
 
 emojiBtn.addEventListener('click', (e) => {
     e.stopPropagation()
@@ -591,10 +594,7 @@ function renderMessage(data) {
         const placeholder = document.createElement('div')
         placeholder.className = 'avatar-placeholder'
         placeholder.textContent = (ausername || '?')[0]
-        // compute a concrete hsl color for background (can't use CSS vars in style.backgroundColor)
-        let hash = 0
-        for (let i = 0; i < ausername.length; i++) hash = ausername.charCodeAt(i) + ((hash << 5) - hash)
-        placeholder.style.backgroundColor = `hsl(${hash % 360}, 55%, 38%)`
+        placeholder.style.backgroundColor = `hsl(${nameHash(ausername) % 360}, 55%, 38%)`
         avatarCol.appendChild(placeholder)
     }
     li.appendChild(avatarCol)

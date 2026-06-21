@@ -230,7 +230,7 @@ function emitUserList() {
             username: s.username,
             email: s.userEmail,
             color: getColor(s.userEmail),
-            avatar: getAvatar(s.userEmail),
+            avatar: s.cachedAvatar ?? null,
             guest: s.userEmail.endsWith('@guest'),
             isOwner: s.userEmail === process.env.OWNER_EMAIL
         })
@@ -301,18 +301,22 @@ io.on('connection', socket => {
         if (saved) socket.username = saved
         socket.emit('savedUsername', saved)
     }
-    socket.emit('savedAvatar', getAvatar(socket.userEmail))
+    socket.cachedAvatar = getAvatar(socket.userEmail)
+    socket.emit('savedAvatar', socket.cachedAvatar)
 
     socket.on('setAvatar', (url) => {
         if (socket.userEmail.endsWith('@guest')) return
-        if (typeof url !== 'string' || !url.startsWith(`${process.env.AWS_S3_PUBLIC_URL}/avatars/`)) return
+        const avatarBase = process.env.AWS_S3_PUBLIC_URL
+        if (!avatarBase || typeof url !== 'string' || !url.startsWith(`${avatarBase}/avatars/`)) return
         setAvatar(socket.userEmail, url)
+        socket.cachedAvatar = url
         socket.emit('savedAvatar', url)
         emitUserList()
     })
 
     socket.on('deleteAvatar', () => {
         deleteAvatar(socket.userEmail)
+        socket.cachedAvatar = null
         socket.emit('savedAvatar', null)
         emitUserList()
     })
