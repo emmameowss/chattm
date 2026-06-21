@@ -5,6 +5,7 @@ import { existsSync } from 'fs'
 const db = new Database('chat.db')
 db.pragma('journal_mode = WAL')
 try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } catch {}
+try { db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -67,6 +68,11 @@ db.exec(`
     email TEXT PRIMARY KEY,
     username TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS avatars (
+    email TEXT PRIMARY KEY,
+    url TEXT NOT NULL
+  );
 `)
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -75,8 +81,8 @@ const MAX_HISTORY = 100
 
 const stmts = {
   insertMessage: db.prepare(`
-    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions)
-    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions)
+    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url)
+    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url)
   `),
   getMessages: db.prepare(`SELECT * FROM messages ORDER BY time ASC`),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
@@ -133,6 +139,11 @@ const stmts = {
   getStoredUsername: db.prepare(`SELECT username FROM usernames WHERE email = ?`),
   getEmailByUsername: db.prepare(`SELECT email FROM usernames WHERE username = ?`),
   saveUsername: db.prepare(`INSERT OR REPLACE INTO usernames (email, username) VALUES (?, ?)`),
+
+  // Avatars
+  getAvatar: db.prepare(`SELECT url FROM avatars WHERE email = ?`),
+  setAvatar: db.prepare(`INSERT OR REPLACE INTO avatars (email, url) VALUES (?, ?)`),
+  deleteAvatar: db.prepare(`DELETE FROM avatars WHERE email = ?`),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -150,6 +161,7 @@ export function getHistory() {
     color: row.color,
     system: !!row.system,
     mentions: JSON.parse(row.mentions || '[]'),
+    avatar: row.avatar_url ?? null,
   }))
 }
 
@@ -166,6 +178,7 @@ export function addMessage(msg) {
     color: msg.color ?? null,
     system: msg.system ? 1 : 0,
     mentions: JSON.stringify(msg.mentions ?? []),
+    avatar_url: msg.avatar ?? null,
   })
   // trim to max
   const { n } = stmts.countMessages.get()
@@ -344,6 +357,20 @@ export function getEmailByUsername(username) {
 
 export function saveUsername(email, username) {
   stmts.saveUsername.run(email, username)
+}
+
+// ─── Avatar API ──────────────────────────────────────────────────────────────
+
+export function getAvatar(email) {
+  return stmts.getAvatar.get(email)?.url ?? null
+}
+
+export function setAvatar(email, url) {
+  stmts.setAvatar.run(email, url)
+}
+
+export function deleteAvatar(email) {
+  stmts.deleteAvatar.run(email)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

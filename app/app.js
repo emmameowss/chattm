@@ -292,6 +292,41 @@ themebtn.addEventListener('click', () => {
     applyTheme()
 })
 
+// avatar
+let myAvatar = null
+const avatarBtn = document.querySelector('#avatar-btn')
+const avatarRemoveBtn = document.querySelector('#avatar-remove-btn')
+const avatarInput = document.querySelector('#avatar-input')
+
+socket.on('savedAvatar', (url) => {
+    myAvatar = url
+    avatarRemoveBtn.style.display = url ? '' : 'none'
+})
+
+avatarBtn.addEventListener('click', () => avatarInput.click())
+avatarInput.addEventListener('change', async () => {
+    const file = avatarInput.files[0]
+    if (!file) return
+    avatarInput.value = ''
+    avatarBtn.textContent = 'uploading...'
+    try {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch(`${window.location.origin}/upload?session=${encodeURIComponent(session || '')}&avatar=1`, {
+            method: 'POST',
+            body: formData
+        })
+        const { url, error } = await res.json()
+        if (error) { showError(error); return }
+        socket.emit('setAvatar', url)
+    } catch (e) {
+        showError('avatar upload failed')
+    } finally {
+        avatarBtn.innerHTML = '<i class="ti ti-user-circle"></i> set avatar'
+    }
+})
+avatarRemoveBtn.addEventListener('click', () => socket.emit('deleteAvatar'))
+
 // typing indicator stuff
 let typeTimeout
 document.querySelector('#message-input').addEventListener('input', () => {
@@ -437,6 +472,7 @@ socket.on('savedUsername', (name) => {
     if (nameToUse.startsWith('guest-')) {
         document.querySelector('#username-input').disabled = true
         document.querySelector('#username-form button[type="submit"]').disabled = true
+        avatarBtn.style.display = 'none'
     }
 })
 
@@ -481,6 +517,12 @@ function renderMessage(data) {
     applyFlagColor(timespan, color)
     li.appendChild(timespan)
     li.appendChild(namespan)
+    if (data.avatar) {
+        const av = document.createElement('img')
+        av.src = data.avatar
+        av.className = 'avatar'
+        namespan.appendChild(av)
+    }
     const nametext = document.createElement('span')
     nametext.textContent = ausername
     if (data.isToken) {
@@ -729,12 +771,18 @@ socket.on('userlist', (users) => {
         inner.textContent = u.username
         inner.style.display = 'inline-block'
         applyFlagColor(inner, u.color || getNameColor(u.username))
+        if (u.avatar) {
+            const av = document.createElement('img')
+            av.src = u.avatar
+            av.className = 'avatar'
+            div.appendChild(av)
+        }
         div.appendChild(inner)
         if (u.guest) {
             const badge = document.createElement('span')
             badge.className = 'ti ti-user'
             badge.style.cssText = 'font-size:10px;color:var(--pink);margin-right:8px'
-            div.insertBefore(badge,inner)
+            div.insertBefore(badge, u.avatar ? div.children[1] : inner)
         }
         if (u.isOwner) {
             const crown = document.createElement('span')

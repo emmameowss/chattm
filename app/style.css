@@ -31,6 +31,17 @@ html.light {
   --name-lightness: 36%;
 }
 
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 5px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 .mention {
   color: var(--pink);
   font-weight: 500;

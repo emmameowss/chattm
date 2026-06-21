@@ -22,7 +22,8 @@ import {
     getSetting, setSetting,
     migrateFromFiles,
     deleteAllGuestSessions,
-    getStoredUsername, saveUsername, getEmailByUsername
+    getStoredUsername, saveUsername, getEmailByUsername,
+    getAvatar, setAvatar, deleteAvatar
 } from './db.js'
 
 const httpServer = createServer()
@@ -228,6 +229,7 @@ function emitUserList() {
             username: s.username,
             email: s.userEmail,
             color: getColor(s.userEmail),
+            avatar: getAvatar(s.userEmail),
             guest: s.userEmail.endsWith('@guest'),
             isOwner: s.userEmail === process.env.OWNER_EMAIL
         })
@@ -296,6 +298,21 @@ io.on('connection', socket => {
         if (saved) socket.username = saved
         socket.emit('savedUsername', saved)
     }
+    socket.emit('savedAvatar', getAvatar(socket.userEmail))
+
+    socket.on('setAvatar', (url) => {
+        if (socket.userEmail.endsWith('@guest')) return
+        if (typeof url !== 'string' || !url.startsWith(`${process.env.AWS_S3_PUBLIC_URL}/avatars/`)) return
+        setAvatar(socket.userEmail, url)
+        socket.emit('savedAvatar', url)
+        emitUserList()
+    })
+
+    socket.on('deleteAvatar', () => {
+        deleteAvatar(socket.userEmail)
+        socket.emit('savedAvatar', null)
+        emitUserList()
+    })
 
     socket.on('setUsername', (name) => {
         if (!isValidUsername(name)) {
@@ -785,7 +802,8 @@ io.on('connection', socket => {
             time: Date.now(),
             isToken: socket.userEmail === process.env.OWNER_EMAIL,
             isGuest: socket.userEmail.endsWith('@guest'),
-            color: getColor(socket.userEmail) ?? null
+            color: getColor(socket.userEmail) ?? null,
+            avatar: getAvatar(socket.userEmail) ?? null
         }
         const onlineNames = [...io.sockets.sockets.values()].map(s => s.username).filter(Boolean)
         const mentions = [...new Set(
@@ -913,8 +931,10 @@ httpServer.on('request', async (req, res) => {
                 }
 
                 const file = files.file[0]
-                const allowedTypes = [
-                    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+                const isAvatar = url.searchParams.get('avatar') === '1'
+                const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+                const allowedTypes = isAvatar ? imageTypes : [
+                    ...imageTypes,
                     'video/mp4', 'video/quicktime',
                     'audio/mpeg', 'audio/ogg', 'audio/wav',
                     'application/pdf', 'text/plain', 'text/markdown',
@@ -931,7 +951,8 @@ httpServer.on('request', async (req, res) => {
 
                 const fileBuffer = await readFile(file.filepath)
                 const ext = extname(file.originalFilename || '')
-                const key = `uploads/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
+                const folder = isAvatar ? 'avatars' : 'uploads'
+                const key = `${folder}/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
 
                 await s3.send(new PutObjectCommand({
                     Bucket: process.env.AWS_S3_BUCKET,
