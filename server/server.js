@@ -272,6 +272,8 @@ io.on('connection', socket => {
     let lastMessage = 0
     console.log(`${socket.userEmail} connected`)
     io.emit('usercount', io.engine.clientsCount)
+    // send emoji map before history so shortcodes render correctly
+    socket.emit('emoji', getCustomEmoji())
     // strip ownerEmail before sending history to client
     socket.emit('history', getHistory().map(({ ownerEmail, ...m }) => m))
     socket.emit('init', {
@@ -300,7 +302,6 @@ io.on('connection', socket => {
         socket.emit('savedUsername', saved)
     }
     socket.emit('savedAvatar', getAvatar(socket.userEmail))
-    socket.emit('emoji', getCustomEmoji())
 
     socket.on('setAvatar', (url) => {
         if (socket.userEmail.endsWith('@guest')) return
