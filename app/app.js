@@ -294,6 +294,23 @@ themebtn.addEventListener('click', () => {
     applyTheme()
 })
 
+const compactbtn = document.querySelector('#compact-btn')
+let compactMode = localStorage.getItem('compactMode') === 'true'
+
+function applyCompact() {
+    document.documentElement.classList.toggle('compact', compactMode)
+    compactbtn.innerHTML = compactMode
+        ? '<i class="ti ti-layout-list"></i> modern mode'
+        : '<i class="ti ti-layout-list"></i> compact mode'
+}
+
+applyCompact()
+compactbtn.addEventListener('click', () => {
+    compactMode = !compactMode
+    localStorage.setItem('compactMode', compactMode)
+    applyCompact()
+})
+
 // avatar
 let myAvatar = null
 const avatarBtn = document.querySelector('#avatar-btn')

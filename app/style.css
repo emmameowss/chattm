@@ -31,6 +31,40 @@ html.light {
   --name-lightness: 36%;
 }
 
+html.compact li.msg {
+  display: block;
+}
+
+html.compact .msg-avatar {
+  display: none;
+}
+
+html.compact .msg-body,
+html.compact .msg-username,
+html.compact .msg-content {
+  display: inline;
+}
+
+html.compact .msg-header {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+html.compact .msg-time {
+  order: -1;
+}
+
+html.compact .msg-header::after {
+  content: ': ';
+}
+
+html.compact .msg-content img:not(.custom-emoji) {
+  display: block;
+  margin-top: 4px;
+}
+
 .mention {
   color: var(--pink);
   font-weight: 500;
