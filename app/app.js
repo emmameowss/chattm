@@ -678,7 +678,7 @@ socket.on('connect_error', (err) => {
             <h1>chat™</h1>
             <p style="color: var(--pink)">you have been banned</p>
             <p>reason: ${err.data?.reason || 'no reason given'}</p>
-            <p style="color: var(--muted)">to appeal, email <a href="mailto:emma@csarcade.wiki">emma@csarcade.wiki</a></p>
+            <p style="color: var(--muted)">to appeal, email <a href="mailto:emma@chattm.app">emma@chattm.app</a></p>
         `
         devInstanceBanner()
         return
