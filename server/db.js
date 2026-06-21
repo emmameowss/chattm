@@ -62,6 +62,11 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS usernames (
+    email TEXT PRIMARY KEY,
+    username TEXT NOT NULL
+  );
 `)
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -123,6 +128,10 @@ const stmts = {
   // Settings
   getSetting: db.prepare(`SELECT value FROM settings WHERE key = ?`),
   setSetting: db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`),
+
+  // Usernames
+  getStoredUsername: db.prepare(`SELECT username FROM usernames WHERE email = ?`),
+  saveUsername: db.prepare(`INSERT OR REPLACE INTO usernames (email, username) VALUES (?, ?)`),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -320,6 +329,16 @@ export function getSetting(key) {
 
 export function setSetting(key, value) {
   stmts.setSetting.run(key, String(value))
+}
+
+// ─── Username API ────────────────────────────────────────────────────────────
+
+export function getStoredUsername(email) {
+  return stmts.getStoredUsername.get(email)?.username ?? null
+}
+
+export function saveUsername(email, username) {
+  stmts.saveUsername.run(email, username)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

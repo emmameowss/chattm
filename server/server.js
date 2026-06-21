@@ -21,7 +21,8 @@ import {
     getFilterWords, addFilterWord, removeFilterWord, replaceFilterWords,
     getSetting, setSetting,
     migrateFromFiles,
-    deleteAllGuestSessions
+    deleteAllGuestSessions,
+    getStoredUsername, saveUsername
 } from './db.js'
 
 const httpServer = createServer()
@@ -268,21 +269,28 @@ io.on('connection', socket => {
     if (socket.userEmail.endsWith('@guest')) {
         const guestUsername = socket.userEmail.replace('@guest', '')
         socket.username = guestUsername
-        socket.emit('guestUsername', guestUsername)
+        socket.emit('savedUsername', guestUsername)
         emitUserList()
+    } else {
+        const saved = getStoredUsername(socket.userEmail)
+        if (saved) socket.username = saved
+        socket.emit('savedUsername', saved)
     }
 
-    socket.on('setUsername', (name, guest) => {
+    socket.on('setUsername', (name) => {
         if (!isValidUsername(name)) {
             socket.emit('commandError', "invalid username, make sure it's within the character limit and uses only letters and numbers")
             return
         }
         const prevUser = socket.username
         socket.username = name
+        if (!socket.userEmail.endsWith('@guest')) {
+            saveUsername(socket.userEmail, name)
+        }
         const isGuest = socket.userEmail.endsWith('@guest')
         if (prevUser && prevUser !== name && !isGuest) {
-            socket.broadcast.emit('userRenamedSys', {from: prevUser, to: name}, guest)
-            socket.emit('userRenamed', { from: prevUser, to: name }, guest)
+            socket.broadcast.emit('userRenamedSys', {from: prevUser, to: name})
+            socket.emit('userRenamed', { from: prevUser, to: name })
         }
         emitUserList()
     })
@@ -591,6 +599,7 @@ io.on('connection', socket => {
             }
             const prevUser = socket.username
             socket.username = nick
+            saveUsername(socket.userEmail, nick)
             const isGuest = socket.userEmail.endsWith('@guest')
             if (prevUser && prevUser !== nick) {
                socket.broadcast.emit('userRenamedSys', {from: prevUser, to: nick}, isGuest)

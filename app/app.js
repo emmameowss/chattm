@@ -245,7 +245,6 @@ document.querySelector('#username-form').addEventListener('submit', (e) => {
         return
     }
     username = input.value.trim()
-    localStorage.setItem('username', username)
     socket.emit('setUsername', username)
 })
 
@@ -404,12 +403,18 @@ function appendMessage(li) {
 
 socket.on('connect', () => {
     localStorage.removeItem('banned')
-    const token = localStorage.getItem('token')
-    socket.emit('setUsername', username, token)
-    if (!username.startsWith('guest-') && !localStorage.getItem('isGuest')) {
-        socket.emit('setUsername', username, token)
-    }
     hideStatus()
+})
+
+socket.on('savedUsername', (name) => {
+    const nameToUse = name || username
+    username = nameToUse
+    document.querySelector('#username-input').value = nameToUse
+    socket.emit('setUsername', nameToUse)
+    if (nameToUse.startsWith('guest-')) {
+        document.querySelector('#username-input').disabled = true
+        document.querySelector('#username-form button[type="submit"]').disabled = true
+    }
 })
 
 socket.on('disconnect', () => {
@@ -789,16 +794,6 @@ document.querySelector('#message-input').addEventListener('keydown', (e) => {
             suggestion.style.display = 'none'
         }
     }
-})
-// guest sign in stuff
-socket.on('guestUsername', (name, guest) => {
-    username = name
-    guest = true
-    document.querySelector('#username-input').value = name
-    socket.emit('setUsername', name, guest)
-
-    document.querySelector('#username-input').disabled = true
-    document.querySelector('#username-form button[type="submit"]').disabled = true
 })
 
 socket.on('commandError', (msg) => {
