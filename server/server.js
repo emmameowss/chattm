@@ -20,7 +20,8 @@ import {
     isIpBanned, addIpBan, removeIpBan,
     getFilterWords, addFilterWord, removeFilterWord, replaceFilterWords,
     getSetting, setSetting,
-    migrateFromFiles
+    migrateFromFiles,
+    deleteAllGuestSessions
 } from './db.js'
 
 const httpServer = createServer()
@@ -47,9 +48,10 @@ const msgcooldown = 1000
 const lastmessage = {}
 const CDN_API_KEY = process.env.CDN_API_KEY
 
-const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick']
+const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests']
 
 let chatMuted = false
+let guestsDisabled = getSetting('guests_disabled') === '1'
 let status = ''
 let maintenance = getSetting('maintenance') === '1'
 let reason = getSetting('maintenance_reason') ?? ''
@@ -541,6 +543,26 @@ io.on('connection', socket => {
             io.emit('unmutechat', ann)
             return
         }
+        if (data.text?.startsWith('/noguests') && socket.userEmail === process.env.OWNER_EMAIL) {
+            guestsDisabled = true
+            setSetting('guests_disabled', '1')
+            deleteAllGuestSessions()
+            for (const [id, s] of io.sockets.sockets) {
+                if (s.userEmail?.endsWith('@guest')) {
+                    s.emit('kicked', 'guest logins have been disabled')
+                    s.skipLeaveMessage = true
+                    s.disconnect()
+                }
+            }
+            socket.emit('commandError', 'guest logins disabled, all guests kicked')
+            return
+        }
+        if (data.text?.startsWith('/allowguests') && socket.userEmail === process.env.OWNER_EMAIL) {
+            guestsDisabled = false
+            setSetting('guests_disabled', '0')
+            socket.emit('commandError', 'guest logins re-enabled')
+            return
+        }
         if (data.text?.startsWith('/whois ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetUsername = data.text.slice(7).trim()
             let found = null
@@ -855,6 +877,11 @@ httpServer.on('request', async (req, res) => {
     }
 
     if (url.pathname === '/guest') {
+        if (guestsDisabled) {
+            res.writeHead(302, { Location: '/?error=guests_disabled' })
+            res.end()
+            return
+        }
         const guestId = randomBytes(3).toString('hex')
         const today = new Date().toISOString().slice(0,10)
         const sessionid = randomBytes(32).toString('hex')

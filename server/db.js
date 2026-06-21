@@ -83,6 +83,7 @@ const stmts = {
   getSession: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
   upsertSession: db.prepare(`INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip) VALUES (@id, @email, @guest, @expires, @ip)`),
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
+  deleteAllGuestSessions: db.prepare(`DELETE FROM sessions WHERE guest = 1`),
 
   // Colors
   getColor: db.prepare(`SELECT color FROM colors WHERE email = ?`),
@@ -197,6 +198,10 @@ export function saveSession(id, data) {
 
 export function deleteSession(id) {
   stmts.deleteSession.run(id)
+}
+
+export function deleteAllGuestSessions() {
+  stmts.deleteAllGuestSessions.run()
 }
 
 // ─── Color API ───────────────────────────────────────────────────────────────
