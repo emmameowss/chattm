@@ -33,7 +33,7 @@ function getNameColor(name) {
     for (let i = 0; i < name.length; i++) {
         hash = name.charCodeAt(i) + ((hash << 5) - hash)
     }
-    return `hsl(${hash % 360}, 70%, 65%)`
+    return `hsl(${hash % 360}, 70%, var(--name-lightness))`
 }
 
 function isSystemMessage(data) {
@@ -273,6 +273,23 @@ mutebtn.addEventListener('click', () => {
     notifymuted = !notifymuted
     localStorage.setItem('notifymuted', notifymuted)
     mutebtn.classList.toggle('muted', notifymuted)
+})
+
+const themebtn = document.querySelector('#theme-btn')
+let lightMode = localStorage.getItem('lightMode') === 'true'
+
+function applyTheme() {
+    document.documentElement.classList.toggle('light', lightMode)
+    themebtn.innerHTML = lightMode
+        ? '<i class="ti ti-moon"></i> dark mode'
+        : '<i class="ti ti-sun"></i> light mode'
+}
+
+applyTheme()
+themebtn.addEventListener('click', () => {
+    lightMode = !lightMode
+    localStorage.setItem('lightMode', lightMode)
+    applyTheme()
 })
 
 // typing indicator stuff

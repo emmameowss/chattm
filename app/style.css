@@ -15,6 +15,20 @@
   --font-sans: 'DM Sans', sans-serif;
   --danger: #d97a7a;
   --danger-dim: rgba(217, 122, 122, 0.1);
+  --name-lightness: 65%;
+}
+
+html.light {
+  --bg: #f7f7f5;
+  --surface: #eeede9;
+  --border: #d8d6d0;
+  --text: #1a1a1a;
+  --muted: #666;
+  --pink: #c95c7a;
+  --pink-dim: rgba(201, 92, 122, 0.1);
+  --danger: #b85555;
+  --danger-dim: rgba(184, 85, 85, 0.1);
+  --name-lightness: 36%;
 }
 
 .mention {
@@ -215,7 +229,6 @@ a:hover {
   align-items: center;
   gap: 12px;
   pointer-events: none;
-  background: var(--bg);
   padding: 0 4px;
 }
 
