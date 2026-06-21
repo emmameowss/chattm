@@ -49,6 +49,25 @@ const msgcooldown = 1000
 const lastmessage = {}
 const CDN_API_KEY = process.env.CDN_API_KEY
 
+const rateLimits = new Map()
+function checkRateLimit(ip, key, max, windowMs) {
+    const now = Date.now()
+    const k = `${ip}:${key}`
+    const timestamps = (rateLimits.get(k) ?? []).filter(t => now - t < windowMs)
+    if (timestamps.length >= max) return false
+    timestamps.push(now)
+    rateLimits.set(k, timestamps)
+    return true
+}
+setInterval(() => {
+    const now = Date.now()
+    for (const [k, timestamps] of rateLimits) {
+        const fresh = timestamps.filter(t => now - t < 60 * 60 * 1000)
+        if (fresh.length === 0) rateLimits.delete(k)
+        else rateLimits.set(k, fresh)
+    }
+}, 10 * 60 * 1000)
+
 const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests']
 
 let chatMuted = false
@@ -216,6 +235,8 @@ function emitUserList() {
 }
 
 io.use((socket, next) => {
+    const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
+    if (!checkRateLimit(ip, 'connect', 20, 60 * 1000)) return next(new Error('rate limited'))
     const sessionId = socket.handshake.auth.session
     const user = getSession(sessionId)
     if (!user) return next(new Error('not authenticated'))
@@ -798,6 +819,12 @@ httpServer.on('request', async (req, res) => {
     }
 
     if (url.pathname === '/callback') {
+        const cbIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        if (!checkRateLimit(cbIp, 'callback', 30, 60 * 60 * 1000)) {
+            res.writeHead(302, { Location: '/?error=rate_limited' })
+            res.end()
+            return
+        }
         const code = url.searchParams.get('code')
         const tokenRes = await fetch('https://auth.hackclub.com/oauth/token', {
             method: 'POST',
@@ -850,6 +877,12 @@ httpServer.on('request', async (req, res) => {
         }
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+        const uploadIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        if (!checkRateLimit(uploadIp, 'upload', 50, 60 * 60 * 1000)) {
+            res.writeHead(429)
+            res.end(JSON.stringify({ error: 'too many uploads, try again later' }))
+            return
+        }
 
         if (req.method === 'OPTIONS') {
             res.writeHead(204)
@@ -934,6 +967,12 @@ httpServer.on('request', async (req, res) => {
     if (url.pathname === '/guest') {
         if (guestsDisabled) {
             res.writeHead(302, { Location: '/?error=guests_disabled' })
+            res.end()
+            return
+        }
+        const guestIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        if (!checkRateLimit(guestIp, 'guest', 10, 60 * 60 * 1000)) {
+            res.writeHead(302, { Location: '/?error=rate_limited' })
             res.end()
             return
         }

@@ -184,6 +184,10 @@ if (urlError === 'auth_denied') {
     window.history.replaceState({}, '', '/')
     sessionStorage.setItem('authDenied', '1')
 }
+if (urlError === 'rate_limited') {
+    window.history.replaceState({}, '', '/')
+    sessionStorage.setItem('rateLimited', '1')
+}
 if (!session) {
     const kickedReason = sessionStorage.getItem('kickedReason')
     if (maintenanceCheck.maintenance) showMaintenance(maintenanceCheck.reason)
@@ -199,10 +203,12 @@ if (!session) {
         ${kickedReason ? `<p style="color: var(--pink)">you've been kicked: ${kickedReason}</p>` : ''}
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
         ${guestsOff ? '<p style="color: var(--muted)">guest logins are currently disabled</p>' : ''}
+        ${sessionStorage.getItem('rateLimited') ? '<p style="color: var(--muted)">you\'re doing that too much, try again later</p>' : ''}
     `
     devInstanceBanner()
     sessionStorage.removeItem('kickedReason')
     sessionStorage.removeItem('authDenied')
+    sessionStorage.removeItem('rateLimited')
     throw new Error('not authenticated')
 }
 
@@ -681,6 +687,7 @@ socket.on('connect_error', (err) => {
         localStorage.removeItem('session')
         location.reload()
     }
+    if (err.message === 'rate limited') return  // socket.io will retry automatically
     // for transient errors, let socket.io reconnect automatically
 })
 
