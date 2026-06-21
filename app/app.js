@@ -507,51 +507,80 @@ document.addEventListener('visibilitychange', () => {
 
 function renderMessage(data) {
     const li = document.createElement('li')
+    li.className = 'msg'
     li.dataset.id = data.id
     const ausername = data.username
     const color = data.color || getNameColor(ausername)
-    const namespan = document.createElement('span')
-    const timespan = document.createElement('span')
-    timespan.className = 'msg-time'
-    timespan.textContent = `[${new Date(Number(data.time)).toLocaleString([], {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}]`
-    applyFlagColor(timespan, color)
-    li.appendChild(timespan)
-    li.appendChild(namespan)
+
+    // left: avatar or initial placeholder
+    const avatarCol = document.createElement('div')
+    avatarCol.className = 'msg-avatar'
     if (data.avatar) {
         const av = document.createElement('img')
         av.src = data.avatar
         av.className = 'avatar'
-        namespan.appendChild(av)
+        avatarCol.appendChild(av)
+    } else {
+        const placeholder = document.createElement('div')
+        placeholder.className = 'avatar-placeholder'
+        placeholder.textContent = (ausername || '?')[0]
+        // compute a concrete hsl color for background (can't use CSS vars in style.backgroundColor)
+        let hash = 0
+        for (let i = 0; i < ausername.length; i++) hash = ausername.charCodeAt(i) + ((hash << 5) - hash)
+        placeholder.style.backgroundColor = `hsl(${hash % 360}, 55%, 38%)`
+        avatarCol.appendChild(placeholder)
     }
-    const nametext = document.createElement('span')
-    nametext.textContent = ausername
+    li.appendChild(avatarCol)
+
+    // right: body
+    const body = document.createElement('div')
+    body.className = 'msg-body'
+
+    // header row: username + badges + time
+    const header = document.createElement('div')
+    header.className = 'msg-header'
+
+    const namespan = document.createElement('span')
+    namespan.className = 'msg-username'
     if (data.isToken) {
-        const tag = document.createElement('span')
-        tag.textContent = '♛'
-        tag.style.cssText = 'color:hotpink;margin-right:8px'
-        namespan.appendChild(tag)
+        const crown = document.createElement('span')
+        crown.textContent = '♛ '
+        crown.style.color = 'hotpink'
+        namespan.appendChild(crown)
     }
     if (data.isGuest) {
         const badge = document.createElement('i')
         badge.className = 'ti ti-user'
-        badge.style.cssText = `font-size:10px;margin-right:8px`
+        badge.style.cssText = 'font-size:10px;margin-right:4px'
         applyFlagColor(badge, color)
         namespan.appendChild(badge)
     }
+    const nametext = document.createElement('span')
     applyFlagColor(nametext, color)
-    nametext.style.display = 'inline-block'
+    nametext.textContent = ausername
     namespan.appendChild(nametext)
-    namespan.appendChild(document.createTextNode(': '))
+    header.appendChild(namespan)
+
+    const timespan = document.createElement('span')
+    timespan.className = 'msg-time'
+    timespan.textContent = new Date(Number(data.time)).toLocaleString([], {hour: '2-digit', minute: '2-digit'})
+    header.appendChild(timespan)
+    body.appendChild(header)
+
+    // content: text and/or image
+    const content = document.createElement('div')
+    content.className = 'msg-content'
     if (data.text) {
-        li.appendChild(functioninglinks(data.text, flags[color] ? null : color))
+        content.appendChild(functioninglinks(data.text, flags[color] ? null : color))
     }
     if (data.image) {
         const img = document.createElement('img')
         img.src = data.image
-        img.style.cssText = 'max-width:300px;display:block;cursor:zoom-in'
         img.addEventListener('click', () => lightbox(data.image))
-        li.appendChild(img)
+        content.appendChild(img)
     }
+    body.appendChild(content)
+    li.appendChild(body)
 
     if (ausername === username || isOwner) {
         li.addEventListener('contextmenu', (e) => {
@@ -771,18 +800,12 @@ socket.on('userlist', (users) => {
         inner.textContent = u.username
         inner.style.display = 'inline-block'
         applyFlagColor(inner, u.color || getNameColor(u.username))
-        if (u.avatar) {
-            const av = document.createElement('img')
-            av.src = u.avatar
-            av.className = 'avatar'
-            div.appendChild(av)
-        }
         div.appendChild(inner)
         if (u.guest) {
             const badge = document.createElement('span')
             badge.className = 'ti ti-user'
             badge.style.cssText = 'font-size:10px;color:var(--pink);margin-right:8px'
-            div.insertBefore(badge, u.avatar ? div.children[1] : inner)
+            div.insertBefore(badge, inner)
         }
         if (u.isOwner) {
             const crown = document.createElement('span')
