@@ -31,6 +31,17 @@ html, body {
   min-height: 100vh;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  background: var(--bg);
+  z-index: 199;
+}
+
 h1 {
   font-family: var(--font-mono);
   font-size: 13px;
