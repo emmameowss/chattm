@@ -439,6 +439,7 @@ function activitya() {
 
 // message history
 socket.on('history', (messages) => {
+    lastMsgMeta = null
     atBottom = false  // suppress per-message scrolls during batch render
     messages.forEach(data => renderMessage(data))
     atBottom = true
@@ -575,12 +576,50 @@ document.addEventListener('visibilitychange', () => {
     }
 })
 
+let lastMsgMeta = null  // { username, time } — for message grouping
+
+function buildMsgContent(data, color) {
+    const content = document.createElement('div')
+    content.className = 'msg-content'
+    if (data.text) content.appendChild(functioninglinks(data.text, flags[color] ? null : color))
+    if (data.image) {
+        const img = document.createElement('img')
+        img.src = data.image
+        img.addEventListener('click', () => lightbox(data.image))
+        content.appendChild(img)
+    }
+    return content
+}
+
 function renderMessage(data) {
+    const ausername = data.username
+    const color = data.color || getNameColor(ausername)
+
+    const isContinuation = !document.documentElement.classList.contains('compact') &&
+        lastMsgMeta &&
+        lastMsgMeta.username === ausername &&
+        (data.time - lastMsgMeta.time) < 5 * 60 * 1000
+
+    lastMsgMeta = { username: ausername, time: data.time }
+
+    if (isContinuation) {
+        const li = document.createElement('li')
+        li.className = 'msg-cont'
+        li.dataset.id = data.id
+        li.appendChild(buildMsgContent(data, color))
+        if (ausername === username || isOwner) {
+            li.addEventListener('contextmenu', (e) => {
+                e.preventDefault()
+                openMessageContextMenu(li, data.id)
+            })
+        }
+        appendMessage(li)
+        return
+    }
+
     const li = document.createElement('li')
     li.className = 'msg'
     li.dataset.id = data.id
-    const ausername = data.username
-    const color = data.color || getNameColor(ausername)
 
     // left: avatar or initial placeholder
     const avatarCol = document.createElement('div')
@@ -634,19 +673,7 @@ function renderMessage(data) {
     header.appendChild(timespan)
     body.appendChild(header)
 
-    // content: text and/or image
-    const content = document.createElement('div')
-    content.className = 'msg-content'
-    if (data.text) {
-        content.appendChild(functioninglinks(data.text, flags[color] ? null : color))
-    }
-    if (data.image) {
-        const img = document.createElement('img')
-        img.src = data.image
-        img.addEventListener('click', () => lightbox(data.image))
-        content.appendChild(img)
-    }
-    body.appendChild(content)
+    body.appendChild(buildMsgContent(data, color))
     li.appendChild(body)
 
     if (ausername === username || isOwner) {

@@ -264,8 +264,12 @@ ul {
 li.msg {
   display: flex;
   gap: 10px;
-  padding: 4px 0;
+  padding: 6px 0 2px;
   align-items: flex-start;
+}
+
+li.msg-cont {
+  padding: 1px 0 1px 46px; /* 36px avatar + 10px gap */
 }
 
 .msg-avatar {
