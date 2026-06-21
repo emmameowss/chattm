@@ -22,7 +22,7 @@ import {
     getSetting, setSetting,
     migrateFromFiles,
     deleteAllGuestSessions,
-    getStoredUsername, saveUsername
+    getStoredUsername, saveUsername, getEmailByUsername
 } from './db.js'
 
 const httpServer = createServer()
@@ -392,9 +392,23 @@ io.on('connection', socket => {
 
         // /ban command
         if (data.text?.startsWith('/ban ') && socket.userEmail === process.env.OWNER_EMAIL) {
-            const args = data.text.slice(5).trim()
-            const [targetEmail, ...reasonParts] = args.split(' ')
-            const banReason = reasonParts.join(' ') || 'no reason given'
+            const args = data.text.slice(5).trim().split(' ')
+            let target = args[0]
+            const banReason = args.slice(1).join(' ') || 'no reason given'
+
+            if (!target.includes('@')) {
+                let found = null
+                for (const [id, s] of io.sockets.sockets) {
+                    if (s.username === target) { found = s.userEmail; break }
+                }
+                target = found ?? getEmailByUsername(target)
+                if (!target) {
+                    socket.emit('commandError', `no user found with username ${args[0]}`)
+                    return
+                }
+            }
+
+            const targetEmail = target
             addBan(targetEmail, banReason)
             await appendFile('bans.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${banReason}\n`)
             for (const [id, s] of io.sockets.sockets) {
@@ -402,11 +416,11 @@ io.on('connection', socket => {
                     addIpBan(s.userIP)
                     await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${s.userIP}\n`)
                     s.emit('banned', banReason)
-                    socket.emit('commandError', `banned ${targetEmail}`)
                     s.skipLeaveMessage = true
                     s.disconnect()
                 }
             }
+            socket.emit('commandError', `banned ${targetEmail}`)
             return
         }
 

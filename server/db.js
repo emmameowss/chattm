@@ -131,6 +131,7 @@ const stmts = {
 
   // Usernames
   getStoredUsername: db.prepare(`SELECT username FROM usernames WHERE email = ?`),
+  getEmailByUsername: db.prepare(`SELECT email FROM usernames WHERE username = ?`),
   saveUsername: db.prepare(`INSERT OR REPLACE INTO usernames (email, username) VALUES (?, ?)`),
 }
 
@@ -335,6 +336,10 @@ export function setSetting(key, value) {
 
 export function getStoredUsername(email) {
   return stmts.getStoredUsername.get(email)?.username ?? null
+}
+
+export function getEmailByUsername(username) {
+  return stmts.getEmailByUsername.get(username)?.email ?? null
 }
 
 export function saveUsername(email, username) {
