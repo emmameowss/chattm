@@ -160,7 +160,7 @@ button:active {
 ul {
   padding-top: 50px;
   list-style: none;
-  padding: 70px 280px 110px 20px;
+  padding: 70px 280px 90px 20px;
   max-width: calc(100% - 130px);
   margin: 0;
   display: flex;
