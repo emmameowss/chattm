@@ -245,7 +245,6 @@ io.use((socket, next) => {
         err.data = { reason: getBanReason(user.email) || 'no reason given' }
         return next(err)
     }
-    const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
     if (isIpBanned(ip)) return next(new Error('banned'))
 
     // guest expiry stuff
