@@ -56,8 +56,9 @@ html.compact .msg-time {
   order: -1;
 }
 
-html.compact .msg-header::after {
-  content: ': ';
+html.compact .msg-username::after {
+  content: ':';
+  margin-right: 4px;
 }
 
 html.compact .msg-content img:not(.custom-emoji) {

@@ -298,6 +298,7 @@ themebtn.addEventListener('click', () => {
 
 const compactbtn = document.querySelector('#compact-btn')
 let compactMode = localStorage.getItem('compactMode') === 'true'
+let renderedHistory = []  // for re-render on mode toggle
 
 function applyCompact() {
     document.documentElement.classList.toggle('compact', compactMode)
@@ -311,6 +312,12 @@ compactbtn.addEventListener('click', () => {
     compactMode = !compactMode
     localStorage.setItem('compactMode', compactMode)
     applyCompact()
+    // re-render so grouping applies (or is removed) immediately
+    const ul = document.querySelector('ul')
+    ul.innerHTML = ''
+    lastMsgMeta = null
+    renderedHistory.forEach(data => renderMessage(data))
+    window.scrollTo({ top: document.body.scrollHeight })
 })
 
 // avatar
@@ -439,6 +446,7 @@ function activitya() {
 
 // message history
 socket.on('history', (messages) => {
+    renderedHistory = messages
     lastMsgMeta = null
     atBottom = false  // suppress per-message scrolls during batch render
     messages.forEach(data => renderMessage(data))
@@ -562,6 +570,7 @@ document.addEventListener('visibilitychange', () => {
 })
 socket.on("message", (data) => {
     if (isSystemMessage(data)) return
+    renderedHistory.push(data)
     renderMessage(data)
     if (!notifymuted && data.mentions && data.mentions.some(m => m.toLowerCase() === username.toLowerCase())) beep()
     if (document.hidden) {
