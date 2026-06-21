@@ -427,6 +427,7 @@ socket.on('history', (messages) => {
 
 async function sendMessageNew(e) {
     e.preventDefault()
+    hideSuggestion()
     // stops typing when a message is sent
     socket.emit('stopTyping')
     const textInput = document.querySelector('#message-input')
