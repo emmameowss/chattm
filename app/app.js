@@ -197,10 +197,12 @@ if (!session) {
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
         <a href="/login"><button><i class="ti ti-login-2"></i> login with Hack Club</button></a>
-        ${sessionStorage.getItem('guestsDisabled') ? '' : '<a href="/guest"><button><i class="ti ti-user"></i> continue as guest</button></a>'}
+        ${sessionStorage.getItem('guestsDisabled')
+            ? '<button disabled style="opacity:0.4;cursor:not-allowed;filter:brightness(0.5)"><i class="ti ti-user"></i> continue as guest</button>'
+            : '<a href="/guest"><button><i class="ti ti-user"></i> continue as guest</button></a>'}
         ${kickedReason ? `<p style="color: var(--pink)">you've been kicked: ${kickedReason}</p>` : ''}
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
-        ${sessionStorage.getItem('guestsDisabled') ? '<p style="color: var(--pink)">guest logins are currently disabled</p>' : ''}
+        ${sessionStorage.getItem('guestsDisabled') ? '<p style="color: var(--muted)">guest logins are currently disabled</p>' : ''}
     `
     devInstanceBanner()
     sessionStorage.removeItem('kickedReason')
@@ -738,7 +740,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
+const commands = ["/whois [username]", '/noguests', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [email]", '/unban [email]', '/unbanip [ip]']
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
