@@ -136,6 +136,51 @@ button:active {
   opacity: 0.7;
 }
 
+#emoji-picker {
+  position: fixed;
+  bottom: 68px;
+  left: 60px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  padding: 8px;
+  grid-template-columns: repeat(6, 36px);
+  gap: 4px;
+  z-index: 300;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#emoji-picker button {
+  width: 36px;
+  height: 36px;
+  padding: 4px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#emoji-picker button:hover { background: var(--border); }
+
+#emoji-picker button img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.custom-emoji {
+  height: 20px;
+  width: auto;
+  vertical-align: middle;
+  display: inline;
+  margin: 0 1px;
+}
+
 #message-form {
   position: fixed;
   bottom: 0;

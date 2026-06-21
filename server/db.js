@@ -73,6 +73,11 @@ db.exec(`
     email TEXT PRIMARY KEY,
     url TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS custom_emoji (
+    shortcode TEXT PRIMARY KEY,
+    url TEXT NOT NULL
+  );
 `)
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -144,6 +149,11 @@ const stmts = {
   getAvatar: db.prepare(`SELECT url FROM avatars WHERE email = ?`),
   setAvatar: db.prepare(`INSERT OR REPLACE INTO avatars (email, url) VALUES (?, ?)`),
   deleteAvatar: db.prepare(`DELETE FROM avatars WHERE email = ?`),
+
+  // Custom emoji
+  getCustomEmoji: db.prepare(`SELECT shortcode, url FROM custom_emoji ORDER BY shortcode`),
+  addCustomEmoji: db.prepare(`INSERT OR REPLACE INTO custom_emoji (shortcode, url) VALUES (?, ?)`),
+  removeCustomEmoji: db.prepare(`DELETE FROM custom_emoji WHERE shortcode = ?`),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -371,6 +381,22 @@ export function setAvatar(email, url) {
 
 export function deleteAvatar(email) {
   stmts.deleteAvatar.run(email)
+}
+
+// ─── Custom Emoji API ────────────────────────────────────────────────────────
+
+export function getCustomEmoji() {
+  const result = {}
+  for (const { shortcode, url } of stmts.getCustomEmoji.all()) result[shortcode] = url
+  return result
+}
+
+export function addCustomEmoji(shortcode, url) {
+  stmts.addCustomEmoji.run(shortcode, url)
+}
+
+export function removeCustomEmoji(shortcode) {
+  stmts.removeCustomEmoji.run(shortcode)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

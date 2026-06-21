@@ -133,6 +133,8 @@ function showMaintenance(reason) {
 devInstanceBanner()
 
 
+let customEmoji = {}
+
 const flags = {
     'flag:pride':       'linear-gradient(90deg,#ff0018,#ffa52c,#ffff41,#008018,#0000f9,#86007d)',
     'flag:gay':         'linear-gradient(90deg,#078D70,#26CEAA,#98E8C1,#FFFFFF,#7BADE2,#5049CC)',
@@ -326,6 +328,53 @@ avatarInput.addEventListener('change', async () => {
     }
 })
 avatarRemoveBtn.addEventListener('click', () => socket.emit('deleteAvatar'))
+
+// custom emoji picker
+const emojiPicker = document.querySelector('#emoji-picker')
+const emojiBtn = document.querySelector('#emoji-btn')
+
+function renderEmojiPicker() {
+    emojiPicker.innerHTML = ''
+    const entries = Object.entries(customEmoji)
+    if (!entries.length) {
+        emojiPicker.style.display = 'none'
+        return
+    }
+    for (const [shortcode, url] of entries) {
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.title = shortcode
+        const img = document.createElement('img')
+        img.src = url
+        btn.appendChild(img)
+        btn.addEventListener('click', () => {
+            const input = document.querySelector('#message-input')
+            const pos = input.selectionStart
+            const val = input.value
+            const insert = shortcode + ' '
+            input.value = val.slice(0, pos) + insert + val.slice(pos)
+            input.selectionStart = input.selectionEnd = pos + insert.length
+            input.focus()
+            emojiPicker.style.display = 'none'
+        })
+        emojiPicker.appendChild(btn)
+    }
+}
+
+socket.on('emoji', map => { customEmoji = map; renderEmojiPicker() })
+socket.on('emojiUpdate', map => { customEmoji = map; renderEmojiPicker() })
+
+emojiBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (!Object.keys(customEmoji).length) return
+    emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'grid' : 'none'
+})
+
+document.addEventListener('click', (e) => {
+    if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+        emojiPicker.style.display = 'none'
+    }
+})
 
 // typing indicator stuff
 let typeTimeout
@@ -659,7 +708,7 @@ async function uploadFile(file) {
 
 // links show up as links in chat
 function functioninglinks(text, color) {
-    const tokenRegex = /(https?:\/\/[^\s]+)|(@[a-zA-Z0-9_]+)/g
+    const tokenRegex = /(https?:\/\/[^\s]+)|(@[a-zA-Z0-9_]+)|(:[a-z0-9_-]+:)/g
     const parts = text.split(tokenRegex).filter(p => p !== undefined)
     const fragment = document.createDocumentFragment()
 
@@ -678,6 +727,13 @@ function functioninglinks(text, color) {
             span.className = 'mention'
             span.textContent = part
             fragment.appendChild(span)
+        } else if (/^:[a-z0-9_-]+:$/.test(part) && customEmoji[part]) {
+            const img = document.createElement('img')
+            img.src = customEmoji[part]
+            img.className = 'custom-emoji'
+            img.title = part
+            img.alt = part
+            fragment.appendChild(img)
         } else {
             fragment.appendChild(document.createTextNode(part))
         }
@@ -835,34 +891,70 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]']
+const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]', '/addemoji [:shortcode:] [url]', '/removeemoji [:shortcode:]']
+
+// stores what to actually insert on Tab (may differ from displayed suggestion text)
+let suggestionInsert = null
+
+function showSuggestion(displayText, insertValue, prefixImg = null) {
+    const suggestion = document.querySelector('#command-suggestion')
+    suggestion.innerHTML = ''
+    if (prefixImg) {
+        const img = document.createElement('img')
+        img.src = prefixImg
+        img.className = 'custom-emoji'
+        img.style.marginRight = '5px'
+        suggestion.appendChild(img)
+    }
+    suggestion.appendChild(document.createTextNode(displayText))
+    suggestion.style.display = 'block'
+    suggestionInsert = insertValue
+}
+
+function hideSuggestion() {
+    const suggestion = document.querySelector('#command-suggestion')
+    suggestion.style.display = 'none'
+    suggestion.innerHTML = ''
+    suggestionInsert = null
+}
 
 document.querySelector('#message-input').addEventListener('input', (e) => {
     const value = e.target.value
-    const suggestion = document.querySelector('#command-suggestion')
+    const cursor = e.target.selectionStart
 
     const usernameCmdMatch = value.match(/^\/(kick|mute|unmute|whois|resetstrikes|setcolor|ban)\s+([a-zA-Z0-9-]*)$/)
     if (usernameCmdMatch) {
         const [, cmd, partial] = usernameCmdMatch
         const lower = partial.toLowerCase()
         const userMatch = onlineUsernames.find(name => name.toLowerCase().startsWith(lower) && name.toLowerCase() !== lower)
-
         if (userMatch) {
-            suggestion.textContent = `/${cmd} ${userMatch} `
-            suggestion.style.display = 'block'
+            const full = `/${cmd} ${userMatch} `
+            showSuggestion(full, full)
             return
         }
     }
 
-    const cursor = e.target.selectionStart
     const before = value.slice(0, cursor)
     const mentionMatch = before.match(/@([a-zA-Z0-9_]*)$/)
     if (mentionMatch) {
         const fragment = mentionMatch[1].toLowerCase()
         const userMatch = onlineUsernames.find(name => name.toLowerCase().startsWith(fragment) && name.toLowerCase() !== fragment)
         if (userMatch) {
-            suggestion.textContent = value.slice(0, cursor - mentionMatch[1].length) + userMatch + value.slice(cursor)
-            suggestion.style.display = 'block'
+            const full = value.slice(0, cursor - mentionMatch[1].length) + userMatch + value.slice(cursor)
+            showSuggestion(full, full)
+            return
+        }
+    }
+
+    // emoji shortcode autocomplete: match :partial before cursor
+    const emojiMatch = before.match(/:([a-z0-9_-]*)$/)
+    if (emojiMatch && !value.startsWith('/')) {
+        const partial = emojiMatch[1].toLowerCase()
+        const match = Object.keys(customEmoji).find(sc => sc.slice(1).startsWith(partial) && sc.slice(1) !== partial)
+        if (match) {
+            const afterCursor = value.slice(cursor)
+            const completed = value.slice(0, cursor - emojiMatch[1].length) + match.slice(1) + ' ' + afterCursor
+            showSuggestion(match + ' ', completed, customEmoji[match])
             return
         }
     }
@@ -870,23 +962,22 @@ document.querySelector('#message-input').addEventListener('input', (e) => {
     if (value.startsWith('/')) {
         const match = commands.find(c => c.startsWith(value))
         if (match && match !== value) {
-            suggestion.textContent = match
-            suggestion.style.display = 'block'
+            showSuggestion(match, match)
         } else {
-            suggestion.style.display = 'none'
+            hideSuggestion()
         }
     } else {
-        suggestion.style.display = 'none'
+        hideSuggestion()
     }
 })
 
 document.querySelector('#message-input').addEventListener('keydown', (e) => {
     if (e.key === 'Tab') {
         const suggestion = document.querySelector('#command-suggestion')
-        if (suggestion.style.display !== 'none') {
+        if (suggestion.style.display !== 'none' && suggestionInsert !== null) {
             e.preventDefault()
-            document.querySelector('#message-input').value = suggestion.textContent
-            suggestion.style.display = 'none'
+            document.querySelector('#message-input').value = suggestionInsert
+            hideSuggestion()
         }
     }
 })

@@ -23,7 +23,8 @@ import {
     migrateFromFiles,
     deleteAllGuestSessions,
     getStoredUsername, saveUsername, getEmailByUsername,
-    getAvatar, setAvatar, deleteAvatar
+    getAvatar, setAvatar, deleteAvatar,
+    getCustomEmoji, addCustomEmoji, removeCustomEmoji
 } from './db.js'
 
 const httpServer = createServer()
@@ -69,7 +70,7 @@ setInterval(() => {
     }
 }, 10 * 60 * 1000)
 
-const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests']
+const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests', '/addemoji', '/removeemoji']
 
 let chatMuted = false
 let guestsDisabled = getSetting('guests_disabled') === '1'
@@ -299,6 +300,7 @@ io.on('connection', socket => {
         socket.emit('savedUsername', saved)
     }
     socket.emit('savedAvatar', getAvatar(socket.userEmail))
+    socket.emit('emoji', getCustomEmoji())
 
     socket.on('setAvatar', (url) => {
         if (socket.userEmail.endsWith('@guest')) return
@@ -647,6 +649,26 @@ io.on('connection', socket => {
             guestsDisabled = false
             setSetting('guests_disabled', '0')
             socket.emit('commandError', 'guest logins re-enabled')
+            return
+        }
+        if (data.text?.startsWith('/addemoji ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const args = data.text.slice(10).trim().split(' ')
+            const shortcode = args[0]
+            const url = args.slice(1).join(' ')
+            if (!/^:[a-z0-9_-]+:$/.test(shortcode) || !url) {
+                socket.emit('commandError', 'usage: /addemoji :shortcode: <url>')
+                return
+            }
+            addCustomEmoji(shortcode, url)
+            io.emit('emojiUpdate', getCustomEmoji())
+            socket.emit('commandError', `added emoji ${shortcode}`)
+            return
+        }
+        if (data.text?.startsWith('/removeemoji ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const shortcode = data.text.slice(13).trim()
+            removeCustomEmoji(shortcode)
+            io.emit('emojiUpdate', getCustomEmoji())
+            socket.emit('commandError', `removed emoji ${shortcode}`)
             return
         }
         if (data.text?.startsWith('/whois ') && socket.userEmail === process.env.OWNER_EMAIL) {
