@@ -448,6 +448,38 @@ io.on('connection', socket => {
             socket.emit('commandError', `unbanned ${targetEmail}, use /unbanip for IP`)
             return
         }
+        if (data.text?.startsWith('/setnick ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const args = data.text.slice(9).trim().split(' ')
+            const targetUsername = args[0]
+            const newName = args[1]
+
+            if (!newName || !isValidUsername(newName)) {
+                socket.emit('commandError', 'usage: /setnick [oldname] [newname]')
+                return
+            }
+            let targetSocket = null
+            for (const [id,s] of io.sockets.sockets) {
+                if (s.username === targetUsername) {
+                    targetSocket = s;
+                    break
+                }
+            }
+            if (!targetSocket) {
+                socket.emit('commandError', `no user found with username ${targetUsername}`)
+                return
+            }
+            if (targetSocket.userEmail.endsWith('@guest')) {
+                socket.emit('commandError', 'cannot rename guests')
+                return
+            }
+            const prevName = targetSocket.username
+            targetSocket.username = newName
+            saveUsername(targetSocket.userEmail, newName)
+            targetSocket.emit('savedUsername', newName)
+            emitUserList()
+            socket.emit('commandError', `changed ${prevName}'s name to ${newName}`)
+            return
+        }
         if (data.text?.startsWith('/unbanip ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetIP = data.text.slice(9).trim()
             removeIpBan(targetIP)
