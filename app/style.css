@@ -292,7 +292,7 @@ li.msg {
   overflow-wrap: anywhere;
 }
 
-.msg-content img {
+.msg-content img:not(.custom-emoji) {
   border-radius: var(--radius);
   margin-top: 6px;
   max-width: 300px;
