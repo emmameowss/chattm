@@ -172,7 +172,7 @@ function isMuted(email) {
     }
     return true
 }
-
+/*
 function systemMessage(text, options = {}) {
     const { excludeUserEmail = null, saveToHistory = true } = options
 
@@ -195,6 +195,7 @@ function systemMessage(text, options = {}) {
         s.emit('message', message)
     }
 }
+*/
 
 function parseDuration(str) {
     const match = str.match(/^(\d+)(s|m|h|d)$/)
@@ -283,7 +284,6 @@ io.on('connection', socket => {
     }
     if (chatMuted) {
         const ann = 'chat is currently muted'
-        systemMessage(ann)
     }
 
     if (socket.userEmail.endsWith('@guest')) {
@@ -327,14 +327,12 @@ io.on('connection', socket => {
     socket.on('userActive', () => {
         if (socket.username && !socket.hasJoined) {
             socket.hasJoined = true
-            systemMessage(`${socket.username} joined`, { excludeUserEmail: socket.userEmail, saveToHistory: false })
         }
     })
 
     socket.on('disconnect', () => {
         io.emit('usercount', io.engine.clientsCount)
         if (socket.username && !socket.skipLeaveMessage) {
-            systemMessage(`${socket.username} left`, { excludeUserEmail: socket.userEmail, saveToHistory: false })
         }
         emitUserList()
     })
@@ -460,7 +458,6 @@ io.on('connection', socket => {
                     s.emit('kicked', kickReason)
                     s.skipLeaveMessage = true
                     s.disconnect()
-                    systemMessage(`${targetUsername} was kicked for ${kickReason}`)
                     kicked = true
                     break
                 }
@@ -596,13 +593,11 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
             clearMessages()
             io.emit('clear')
-            systemMessage('chat was cleared', { saveToHistory: false })
             return
         }
 
         if (data.text?.startsWith('/announce ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const ann = data.text.slice(10).trim()
-            systemMessage(ann)
             return
         }
         if (data.text?.startsWith('/mutechat') && socket.userEmail === process.env.OWNER_EMAIL) {
