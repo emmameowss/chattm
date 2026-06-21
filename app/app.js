@@ -184,30 +184,25 @@ if (urlError === 'auth_denied') {
     window.history.replaceState({}, '', '/')
     sessionStorage.setItem('authDenied', '1')
 }
-if (urlError === 'guests_disabled') {
-    window.history.replaceState({}, '', '/')
-    sessionStorage.setItem('guestsDisabled', '1')
-}
-
 if (!session) {
     const kickedReason = sessionStorage.getItem('kickedReason')
     if (maintenanceCheck.maintenance) showMaintenance(maintenanceCheck.reason)
+    const guestsOff = maintenanceCheck.guestsDisabled
     document.body.className = 'login-page'
     document.body.innerHTML = `
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
         <a href="/login"><button><i class="ti ti-login-2"></i> login with Hack Club</button></a>
-        ${sessionStorage.getItem('guestsDisabled')
-            ? '<button disabled style="opacity:0.4;cursor:not-allowed;filter:brightness(0.5)"><i class="ti ti-user"></i> continue as guest</button>'
+        ${guestsOff
+            ? '<button disabled style="opacity:0.6;cursor:not-allowed"><i class="ti ti-user"></i> continue as guest</button>'
             : '<a href="/guest"><button><i class="ti ti-user"></i> continue as guest</button></a>'}
         ${kickedReason ? `<p style="color: var(--pink)">you've been kicked: ${kickedReason}</p>` : ''}
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
-        ${sessionStorage.getItem('guestsDisabled') ? '<p style="color: var(--muted)">guest logins are currently disabled</p>' : ''}
+        ${guestsOff ? '<p style="color: var(--muted)">guest logins are currently disabled</p>' : ''}
     `
     devInstanceBanner()
     sessionStorage.removeItem('kickedReason')
     sessionStorage.removeItem('authDenied')
-    sessionStorage.removeItem('guestsDisabled')
     throw new Error('not authenticated')
 }
 

@@ -901,7 +901,7 @@ httpServer.on('request', async (req, res) => {
 
     if (url.pathname === '/maintenance') {
         res.writeHead(200, {'content-type': 'application/json'})
-        res.end(JSON.stringify({maintenance: maintenance, reason: reason}))
+        res.end(JSON.stringify({maintenance: maintenance, reason: reason, guestsDisabled: guestsDisabled}))
         return
     }
 
