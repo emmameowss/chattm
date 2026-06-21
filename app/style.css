@@ -146,6 +146,7 @@ button:active {
   display: flex;
   gap: 6px;
   align-items: center;
+  z-index: 201;
 }
 
 #username-form input[type="text"] {
@@ -358,8 +359,8 @@ color-input {
 }
 
 body:has(#dev-banner) h1 {
-  top: 28px;
-  padding-top: 12px;
+  top: 0;
+  padding-top: 40px;
 }
 
 body:has(#dev-banner) #username-form {
