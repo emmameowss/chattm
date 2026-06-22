@@ -691,13 +691,6 @@ function renderMessage(data) {
     namespan.appendChild(nametext)
     if (data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
     if (data.verified && !data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
-    if (data.isGuest) {
-        const badge = document.createElement('i')
-        badge.className = 'ti ti-user'
-        badge.style.cssText = 'font-size:10px;margin-left:4px'
-        applyFlagColor(badge, color)
-        namespan.appendChild(badge)
-    }
     header.appendChild(namespan)
 
     const timespan = document.createElement('span')
@@ -939,12 +932,6 @@ socket.on('userlist', (users) => {
             div.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 12, 'this user is verified to be the owner of chat™'))
         } else if (u.verified) {
             div.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 12, 'this user has been verified'))
-        }
-        if (u.guest) {
-            const badge = document.createElement('span')
-            badge.className = 'ti ti-user'
-            badge.style.cssText = 'font-size:10px;color:var(--pink);margin-left:4px'
-            div.appendChild(badge)
         }
         ul.appendChild(div)
     })
