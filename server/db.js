@@ -87,7 +87,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
     email TEXT PRIMARY KEY,
     bio TEXT,
-    status TEXT
+    status TEXT,
+    pronouns TEXT
   );
 `)
 
@@ -175,6 +176,7 @@ const stmts = {
   getProfileData: db.prepare(`SELECT bio, status FROM profiles WHERE email = ?`),
   setProfileBio: db.prepare(`INSERT INTO profiles (email, bio) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET bio = excluded.bio`),
   setProfileStatus: db.prepare(`INSERT INTO profiles (email, status) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET status = excluded.status`),
+  setProfilePronouns: db.prepare(`INSERT INTO profiles (email, pronouns) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET pronouns = excluded.pronouns`),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -440,7 +442,7 @@ export function removeVerified(email) {
 
 export function getProfileData(email) {
   const row = stmts.getProfileData.get(email)
-  return { bio: row?.bio ?? null, status: row?.status ?? null }
+  return { bio: row?.bio ?? null, status: row?.status ?? null, pronouns: row?.pronouns ?? null }
 }
 
 export function setProfileBio(email, bio) {
@@ -449,6 +451,10 @@ export function setProfileBio(email, bio) {
 
 export function setProfileStatus(email, status) {
   stmts.setProfileStatus.run(email, status)
+}
+
+export function setProfilePronouns(email, pronouns) {
+  stmts.setProfilePronouns.run(email, pronouns)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

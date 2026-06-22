@@ -412,6 +412,17 @@ button:active {
   font-size: 15px;
   font-weight: 500;
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.profile-pronouns {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
 }
 
 #profile-status-display {

@@ -246,6 +246,7 @@ const MAX_SIZE = 50 * 1024 * 1024 // 10mb limit to images
 // profile button (replaces old username form)
 let myBio = ''
 let myStatus = ''
+let myPronouns = ''
 let myAvatar = null
 let myVerified = false
 
@@ -428,6 +429,7 @@ socket.on('savedProfile', (data) => {
     if (!data) return
     myBio = data.bio ?? ''
     myStatus = data.status ?? 'online'
+    myPronouns = data.pronouns ?? ''
     // refresh panel if showing own profile
     const panel = document.querySelector('#profile-panel')
     if (panel.style.display !== 'none' && panel.dataset.profileUsername === username) {
@@ -526,6 +528,12 @@ socket.on('profileData', (data) => {
     nameRow.appendChild(nameEl)
     if (data.isOwner) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
     else if (data.verified) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
+    if (data.pronouns) {
+        const pronounEl = document.createElement('span')
+        pronounEl.className = 'profile-pronouns'
+        pronounEl.textContent = data.pronouns
+        nameRow.appendChild(pronounEl)
+    }
 
     // status display
     const isOwnProfile = data.username === username
@@ -589,6 +597,9 @@ socket.on('profileData', (data) => {
 
     function openEdit() {
         document.querySelector('#profile-username-input').value = data.username
+        const pronounsInput = document.querySelector('#profile-pronouns-input')
+        pronounsInput.value = data.pronouns || ''
+        pronounsInput.disabled = data.isGuest
         const bioInput = document.querySelector('#profile-bio-input')
         bioInput.value = data.bio || ''
         bioInput.disabled = data.isGuest
@@ -616,8 +627,10 @@ socket.on('profileData', (data) => {
 
 document.querySelector('#profile-save-btn').addEventListener('click', () => {
     const newName = document.querySelector('#profile-username-input').value.trim()
+    const newPronouns = document.querySelector('#profile-pronouns-input').value.trim()
     const newBio = document.querySelector('#profile-bio-input').value.trim()
     if (newName && newName !== username) socket.emit('setUsername', newName)
+    if (newPronouns !== myPronouns) socket.emit('setPronouns', newPronouns)
     if (newBio !== myBio) socket.emit('setBio', newBio)
     if (pendingAvatar === null) socket.emit('deleteAvatar')
     else if (pendingAvatar !== undefined) socket.emit('setAvatar', pendingAvatar)

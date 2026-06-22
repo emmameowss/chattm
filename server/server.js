@@ -26,7 +26,7 @@ import {
     getAvatar, setAvatar, deleteAvatar,
     getCustomEmoji, addCustomEmoji, removeCustomEmoji,
     isVerified, setVerified, removeVerified,
-    getProfileData, setProfileBio, setProfileStatus
+    getProfileData, setProfileBio, setProfileStatus, setProfilePronouns
 } from './db.js'
 
 const httpServer = createServer()
@@ -372,6 +372,13 @@ io.on('connection', socket => {
         socket.emit('savedProfile', getProfileData(socket.userEmail))
     })
 
+    socket.on('setPronouns', (pronouns) => {
+        if (socket.userEmail.endsWith('@guest')) return
+        const p = String(pronouns ?? '').slice(0, 40)
+        setProfilePronouns(socket.userEmail, p)
+        socket.emit('savedProfile', getProfileData(socket.userEmail))
+    })
+
     socket.on('getProfile', (reqUsername) => {
         if (!reqUsername || typeof reqUsername !== 'string') {
             socket.emit('profileData', null)
@@ -391,6 +398,7 @@ io.on('connection', socket => {
                 username: reqUsername,
                 bio: email.endsWith('@guest') ? "i'm a guest on chat™" : (profile.bio ?? ''),
                 status: profile.status ?? '',
+                pronouns: email.endsWith('@guest') ? '' : (profile.pronouns ?? ''),
                 color: getColor(email),
                 avatar: getAvatar(email),
                 verified: isVerified(email),
