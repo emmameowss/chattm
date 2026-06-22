@@ -434,9 +434,27 @@ button:active {
   align-self: flex-end;
 }
 
+#profile-actions {
+  margin-top: 4px;
+}
+
 #profile-edit-btn {
   width: 100%;
-  margin-top: 4px;
+}
+
+#profile-edit-actions {
+  gap: 6px;
+}
+
+#profile-edit-actions #profile-save-btn {
+  flex: 1;
+}
+
+#profile-edit-actions #profile-cancel-btn {
+  flex: 1;
+  background: none;
+  border-color: var(--border);
+  color: var(--muted);
 }
 
 .status-dot {

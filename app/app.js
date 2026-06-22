@@ -528,23 +528,34 @@ socket.on('profileData', (data) => {
     // bio
     document.querySelector('#profile-bio-display').textContent = data.bio || ''
     const editBtn = document.querySelector('#profile-edit-btn')
+    const editActions = document.querySelector('#profile-edit-actions')
     editBtn.style.display = isOwnProfile ? '' : 'none'
+    editBtn.disabled = data.isGuest
+    editBtn.style.opacity = data.isGuest ? '0.4' : ''
+    editBtn.title = data.isGuest ? "guests can't edit their profile" : ''
 
-    editBtn.onclick = () => {
-        const editSection = document.querySelector('#profile-edit')
-        editSection.style.display = editSection.style.display === 'none' ? 'flex' : 'none'
-        if (editSection.style.display === 'flex') {
-            document.querySelector('#profile-username-input').value = data.username
-            const bioInput = document.querySelector('#profile-bio-input')
-            bioInput.value = data.bio || ''
-            bioInput.disabled = data.isGuest
-            bioInput.placeholder = data.isGuest ? "guests can't set a bio" : 'bio (optional)'
-        }
+    function openEdit() {
+        document.querySelector('#profile-username-input').value = data.username
+        const bioInput = document.querySelector('#profile-bio-input')
+        bioInput.value = data.bio || ''
+        bioInput.disabled = data.isGuest
+        bioInput.placeholder = data.isGuest ? "guests can't set a bio" : 'bio (optional)'
+        document.querySelector('#profile-edit').style.display = 'flex'
+        editBtn.style.display = 'none'
+        editActions.style.display = 'flex'
     }
+
+    function closeEdit() {
+        document.querySelector('#profile-edit').style.display = 'none'
+        editBtn.style.display = ''
+        editActions.style.display = 'none'
+    }
+
+    editBtn.onclick = openEdit
 
     if (panel.dataset.editOnLoad === '1') {
         delete panel.dataset.editOnLoad
-        editBtn.onclick()
+        openEdit()
     }
 })
 
@@ -554,6 +565,14 @@ document.querySelector('#profile-save-btn').addEventListener('click', () => {
     if (newName && newName !== username) socket.emit('setUsername', newName)
     if (newBio !== myBio) socket.emit('setBio', newBio)
     document.querySelector('#profile-edit').style.display = 'none'
+    document.querySelector('#profile-edit-btn').style.display = ''
+    document.querySelector('#profile-edit-actions').style.display = 'none'
+})
+
+document.querySelector('#profile-cancel-btn').addEventListener('click', () => {
+    document.querySelector('#profile-edit').style.display = 'none'
+    document.querySelector('#profile-edit-btn').style.display = ''
+    document.querySelector('#profile-edit-actions').style.display = 'none'
 })
 
 document.querySelector('#profile-close').addEventListener('click', () => {

@@ -54,9 +54,14 @@
             <input id="profile-username-input" maxlength="20" placeholder="username" autocomplete="off">
             <label class="profile-field-label">bio</label>
             <textarea id="profile-bio-input" maxlength="300" placeholder="bio (optional)"></textarea>
-            <button type="button" id="profile-save-btn">save</button>
         </div>
-        <button type="button" id="profile-edit-btn" style="display:none"><i class="ti ti-pencil"></i> edit profile</button>
+        <div id="profile-actions">
+            <button type="button" id="profile-edit-btn" style="display:none"><i class="ti ti-pencil"></i> edit profile</button>
+            <div id="profile-edit-actions" style="display:none">
+                <button type="button" id="profile-save-btn">save</button>
+                <button type="button" id="profile-cancel-btn">cancel</button>
+            </div>
+        </div>
     </div>
     <div id="userlist"></div>
     <div id="bottom-hints">
