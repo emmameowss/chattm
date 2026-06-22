@@ -350,17 +350,12 @@ button:active {
 
 #profile-avatar-wrap {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 12px;
-  position: relative;
-  width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
 }
 
-#profile-avatar-wrap {
-  position: relative;
-}
 
 #profile-avatar-wrap img,
 #profile-avatar-wrap .profile-avatar-placeholder {
@@ -397,10 +392,6 @@ button:active {
 #profile-avatar-wrap:hover .avatar-edit-overlay { opacity: 1; }
 
 .avatar-remove-btn {
-  position: absolute;
-  bottom: -24px;
-  left: 50%;
-  transform: translateX(-50%);
   font-size: 11px;
   padding: 2px 8px;
   background: none;
