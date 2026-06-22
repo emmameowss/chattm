@@ -430,7 +430,7 @@ socket.on('savedProfile', (data) => {
 const profilePanel = document.querySelector('#profile-panel')
 
 function openProfile(targetUsername, editMode = false) {
-    profilePanel.style.display = 'block'
+    profilePanel.style.display = 'block'; document.querySelector('#profile-backdrop').style.display = 'block'
     profilePanel.dataset.profileUsername = targetUsername
     // clear previous content
     document.querySelector('#profile-avatar-wrap').innerHTML = ''
@@ -576,14 +576,14 @@ document.querySelector('#profile-cancel-btn').addEventListener('click', () => {
 })
 
 document.querySelector('#profile-close').addEventListener('click', () => {
-    profilePanel.style.display = 'none'
+    profilePanel.style.display = 'none'; document.querySelector('#profile-backdrop').style.display = 'none'
 })
 
 document.addEventListener('click', (e) => {
     if (profilePanel.style.display !== 'none' &&
         !profilePanel.contains(e.target) &&
         e.target !== document.querySelector('#profile-btn')) {
-        profilePanel.style.display = 'none'
+        profilePanel.style.display = 'none'; document.querySelector('#profile-backdrop').style.display = 'none'
     }
 })
 
