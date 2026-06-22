@@ -452,7 +452,8 @@ function renderProfileAvatarWrap(avatarUrl, editable = false) {
 
     // inner: relative container so overlay sits on top of avatar
     const inner = document.createElement('div')
-    inner.style.cssText = 'position:relative;display:inline-block'
+    inner.className = 'avatar-inner'
+    inner.style.cssText = 'position:relative;display:inline-block;overflow:hidden;border-radius:10px'
 
     if (avatarUrl) {
         const img = document.createElement('img')

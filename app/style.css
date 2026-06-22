@@ -389,7 +389,7 @@ button:active {
   transition: opacity 0.15s;
 }
 
-#profile-avatar-wrap:hover .avatar-edit-overlay { opacity: 1; }
+.avatar-inner:hover .avatar-edit-overlay { opacity: 1; }
 
 .avatar-remove-btn {
   font-size: 11px;
