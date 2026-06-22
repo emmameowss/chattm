@@ -1313,7 +1313,7 @@ socket.on('userlist', (users) => {
     if (online.length) {
         const header = document.createElement('div')
         header.className = 'ul-section'
-        header.textContent = `online — ${online.length}`
+        header.textContent = `online - ${online.length}`
         ul.appendChild(header)
         online.forEach(u => ul.appendChild(makeUserlistEntry(u)))
     }
@@ -1321,7 +1321,7 @@ socket.on('userlist', (users) => {
     if (offline.length) {
         const header = document.createElement('div')
         header.className = 'ul-section'
-        header.textContent = `offline — ${offline.length}`
+        header.textContent = `offline - ${offline.length}`
         ul.appendChild(header)
         offline.forEach(u => ul.appendChild(makeUserlistEntry(u)))
     }
@@ -1455,7 +1455,7 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
     if (uMuted) {
         document.querySelector('#message-input').disabled = true
         document.querySelector('#message-form button[type="submit"]').disabled = true
-        showStatus(`you are muted${uMuted.until ? ' until ' + new Date(uMuted.until).toLocaleString() : ''} — ${uMuted.reason}`, 'pink')
+        showStatus(`you are muted${uMuted.until ? ' until ' + new Date(uMuted.until).toLocaleString() : ''} - ${uMuted.reason}`, 'pink')
     }
     if (isOwner) {
         document.querySelector('#owner-divider').style.display = 'block'

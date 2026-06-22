@@ -185,7 +185,20 @@ const stmts = {
   setProfileStatus: db.prepare(`INSERT INTO profiles (email, status) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET status = excluded.status`),
   setProfilePronouns: db.prepare(`INSERT INTO profiles (email, pronouns) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET pronouns = excluded.pronouns`),
   setLastSeen: db.prepare(`INSERT INTO profiles (email, last_seen) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET last_seen = excluded.last_seen`),
-  getRecentUsers: db.prepare(`SELECT p.email, p.last_seen, u.username FROM profiles p JOIN usernames u ON u.email = p.email WHERE p.last_seen > ? AND u.email NOT LIKE '%@guest' ORDER BY p.last_seen DESC LIMIT 100`),
+  getRecentUsers: db.prepare(`
+    SELECT p.email, p.last_seen, u.username,
+           p.status, p.bio, p.pronouns,
+           c.color,
+           a.url AS avatar,
+           CASE WHEN v.email IS NOT NULL THEN 1 ELSE 0 END AS verified
+    FROM profiles p
+    JOIN usernames u ON u.email = p.email
+    LEFT JOIN colors c ON c.email = p.email
+    LEFT JOIN avatars a ON a.email = p.email
+    LEFT JOIN verified_users v ON v.email = p.email
+    WHERE p.last_seen > ? AND u.email NOT LIKE '%@guest'
+    ORDER BY p.last_seen DESC LIMIT 100
+  `),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────

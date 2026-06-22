@@ -133,6 +133,7 @@ let versionCache = null
 let versionCacheTime = 0
 let statsCache = null
 let statsCacheTime = 0
+let statsFetchPromise = null
 
 const types = {
     '.html': 'text/html',
@@ -280,37 +281,36 @@ function emitUserList() {
     const onlineEmails = new Set()
     const users = []
 
+    // online users: use data already cached on the socket — zero DB reads
     for (const [id, s] of io.sockets.sockets) {
         if (!s.username) continue
         onlineEmails.add(s.userEmail)
-        const profile = getProfileData(s.userEmail)
         users.push({
             username: s.username,
             email: s.userEmail,
-            color: getColor(s.userEmail),
+            color: s.cachedColor ?? null,
             avatar: s.cachedAvatar ?? null,
             guest: s.userEmail.endsWith('@guest'),
             isOwner: s.userEmail === process.env.OWNER_EMAIL,
-            verified: isVerified(s.userEmail),
-            status: profile.status ?? 'online',
+            verified: s.cachedVerified ?? false,
+            status: s.cachedStatus ?? 'online',
             online: true,
         })
     }
 
-    // include recent non-guest offline users (active in last 30 days)
+    // offline users: single JOIN query — all fields in one SELECT
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
     for (const row of getRecentUsers(cutoff)) {
         if (onlineEmails.has(row.email)) continue
-        const profile = getProfileData(row.email)
         users.push({
             username: row.username,
             email: row.email,
-            color: getColor(row.email),
-            avatar: getAvatar(row.email),
+            color: row.color ?? null,
+            avatar: row.avatar ?? null,
             guest: false,
             isOwner: row.email === process.env.OWNER_EMAIL,
-            verified: isVerified(row.email),
-            status: profile.status ?? 'online',
+            verified: !!row.verified,
+            status: row.status ?? 'online',
             online: false,
         })
     }
@@ -383,12 +383,16 @@ io.on('connection', socket => {
         socket.emit('savedUsername', saved)
     }
     socket.cachedAvatar = getAvatar(socket.userEmail)
+    socket.cachedColor = getColor(socket.userEmail)
+    socket.cachedVerified = isVerified(socket.userEmail)
+    socket.cachedStatus = getProfileData(socket.userEmail).status ?? 'online'
     socket.emit('savedAvatar', socket.cachedAvatar)
     socket.emit('savedProfile', getProfileData(socket.userEmail))
 
     socket.on('setStatus', (status) => {
         const s = String(status ?? '').slice(0, 100)
         setProfileStatus(socket.userEmail, s)
+        socket.cachedStatus = s
         emitUserList()
         socket.emit('savedProfile', getProfileData(socket.userEmail))
     })
@@ -819,6 +823,9 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/verify ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetEmail = data.text.slice(8).trim()
             setVerified(targetEmail)
+            for (const [, s] of io.sockets.sockets) {
+                if (s.userEmail === targetEmail) s.cachedVerified = true
+            }
             emitUserList()
             socket.emit('commandError', `verified ${targetEmail}`)
             return
@@ -826,6 +833,9 @@ io.on('connection', socket => {
         if (data.text?.startsWith('/unverify ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetEmail = data.text.slice(10).trim()
             removeVerified(targetEmail)
+            for (const [, s] of io.sockets.sockets) {
+                if (s.userEmail === targetEmail) s.cachedVerified = false
+            }
             emitUserList()
             socket.emit('commandError', `unverified ${targetEmail}`)
             return
@@ -904,6 +914,7 @@ io.on('connection', socket => {
                 return
             }
             setColor(socket.userEmail, color)
+            socket.cachedColor = color
             socket.emit('colorChanged', color)
             emitUserList()
             return
@@ -1204,21 +1215,35 @@ httpServer.on('request', async (req, res) => {
 
     if (url.pathname === '/stats') {
         if (!statsCache || Date.now() - statsCacheTime > 10 * 60 * 1000) {
-            const db = getDbStats()
-            let totalSize = 0, uploads = 0
-            try {
-                let token
-                do {
-                    const r = await s3.send(new ListObjectsV2Command({ Bucket: process.env.AWS_S3_BUCKET, ContinuationToken: token }))
-                    for (const obj of r.Contents ?? []) {
-                        totalSize += obj.Size
-                        if (obj.Key.startsWith('uploads/')) uploads++
-                    }
-                    token = r.IsTruncated ? r.NextContinuationToken : null
-                } while (token)
-            } catch {}
-            statsCache = { users: db.users, messages: db.messages, emoji: db.emoji, totalSize, uploads }
-            statsCacheTime = Date.now()
+            // share a single in-flight promise among concurrent cold-cache requests
+            if (!statsFetchPromise) {
+                statsFetchPromise = (async () => {
+                    const db = getDbStats()
+                    let totalSize = 0, uploads = 0
+                    let token
+                    do {
+                        const r = await s3.send(new ListObjectsV2Command({ Bucket: process.env.AWS_S3_BUCKET, ContinuationToken: token }))
+                        for (const obj of r.Contents ?? []) {
+                            totalSize += obj.Size
+                            if (obj.Key.startsWith('uploads/')) uploads++
+                        }
+                        token = r.IsTruncated ? r.NextContinuationToken : null
+                    } while (token)
+                    // only cache on full success
+                    statsCache = { users: db.users, messages: db.messages, emoji: db.emoji, totalSize, uploads }
+                    statsCacheTime = Date.now()
+                    return statsCache
+                })().catch(e => {
+                    console.error('stats fetch failed:', e.message)
+                    return statsCache // return stale cache or null on first failure
+                }).finally(() => { statsFetchPromise = null })
+            }
+            await statsFetchPromise
+        }
+        if (!statsCache) {
+            res.writeHead(503)
+            res.end(JSON.stringify({ error: 'stats unavailable' }))
+            return
         }
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify(statsCache))
