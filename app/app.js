@@ -247,6 +247,7 @@ const MAX_SIZE = 50 * 1024 * 1024 // 10mb limit to images
 let myBio = ''
 let myStatus = ''
 let myAvatar = null
+let myVerified = false
 
 function updateProfileBtn() {
     const btn = document.querySelector('#profile-btn')
@@ -263,6 +264,17 @@ function updateProfileBtn() {
         btn.appendChild(pl)
     }
     btn.appendChild(document.createTextNode(username))
+    if (isOwner) {
+        const badge = document.createElement('img')
+        badge.src = 'https://cdn.chattm.app/verified_owner.png'
+        badge.style.cssText = 'width:13px;height:13px;vertical-align:middle;margin-left:3px'
+        btn.appendChild(badge)
+    } else if (myVerified) {
+        const badge = document.createElement('img')
+        badge.src = 'https://cdn.chattm.app/verified.png'
+        badge.style.cssText = 'width:13px;height:13px;vertical-align:middle;margin-left:3px'
+        btn.appendChild(badge)
+    }
 }
 
 updateProfileBtn()
@@ -464,6 +476,10 @@ socket.on('profileData', (data) => {
 
     // status display
     const isOwnProfile = data.username === username
+    if (isOwnProfile) {
+        myVerified = data.verified
+        updateProfileBtn()
+    }
 
     function renderStatusDisplay(currentStatus) {
         const sd = document.querySelector('#profile-status-display')
@@ -1242,6 +1258,7 @@ let chatMutedb = false
 // check owner status and mute chat status on connect
 socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
     isOwner = owner
+    updateProfileBtn()
     if (muted && !isOwner) {
         showStatus('chat has been muted', 'pink')
         document.querySelector('#message-input').disabled = true
