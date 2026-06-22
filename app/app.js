@@ -881,7 +881,7 @@ socket.on("message", (data) => {
     if (isSystemMessage(data)) return
     renderedHistory.push(data)
     renderMessage(data)
-    if (!notifymuted && data.mentions && data.mentions.some(m => m.toLowerCase() === username.toLowerCase())) beep()
+    if (!notifymuted && myStatus !== 'dnd' && data.mentions && data.mentions.some(m => m.toLowerCase() === username.toLowerCase())) beep()
     if (document.hidden) {
         unread++
         document.title = `(${unread}) chat™`
