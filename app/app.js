@@ -320,6 +320,23 @@ compactbtn.addEventListener('click', () => {
     window.scrollTo({ top: document.body.scrollHeight })
 })
 
+const tooltipsbtn = document.querySelector('#tooltips-btn')
+let tooltipsHidden = localStorage.getItem('tooltipsHidden') === 'true'
+
+function applyTooltips() {
+    document.documentElement.classList.toggle('no-tooltips', tooltipsHidden)
+    tooltipsbtn.innerHTML = tooltipsHidden
+        ? '<i class="ti ti-info-circle"></i> show tooltips'
+        : '<i class="ti ti-info-circle"></i> hide tooltips'
+}
+
+applyTooltips()
+tooltipsbtn.addEventListener('click', () => {
+    tooltipsHidden = !tooltipsHidden
+    localStorage.setItem('tooltipsHidden', tooltipsHidden)
+    applyTooltips()
+})
+
 // avatar
 const avatarBtn = document.querySelector('#avatar-btn')
 const avatarRemoveBtn = document.querySelector('#avatar-remove-btn')

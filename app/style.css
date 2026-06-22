@@ -96,6 +96,10 @@ html.compact .msg-content img:not(.custom-emoji) {
   opacity: 1;
 }
 
+html.no-tooltips .badge-wrap::after {
+  display: none;
+}
+
 .mention {
   color: var(--pink);
   font-weight: 500;
