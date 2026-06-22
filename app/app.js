@@ -587,6 +587,17 @@ document.addEventListener('visibilitychange', () => {
 
 let lastMsgMeta = null  // { username, time } — for message grouping
 
+function makeBadge(src, size, tooltip) {
+    const wrap = document.createElement('span')
+    wrap.className = 'badge-wrap'
+    wrap.dataset.tooltip = tooltip
+    const img = document.createElement('img')
+    img.src = src
+    img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;margin-left:4px`
+    wrap.appendChild(img)
+    return wrap
+}
+
 function buildMsgContent(data, color) {
     const content = document.createElement('div')
     content.className = 'msg-content'
@@ -661,18 +672,8 @@ function renderMessage(data) {
     applyFlagColor(nametext, color)
     nametext.textContent = ausername
     namespan.appendChild(nametext)
-    if (data.isToken) {
-        const badge = document.createElement('img')
-        badge.src = 'https://cdn.chattm.app/verified_owner.png'
-        badge.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-left:4px'
-        namespan.appendChild(badge)
-    }
-    if (data.verified && !data.isToken) {
-        const badge = document.createElement('img')
-        badge.src = 'https://cdn.chattm.app/verified.png'
-        badge.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-left:4px'
-        namespan.appendChild(badge)
-    }
+    if (data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
+    if (data.verified && !data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
     if (data.isGuest) {
         const badge = document.createElement('i')
         badge.className = 'ti ti-user'
@@ -918,15 +919,9 @@ socket.on('userlist', (users) => {
         applyFlagColor(inner, u.color || getNameColor(u.username))
         div.appendChild(inner)
         if (u.isOwner) {
-            const badge = document.createElement('img')
-            badge.src = 'https://cdn.chattm.app/verified_owner.png'
-            badge.style.cssText = 'width:12px;height:12px;vertical-align:middle;margin-left:4px'
-            div.appendChild(badge)
+            div.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 12, 'this user is verified to be the owner of chat™'))
         } else if (u.verified) {
-            const badge = document.createElement('img')
-            badge.src = 'https://cdn.chattm.app/verified.png'
-            badge.style.cssText = 'width:12px;height:12px;vertical-align:middle;margin-left:4px'
-            div.appendChild(badge)
+            div.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 12, 'this user has been verified'))
         }
         if (u.guest) {
             const badge = document.createElement('span')
