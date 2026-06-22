@@ -6,6 +6,7 @@ const db = new Database('chat.db')
 db.pragma('journal_mode = WAL')
 try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT") } catch {}
+try { db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -78,6 +79,10 @@ db.exec(`
     shortcode TEXT PRIMARY KEY,
     url TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS verified_users (
+    email TEXT PRIMARY KEY
+  );
 `)
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -86,8 +91,8 @@ const MAX_HISTORY = 100
 
 const stmts = {
   insertMessage: db.prepare(`
-    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url)
-    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url)
+    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url, is_verified)
+    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url, @is_verified)
   `),
   getMessages: db.prepare(`SELECT * FROM messages ORDER BY time ASC`),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
@@ -154,6 +159,11 @@ const stmts = {
   getCustomEmoji: db.prepare(`SELECT shortcode, url FROM custom_emoji ORDER BY shortcode`),
   addCustomEmoji: db.prepare(`INSERT OR REPLACE INTO custom_emoji (shortcode, url) VALUES (?, ?)`),
   removeCustomEmoji: db.prepare(`DELETE FROM custom_emoji WHERE shortcode = ?`),
+
+  // Verified users
+  isVerified: db.prepare(`SELECT 1 FROM verified_users WHERE email = ?`),
+  setVerified: db.prepare(`INSERT OR IGNORE INTO verified_users (email) VALUES (?)`),
+  removeVerified: db.prepare(`DELETE FROM verified_users WHERE email = ?`),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -172,6 +182,7 @@ export function getHistory() {
     system: !!row.system,
     mentions: JSON.parse(row.mentions || '[]'),
     avatar: row.avatar_url ?? null,
+    verified: !!row.is_verified,
   }))
 }
 
@@ -189,6 +200,7 @@ export function addMessage(msg) {
     system: msg.system ? 1 : 0,
     mentions: JSON.stringify(msg.mentions ?? []),
     avatar_url: msg.avatar ?? null,
+    is_verified: msg.verified ? 1 : 0,
   })
   // trim to max
   const { n } = stmts.countMessages.get()
@@ -397,6 +409,20 @@ export function addCustomEmoji(shortcode, url) {
 
 export function removeCustomEmoji(shortcode) {
   stmts.removeCustomEmoji.run(shortcode)
+}
+
+// ─── Verified Users API ──────────────────────────────────────────────────────
+
+export function isVerified(email) {
+  return !!stmts.isVerified.get(email)
+}
+
+export function setVerified(email) {
+  stmts.setVerified.run(email)
+}
+
+export function removeVerified(email) {
+  stmts.removeVerified.run(email)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

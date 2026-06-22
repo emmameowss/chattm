@@ -662,10 +662,16 @@ function renderMessage(data) {
     nametext.textContent = ausername
     namespan.appendChild(nametext)
     if (data.isToken) {
-        const verified = document.createElement('img')
-        verified.src = 'https://cdn.chattm.app/verified_owner.png'
-        verified.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-left:4px'
-        namespan.appendChild(verified)
+        const badge = document.createElement('img')
+        badge.src = 'https://cdn.chattm.app/verified_owner.png'
+        badge.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-left:4px'
+        namespan.appendChild(badge)
+    }
+    if (data.verified && !data.isToken) {
+        const badge = document.createElement('img')
+        badge.src = 'https://cdn.chattm.app/verified.png'
+        badge.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-left:4px'
+        namespan.appendChild(badge)
     }
     if (data.isGuest) {
         const badge = document.createElement('i')
@@ -912,10 +918,15 @@ socket.on('userlist', (users) => {
         applyFlagColor(inner, u.color || getNameColor(u.username))
         div.appendChild(inner)
         if (u.isOwner) {
-            const verified = document.createElement('img')
-            verified.src = 'https://cdn.chattm.app/verified_owner.png'
-            verified.style.cssText = 'width:12px;height:12px;vertical-align:middle;margin-left:4px'
-            div.appendChild(verified)
+            const badge = document.createElement('img')
+            badge.src = 'https://cdn.chattm.app/verified_owner.png'
+            badge.style.cssText = 'width:12px;height:12px;vertical-align:middle;margin-left:4px'
+            div.appendChild(badge)
+        } else if (u.verified) {
+            const badge = document.createElement('img')
+            badge.src = 'https://cdn.chattm.app/verified.png'
+            badge.style.cssText = 'width:12px;height:12px;vertical-align:middle;margin-left:4px'
+            div.appendChild(badge)
         }
         if (u.guest) {
             const badge = document.createElement('span')
@@ -945,7 +956,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]', '/addemoji [:shortcode:] [url]', '/removeemoji [:shortcode:]', '/reloademojis']
+const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]', '/addemoji [:shortcode:] [url]', '/removeemoji [:shortcode:]', '/reloademojis', '/verify [email]', '/unverify [email]']
 
 // stores what to actually insert on Tab (may differ from displayed suggestion text)
 let suggestionInsert = null

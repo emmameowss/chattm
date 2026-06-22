@@ -24,7 +24,8 @@ import {
     deleteAllGuestSessions,
     getStoredUsername, saveUsername, getEmailByUsername,
     getAvatar, setAvatar, deleteAvatar,
-    getCustomEmoji, addCustomEmoji, removeCustomEmoji
+    getCustomEmoji, addCustomEmoji, removeCustomEmoji,
+    isVerified, setVerified, removeVerified
 } from './db.js'
 
 const httpServer = createServer()
@@ -119,7 +120,7 @@ setInterval(() => {
     }
 }, 10 * 60 * 1000)
 
-const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests', '/addemoji', '/removeemoji', '/reloademojis']
+const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests', '/addemoji', '/removeemoji', '/reloademojis', '/verify', '/unverify']
 
 let chatMuted = false
 let guestsDisabled = getSetting('guests_disabled') === '1'
@@ -281,7 +282,8 @@ function emitUserList() {
             color: getColor(s.userEmail),
             avatar: s.cachedAvatar ?? null,
             guest: s.userEmail.endsWith('@guest'),
-            isOwner: s.userEmail === process.env.OWNER_EMAIL
+            isOwner: s.userEmail === process.env.OWNER_EMAIL,
+            verified: isVerified(s.userEmail)
         })
     }
     io.emit('userlist', users)
@@ -730,6 +732,20 @@ io.on('connection', socket => {
             socket.emit('commandError', 'emoji sync complete')
             return
         }
+        if (data.text?.startsWith('/verify ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetEmail = data.text.slice(8).trim()
+            setVerified(targetEmail)
+            emitUserList()
+            socket.emit('commandError', `verified ${targetEmail}`)
+            return
+        }
+        if (data.text?.startsWith('/unverify ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetEmail = data.text.slice(10).trim()
+            removeVerified(targetEmail)
+            emitUserList()
+            socket.emit('commandError', `unverified ${targetEmail}`)
+            return
+        }
         if (data.text?.startsWith('/whois ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetUsername = data.text.slice(7).trim()
             let found = null
@@ -884,7 +900,8 @@ io.on('connection', socket => {
             isToken: socket.userEmail === process.env.OWNER_EMAIL,
             isGuest: socket.userEmail.endsWith('@guest'),
             color: getColor(socket.userEmail) ?? null,
-            avatar: getAvatar(socket.userEmail) ?? null
+            avatar: getAvatar(socket.userEmail) ?? null,
+            verified: isVerified(socket.userEmail)
         }
         const onlineNames = [...io.sockets.sockets.values()].map(s => s.username).filter(Boolean)
         const mentions = [...new Set(
