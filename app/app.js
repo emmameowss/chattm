@@ -384,16 +384,27 @@ async function uploadAvatar(file) {
     return url
 }
 
+let pendingAvatar = undefined  // undefined=no change, null=remove, string=new url
+let suppressProfileClose = false
+
 avatarInput.addEventListener('change', async () => {
     const file = avatarInput.files[0]
     if (!file) return
     avatarInput.value = ''
     try {
         const url = await uploadAvatar(file)
-        socket.emit('setAvatar', url)
+        pendingAvatar = url
+        // preview in the panel without saving yet
+        renderProfileAvatarWrap(url, true)
     } catch (e) {
         showError('avatar upload failed')
     }
+})
+
+// prevent panel close when file dialog opens
+avatarInput.addEventListener('click', () => {
+    suppressProfileClose = true
+    setTimeout(() => { suppressProfileClose = false }, 500)
 })
 
 const STATUS_OPTIONS = [
@@ -481,7 +492,11 @@ function renderProfileAvatarWrap(avatarUrl, editable = false) {
             removeBtn.type = 'button'
             removeBtn.className = 'avatar-remove-btn'
             removeBtn.textContent = 'remove'
-            removeBtn.addEventListener('click', (e) => { e.stopPropagation(); socket.emit('deleteAvatar') })
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation()
+                pendingAvatar = null
+                renderProfileAvatarWrap(null, true)
+            })
             avWrap.appendChild(inner)
             avWrap.appendChild(removeBtn)
             return
@@ -604,12 +619,17 @@ document.querySelector('#profile-save-btn').addEventListener('click', () => {
     const newBio = document.querySelector('#profile-bio-input').value.trim()
     if (newName && newName !== username) socket.emit('setUsername', newName)
     if (newBio !== myBio) socket.emit('setBio', newBio)
+    if (pendingAvatar === null) socket.emit('deleteAvatar')
+    else if (pendingAvatar !== undefined) socket.emit('setAvatar', pendingAvatar)
+    pendingAvatar = undefined
     document.querySelector('#profile-edit').style.display = 'none'
     document.querySelector('#profile-edit-btn').style.display = ''
     document.querySelector('#profile-edit-actions').style.display = 'none'
 })
 
 document.querySelector('#profile-cancel-btn').addEventListener('click', () => {
+    pendingAvatar = undefined
+    renderProfileAvatarWrap(myAvatar, false)
     document.querySelector('#profile-edit').style.display = 'none'
     document.querySelector('#profile-edit-btn').style.display = ''
     document.querySelector('#profile-edit-actions').style.display = 'none'
@@ -621,12 +641,14 @@ function closeProfile() {
     document.querySelector('#profile-edit').style.display = 'none'
     document.querySelector('#profile-edit-actions').style.display = 'none'
     document.querySelector('#profile-edit-btn').style.display = 'none'
-    renderProfileAvatarWrap(myAvatar, false)
+    document.querySelector('#profile-avatar-wrap').innerHTML = ''
+    pendingAvatar = undefined
 }
 
 document.querySelector('#profile-close').addEventListener('click', closeProfile)
 
 document.addEventListener('click', (e) => {
+    if (suppressProfileClose) return
     if (profilePanel.style.display !== 'none' &&
         !profilePanel.contains(e.target) &&
         e.target !== document.querySelector('#profile-btn')) {
