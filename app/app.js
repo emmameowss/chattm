@@ -464,16 +464,50 @@ socket.on('profileData', (data) => {
     else if (data.verified) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
 
     // status display
-    const sd = document.querySelector('#profile-status-display')
-    sd.innerHTML = ''
-    sd.appendChild(statusDot(data.status || 'online'))
-    sd.appendChild(document.createTextNode(statusLabel(data.status || 'online')))
+    const isOwnProfile = data.username === username
+
+    function renderStatusDisplay(currentStatus) {
+        const sd = document.querySelector('#profile-status-display')
+        sd.innerHTML = ''
+        sd.appendChild(statusDot(currentStatus || 'online'))
+        sd.appendChild(document.createTextNode(statusLabel(currentStatus || 'online')))
+
+        if (!isOwnProfile) return
+        sd.style.cursor = 'pointer'
+        sd.title = 'change status'
+
+        // dropdown
+        const dropdown = document.createElement('div')
+        dropdown.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;z-index:600;min-width:170px;display:none;flex-direction:column;gap:2px;box-shadow:0 4px 16px rgba(0,0,0,0.4)'
+        STATUS_OPTIONS.forEach(opt => {
+            const btn = document.createElement('button')
+            btn.type = 'button'
+            btn.className = 'status-option' + (opt.value === (currentStatus || 'online') ? ' active' : '')
+            btn.appendChild(statusDot(opt.value))
+            btn.appendChild(document.createTextNode(opt.label))
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation()
+                socket.emit('setStatus', opt.value)
+                myStatus = opt.value
+                dropdown.style.display = 'none'
+                renderStatusDisplay(opt.value)
+            })
+            dropdown.appendChild(btn)
+        })
+        sd.style.position = 'relative'
+        sd.appendChild(dropdown)
+
+        sd.onclick = (e) => {
+            e.stopPropagation()
+            dropdown.style.display = dropdown.style.display === 'none' ? 'flex' : 'none'
+        }
+        document.addEventListener('click', () => { dropdown.style.display = 'none' }, { once: true })
+    }
+
+    renderStatusDisplay(data.status || 'online')
 
     // bio
     document.querySelector('#profile-bio-display').textContent = data.bio || ''
-
-    // own profile controls
-    const isOwnProfile = data.username === username
     const editBtn = document.querySelector('#profile-edit-btn')
     editBtn.style.display = isOwnProfile ? '' : 'none'
 
@@ -482,27 +516,6 @@ socket.on('profileData', (data) => {
         editSection.style.display = editSection.style.display === 'none' ? 'flex' : 'none'
         if (editSection.style.display === 'flex') {
             document.querySelector('#profile-username-input').value = data.username
-
-            // build status picker
-            const pickerWrap = document.querySelector('#profile-status-picker')
-            pickerWrap.innerHTML = ''
-            let selectedStatus = data.status || 'online'
-            STATUS_OPTIONS.forEach(opt => {
-                const btn = document.createElement('button')
-                btn.type = 'button'
-                btn.className = 'status-option' + (opt.value === selectedStatus ? ' active' : '')
-                btn.dataset.value = opt.value
-                btn.appendChild(statusDot(opt.value))
-                btn.appendChild(document.createTextNode(opt.label))
-                btn.addEventListener('click', () => {
-                    selectedStatus = opt.value
-                    pickerWrap.querySelectorAll('.status-option').forEach(b => b.classList.toggle('active', b.dataset.value === opt.value))
-                    pickerWrap.dataset.selected = opt.value
-                })
-                pickerWrap.appendChild(btn)
-            })
-            pickerWrap.dataset.selected = selectedStatus
-
             const bioInput = document.querySelector('#profile-bio-input')
             bioInput.value = data.bio || ''
             bioInput.disabled = data.isGuest
@@ -518,11 +531,8 @@ socket.on('profileData', (data) => {
 
 document.querySelector('#profile-save-btn').addEventListener('click', () => {
     const newName = document.querySelector('#profile-username-input').value.trim()
-    const picker = document.querySelector('#profile-status-picker')
-    const newStatus = picker.dataset.selected || 'online'
     const newBio = document.querySelector('#profile-bio-input').value.trim()
     if (newName && newName !== username) socket.emit('setUsername', newName)
-    if (newStatus !== myStatus) socket.emit('setStatus', newStatus)
     if (newBio !== myBio) socket.emit('setBio', newBio)
     document.querySelector('#profile-edit').style.display = 'none'
 })
