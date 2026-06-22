@@ -863,7 +863,7 @@ function makeBadge(src, size, tooltip) {
     wrap.dataset.tooltip = tooltip
     const img = document.createElement('img')
     img.src = src
-    img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;margin-left:4px`
+    img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;margin-left:4px;position:relative;top:-2px`
     wrap.appendChild(img)
     return wrap
 }
