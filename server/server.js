@@ -104,7 +104,7 @@ setInterval(() => {
     }
 }, 10 * 60 * 1000)
 
-const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests', '/addemoji', '/removeemoji']
+const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests', '/addemoji', '/removeemoji', '/reloademojis']
 
 let chatMuted = false
 let guestsDisabled = getSetting('guests_disabled') === '1'
@@ -708,6 +708,12 @@ io.on('connection', socket => {
             removeCustomEmoji(shortcode)
             io.emit('emojiUpdate', getCustomEmoji())
             socket.emit('commandError', `removed emoji ${shortcode}`)
+            return
+        }
+        if (data.text?.startsWith('/reloademojis') && socket.userEmail === process.env.OWNER_EMAIL) {
+            await syncEmojisFromS3()
+            io.emit('emojiUpdate', getCustomEmoji())
+            socket.emit('commandError', 'emoji sync complete')
             return
         }
         if (data.text?.startsWith('/whois ') && socket.userEmail === process.env.OWNER_EMAIL) {

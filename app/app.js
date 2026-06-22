@@ -945,7 +945,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]', '/addemoji [:shortcode:] [url]', '/removeemoji [:shortcode:]']
+const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]', '/addemoji [:shortcode:] [url]', '/removeemoji [:shortcode:]', '/reloademojis']
 
 // stores what to actually insert on Tab (may differ from displayed suggestion text)
 let suggestionInsert = null
