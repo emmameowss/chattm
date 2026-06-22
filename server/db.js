@@ -174,6 +174,11 @@ const stmts = {
   setVerified: db.prepare(`INSERT OR IGNORE INTO verified_users (email) VALUES (?)`),
   removeVerified: db.prepare(`DELETE FROM verified_users WHERE email = ?`),
 
+  // Stats
+  countUsers: db.prepare(`SELECT COUNT(DISTINCT email) AS n FROM sessions WHERE email NOT LIKE '%@guest'`),
+  countMessages: db.prepare(`SELECT COUNT(*) AS n FROM messages WHERE system = 0`),
+  countEmoji: db.prepare(`SELECT COUNT(*) AS n FROM custom_emoji`),
+
   // Profiles
   getProfileData: db.prepare(`SELECT bio, status, pronouns FROM profiles WHERE email = ?`),
   setProfileBio: db.prepare(`INSERT INTO profiles (email, bio) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET bio = excluded.bio`),
@@ -463,6 +468,14 @@ export function setProfilePronouns(email, pronouns) {
 
 export function setLastSeen(email) {
   stmts.setLastSeen.run(email, Date.now())
+}
+
+export function getDbStats() {
+  return {
+    users: stmts.countUsers.get().n,
+    messages: stmts.countMessages.get().n,
+    emoji: stmts.countEmoji.get().n,
+  }
 }
 
 export function getRecentUsers(cutoffMs) {

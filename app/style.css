@@ -319,6 +319,71 @@ button:active {
   z-index: 499;
 }
 
+#stats-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 499;
+}
+
+#stats-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 280px;
+  z-index: 500;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+#stats-panel h2 {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 16px;
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+#stats-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+#stats-close:hover { color: var(--text); }
+
+#stats-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.stat-label { color: var(--muted); }
+.stat-value { font-weight: 500; color: var(--text); }
+.stats-loading { color: var(--muted); font-size: 12px; font-style: italic; text-align: center; display: block; }
+
 #profile-panel {
   position: fixed;
   top: 50%;

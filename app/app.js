@@ -1164,6 +1164,53 @@ document.querySelector('#signout').addEventListener('click', () => {
     window.location.href = `/signout?session=${session}`
 })
 
+// stats panel
+const statsPanel = document.querySelector('#stats-panel')
+const statsBackdrop = document.querySelector('#stats-backdrop')
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(1) + ' KB'
+    if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + ' MB'
+    return (bytes / 1024 ** 3).toFixed(2) + ' GB'
+}
+
+function openStats() {
+    statsPanel.style.display = 'block'
+    statsBackdrop.style.display = 'block'
+    document.querySelector('#stats-content').innerHTML = '<span class="stats-loading">loading...</span>'
+    fetch('/stats').then(r => r.json()).then(data => {
+        const rows = [
+            ['users (hca)', data.users.toLocaleString()],
+            ['total messages', data.messages.toLocaleString()],
+            ['images uploaded', data.uploads.toLocaleString()],
+            ['custom emojis', data.emoji.toLocaleString()],
+            ['storage used', formatBytes(data.totalSize)],
+        ]
+        document.querySelector('#stats-content').innerHTML = rows.map(([label, value]) =>
+            `<div class="stat-row"><span class="stat-label">${label}</span><span class="stat-value">${value}</span></div>`
+        ).join('')
+    }).catch(() => {
+        document.querySelector('#stats-content').innerHTML = '<span class="stats-loading">failed to load</span>'
+    })
+}
+
+document.querySelector('#stats-btn').addEventListener('click', (e) => {
+    e.stopPropagation()
+    moreMenu.classList.remove('open')
+    openStats()
+})
+
+document.querySelector('#stats-close').addEventListener('click', () => {
+    statsPanel.style.display = 'none'
+    statsBackdrop.style.display = 'none'
+})
+
+statsBackdrop.addEventListener('click', () => {
+    statsPanel.style.display = 'none'
+    statsBackdrop.style.display = 'none'
+})
+
 // banned
 socket.on('banned', (reason) => {
     // useless localStorage.setItem('banned', reason || 'no reason given')

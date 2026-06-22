@@ -26,7 +26,7 @@ import {
     getAvatar, setAvatar, deleteAvatar,
     getCustomEmoji, addCustomEmoji, removeCustomEmoji,
     isVerified, setVerified, removeVerified,
-    getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers
+    getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats
 } from './db.js'
 
 const httpServer = createServer()
@@ -131,6 +131,8 @@ let reason = getSetting('maintenance_reason') ?? ''
 const PORT = process.env.PORT || 3000
 let versionCache = null
 let versionCacheTime = 0
+let statsCache = null
+let statsCacheTime = 0
 
 const types = {
     '.html': 'text/html',
@@ -1197,6 +1199,29 @@ httpServer.on('request', async (req, res) => {
     if (url.pathname === '/config') {
         res.writeHead(200, {"content-type": "application/json"})
         res.end(JSON.stringify({port: PORT}))
+        return
+    }
+
+    if (url.pathname === '/stats') {
+        if (!statsCache || Date.now() - statsCacheTime > 10 * 60 * 1000) {
+            const db = getDbStats()
+            let totalSize = 0, uploads = 0
+            try {
+                let token
+                do {
+                    const r = await s3.send(new ListObjectsV2Command({ Bucket: process.env.AWS_S3_BUCKET, ContinuationToken: token }))
+                    for (const obj of r.Contents ?? []) {
+                        totalSize += obj.Size
+                        if (obj.Key.startsWith('uploads/')) uploads++
+                    }
+                    token = r.IsTruncated ? r.NextContinuationToken : null
+                } while (token)
+            } catch {}
+            statsCache = { users: db.users, messages: db.messages, emoji: db.emoji, totalSize, uploads }
+            statsCacheTime = Date.now()
+        }
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        res.end(JSON.stringify(statsCache))
         return
     }
 
