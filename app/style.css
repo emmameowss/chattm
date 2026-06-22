@@ -415,15 +415,17 @@ button:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
-.profile-pronouns {
-  font-size: 11px;
+#profile-pronouns-display {
+  text-align: center;
+  font-size: 12px;
   color: var(--muted);
-  font-weight: 400;
+  margin-bottom: 4px;
 }
+
+#profile-pronouns-display:empty { display: none; }
 
 #profile-status-display {
   display: flex;

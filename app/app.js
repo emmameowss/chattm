@@ -450,6 +450,7 @@ function openProfile(targetUsername, editMode = false) {
     // clear previous content
     document.querySelector('#profile-avatar-wrap').innerHTML = ''
     document.querySelector('#profile-name-row').innerHTML = ''
+    document.querySelector('#profile-pronouns-display').textContent = ''
     document.querySelector('#profile-status-display').textContent = '...'
     document.querySelector('#profile-bio-display').textContent = ''
     document.querySelector('#profile-edit').style.display = 'none'
@@ -528,12 +529,8 @@ socket.on('profileData', (data) => {
     nameRow.appendChild(nameEl)
     if (data.isOwner) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
     else if (data.verified) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
-    if (data.pronouns) {
-        const pronounEl = document.createElement('span')
-        pronounEl.className = 'profile-pronouns'
-        pronounEl.textContent = data.pronouns
-        nameRow.appendChild(pronounEl)
-    }
+
+    document.querySelector('#profile-pronouns-display').textContent = data.pronouns || ''
 
     // status display
     const isOwnProfile = data.username === username
