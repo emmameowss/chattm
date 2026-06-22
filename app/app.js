@@ -1357,6 +1357,24 @@ document.querySelector('#file-input').addEventListener('change', () => {
     btn.style.color = file ? 'var(--pink)' : ''
 })
 
+document.querySelector('#message-input').addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            const file = item.getAsFile()
+            if (!file) continue
+            const dt = new DataTransfer()
+            dt.items.add(file)
+            const fileInput = document.querySelector('#file-input')
+            fileInput.files = dt.files
+            fileInput.dispatchEvent(new Event('change'))
+            e.preventDefault()
+            break
+        }
+    }
+})
+
 // clear chat command
 socket.on('clear', () => {
     document.querySelector('ul').innerHTML = ''
