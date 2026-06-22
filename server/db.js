@@ -7,8 +7,6 @@ db.pragma('journal_mode = WAL')
 try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0") } catch {}
-try { db.exec("ALTER TABLE profiles ADD COLUMN pronouns TEXT") } catch {}
-try { db.exec("ALTER TABLE profiles ADD COLUMN last_seen INTEGER") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -90,9 +88,14 @@ db.exec(`
     email TEXT PRIMARY KEY,
     bio TEXT,
     status TEXT,
-    pronouns TEXT
+    pronouns TEXT,
+    last_seen INTEGER
   );
 `)
+
+// profiles column migrations (run after CREATE TABLE so the table exists)
+try { db.exec("ALTER TABLE profiles ADD COLUMN pronouns TEXT") } catch {}
+try { db.exec("ALTER TABLE profiles ADD COLUMN last_seen INTEGER") } catch {}
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 
