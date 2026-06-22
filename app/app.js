@@ -663,7 +663,7 @@ function renderMessage(data) {
     namespan.appendChild(nametext)
     if (data.isToken) {
         const verified = document.createElement('img')
-        verified.src = 'https://cdn.chattm.app/emojis/verified.png'
+        verified.src = 'https://cdn.chattm.app/verified_owner.png'
         verified.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-left:4px'
         namespan.appendChild(verified)
     }
@@ -913,7 +913,7 @@ socket.on('userlist', (users) => {
         div.appendChild(inner)
         if (u.isOwner) {
             const verified = document.createElement('img')
-            verified.src = 'https://cdn.chattm.app/emojis/verified.png'
+            verified.src = 'https://cdn.chattm.app/verified_owner.png'
             verified.style.cssText = 'width:12px;height:12px;vertical-align:middle;margin-left:4px'
             div.appendChild(verified)
         }
