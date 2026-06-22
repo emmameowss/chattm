@@ -360,39 +360,41 @@ tooltipsbtn.addEventListener('click', () => {
 })
 
 // avatar
-const avatarBtn = document.querySelector('#avatar-btn')
-const avatarRemoveBtn = document.querySelector('#avatar-remove-btn')
 const avatarInput = document.querySelector('#avatar-input')
 
 socket.on('savedAvatar', (url) => {
     myAvatar = url
-    avatarRemoveBtn.style.display = url ? '' : 'none'
     updateProfileBtn()
+    // refresh avatar wrap in panel if open and showing own profile
+    if (profilePanel && profilePanel.style.display !== 'none' &&
+        profilePanel.dataset.profileUsername === username) {
+        renderProfileAvatarWrap(url)
+    }
 })
 
-avatarBtn.addEventListener('click', () => avatarInput.click())
+async function uploadAvatar(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch(`${window.location.origin}/upload?session=${encodeURIComponent(session || '')}&avatar=1`, {
+        method: 'POST',
+        body: formData
+    })
+    const { url, error } = await res.json()
+    if (error) throw new Error(error)
+    return url
+}
+
 avatarInput.addEventListener('change', async () => {
     const file = avatarInput.files[0]
     if (!file) return
     avatarInput.value = ''
-    avatarBtn.textContent = 'uploading...'
     try {
-        const formData = new FormData()
-        formData.append('file', file)
-        const res = await fetch(`${window.location.origin}/upload?session=${encodeURIComponent(session || '')}&avatar=1`, {
-            method: 'POST',
-            body: formData
-        })
-        const { url, error } = await res.json()
-        if (error) { showError(error); return }
+        const url = await uploadAvatar(file)
         socket.emit('setAvatar', url)
     } catch (e) {
         showError('avatar upload failed')
-    } finally {
-        avatarBtn.innerHTML = '<i class="ti ti-user-circle"></i> set avatar'
     }
 })
-avatarRemoveBtn.addEventListener('click', () => socket.emit('deleteAvatar'))
 
 const STATUS_OPTIONS = [
     { value: 'online', label: 'Online',         color: 'online' },
@@ -443,6 +445,45 @@ function openProfile(targetUsername, editMode = false) {
     if (editMode) profilePanel.dataset.editOnLoad = '1'
 }
 
+function renderProfileAvatarWrap(avatarUrl, editable = false) {
+    const avWrap = document.querySelector('#profile-avatar-wrap')
+    avWrap.innerHTML = ''
+    avWrap.style.cursor = editable ? 'pointer' : ''
+    avWrap.title = editable ? 'click to change avatar' : ''
+
+    if (avatarUrl) {
+        const img = document.createElement('img')
+        img.src = avatarUrl
+        img.className = 'profile-avatar'
+        avWrap.appendChild(img)
+    } else {
+        const pl = document.createElement('div')
+        pl.className = 'profile-avatar-placeholder'
+        pl.textContent = (username || '?')[0]
+        pl.style.backgroundColor = `hsl(${nameHash(username) % 360}, 55%, 38%)`
+        avWrap.appendChild(pl)
+    }
+
+    if (editable) {
+        const overlay = document.createElement('div')
+        overlay.className = 'avatar-edit-overlay'
+        overlay.innerHTML = '<i class="ti ti-camera"></i>'
+        avWrap.appendChild(overlay)
+        avWrap.onclick = (e) => { e.stopPropagation(); avatarInput.click() }
+
+        if (avatarUrl) {
+            const removeBtn = document.createElement('button')
+            removeBtn.type = 'button'
+            removeBtn.className = 'avatar-remove-btn'
+            removeBtn.textContent = 'remove'
+            removeBtn.addEventListener('click', (e) => { e.stopPropagation(); socket.emit('deleteAvatar') })
+            avWrap.appendChild(removeBtn)
+        }
+    } else {
+        avWrap.onclick = null
+    }
+}
+
 socket.on('profileData', (data) => {
     if (!data) {
         document.querySelector('#profile-status-display').textContent = 'profile not found'
@@ -451,21 +492,8 @@ socket.on('profileData', (data) => {
     const panel = profilePanel
     const color = data.color || getNameColor(data.username)
 
-    // avatar
-    const avWrap = document.querySelector('#profile-avatar-wrap')
-    avWrap.innerHTML = ''
-    if (data.avatar) {
-        const img = document.createElement('img')
-        img.src = data.avatar
-        img.className = 'profile-avatar'
-        avWrap.appendChild(img)
-    } else {
-        const pl = document.createElement('div')
-        pl.className = 'profile-avatar-placeholder'
-        pl.textContent = (data.username || '?')[0]
-        pl.style.backgroundColor = `hsl(${nameHash(data.username) % 360}, 55%, 38%)`
-        avWrap.appendChild(pl)
-    }
+    // avatar (static initially; becomes editable when edit section opens)
+    renderProfileAvatarWrap(data.avatar, false)
 
     // name row
     const nameRow = document.querySelector('#profile-name-row')
@@ -546,12 +574,14 @@ socket.on('profileData', (data) => {
         document.querySelector('#profile-edit').style.display = 'flex'
         editBtn.style.display = 'none'
         editActions.style.display = 'flex'
+        if (!data.isGuest) renderProfileAvatarWrap(myAvatar, true)
     }
 
     function closeEdit() {
         document.querySelector('#profile-edit').style.display = 'none'
         editBtn.style.display = ''
         editActions.style.display = 'none'
+        renderProfileAvatarWrap(myAvatar, false)
     }
 
     editBtn.onclick = openEdit
@@ -784,9 +814,7 @@ socket.on('savedUsername', (name) => {
     const nameToUse = name || username
     username = nameToUse
     socket.emit('setUsername', nameToUse)
-    if (nameToUse.startsWith('guest-')) {
-        avatarBtn.style.display = 'none'
-    }
+    // guests: avatar upload is hidden inside the edit profile view
     updateProfileBtn()
 })
 

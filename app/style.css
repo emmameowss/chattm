@@ -352,6 +352,14 @@ button:active {
   display: flex;
   justify-content: center;
   margin-bottom: 12px;
+  position: relative;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#profile-avatar-wrap {
+  position: relative;
 }
 
 #profile-avatar-wrap img,
@@ -371,6 +379,39 @@ button:active {
   color: #fff;
   text-transform: uppercase;
 }
+
+.avatar-edit-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  border-radius: 10px;
+  font-size: 22px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+#profile-avatar-wrap:hover .avatar-edit-overlay { opacity: 1; }
+
+.avatar-remove-btn {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--danger);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.avatar-remove-btn:hover { background: var(--danger-dim); }
 
 #profile-name-row {
   text-align: center;
