@@ -473,6 +473,10 @@ socket.on('profileData', (data) => {
         sd.appendChild(document.createTextNode(statusLabel(currentStatus || 'online')))
 
         if (!isOwnProfile) return
+        const chevron = document.createElement('i')
+        chevron.className = 'ti ti-chevron-down'
+        chevron.style.cssText = 'font-size:11px;color:var(--muted);margin-left:3px'
+        sd.appendChild(chevron)
         sd.style.cursor = 'pointer'
         sd.title = 'change status'
 
