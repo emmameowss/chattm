@@ -243,20 +243,31 @@ const maxmessages = 100
 let announce = false
 const MAX_SIZE = 50 * 1024 * 1024 // 10mb limit to images
 
-// username functionality stuff
-document.querySelector('#username-input').value = username
+// profile button (replaces old username form)
+let myBio = ''
+let myStatus = ''
 
-document.querySelector('#username-form').addEventListener('submit', (e) => {
-    e.preventDefault()
-    const input = document.querySelector('#username-input')
-    const value = input.value.trim()
-    if (!/^[a-zA-Z0-9]{1,20}$/.test(value)) {
-        showError("invalid username, make sure it's within the character limit and uses only letters and numbers")
-        return
+function updateProfileBtn() {
+    const btn = document.querySelector('#profile-btn')
+    btn.innerHTML = ''
+    const cachedAv = document.querySelector('#avatar-remove-btn').style.display !== 'none'
+        ? document.querySelector('#avatar-remove-btn').dataset.avatarUrl || null
+        : null
+    if (myAvatar) {
+        const img = document.createElement('img')
+        img.src = myAvatar
+        btn.appendChild(img)
+    } else {
+        const pl = document.createElement('span')
+        pl.className = 'btn-avatar-placeholder'
+        pl.textContent = (username || '?')[0]
+        pl.style.backgroundColor = `hsl(${nameHash(username) % 360}, 55%, 38%)`
+        btn.appendChild(pl)
     }
-    username = input.value.trim()
-    socket.emit('setUsername', username)
-})
+    btn.appendChild(document.createTextNode(username))
+}
+
+document.querySelector('#profile-btn').addEventListener('click', () => openProfile(username))
 
 // move socket joined/left stuff after intialiing socket
 /* unneeded
@@ -343,7 +354,9 @@ const avatarRemoveBtn = document.querySelector('#avatar-remove-btn')
 const avatarInput = document.querySelector('#avatar-input')
 
 socket.on('savedAvatar', (url) => {
+    myAvatar = url
     avatarRemoveBtn.style.display = url ? '' : 'none'
+    updateProfileBtn()
 })
 
 avatarBtn.addEventListener('click', () => avatarInput.click())
@@ -369,6 +382,162 @@ avatarInput.addEventListener('change', async () => {
     }
 })
 avatarRemoveBtn.addEventListener('click', () => socket.emit('deleteAvatar'))
+
+const STATUS_OPTIONS = [
+    { value: 'online', label: 'Online',         color: 'online' },
+    { value: 'idle',   label: 'Idle',           color: 'idle' },
+    { value: 'dnd',    label: 'Do Not Disturb', color: 'dnd' },
+]
+
+function statusDot(value) {
+    const dot = document.createElement('span')
+    dot.className = `status-dot ${value || 'online'}`
+    return dot
+}
+
+function statusLabel(value) {
+    return STATUS_OPTIONS.find(o => o.value === value)?.label ?? 'Online'
+}
+
+// saved profile
+socket.on('savedProfile', (data) => {
+    if (!data) return
+    myBio = data.bio ?? ''
+    myStatus = data.status ?? 'online'
+    // refresh panel if showing own profile
+    const panel = document.querySelector('#profile-panel')
+    if (panel.style.display !== 'none' && panel.dataset.profileUsername === username) {
+        const sd = document.querySelector('#profile-status-display')
+        sd.innerHTML = ''
+        sd.appendChild(statusDot(myStatus))
+        sd.appendChild(document.createTextNode(statusLabel(myStatus)))
+        document.querySelector('#profile-bio-display').textContent = myBio
+    }
+})
+
+// profile panel
+const profilePanel = document.querySelector('#profile-panel')
+
+function openProfile(targetUsername, editMode = false) {
+    profilePanel.style.display = 'block'
+    profilePanel.dataset.profileUsername = targetUsername
+    // clear previous content
+    document.querySelector('#profile-avatar-wrap').innerHTML = ''
+    document.querySelector('#profile-name-row').innerHTML = ''
+    document.querySelector('#profile-status-display').textContent = '...'
+    document.querySelector('#profile-bio-display').textContent = ''
+    document.querySelector('#profile-edit').style.display = 'none'
+    document.querySelector('#profile-edit-btn').style.display = 'none'
+    socket.emit('getProfile', targetUsername)
+    if (editMode) profilePanel.dataset.editOnLoad = '1'
+}
+
+socket.on('profileData', (data) => {
+    if (!data) return
+    const panel = profilePanel
+    const color = data.color || getNameColor(data.username)
+
+    // avatar
+    const avWrap = document.querySelector('#profile-avatar-wrap')
+    avWrap.innerHTML = ''
+    if (data.avatar) {
+        const img = document.createElement('img')
+        img.src = data.avatar
+        img.className = 'profile-avatar'
+        avWrap.appendChild(img)
+    } else {
+        const pl = document.createElement('div')
+        pl.className = 'profile-avatar-placeholder'
+        pl.textContent = (data.username || '?')[0]
+        pl.style.backgroundColor = `hsl(${nameHash(data.username) % 360}, 55%, 38%)`
+        avWrap.appendChild(pl)
+    }
+
+    // name row
+    const nameRow = document.querySelector('#profile-name-row')
+    nameRow.innerHTML = ''
+    const nameEl = document.createElement('span')
+    applyFlagColor(nameEl, color)
+    nameEl.textContent = data.username
+    nameRow.appendChild(nameEl)
+    if (data.isOwner) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
+    else if (data.verified) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
+
+    // status display
+    const sd = document.querySelector('#profile-status-display')
+    sd.innerHTML = ''
+    sd.appendChild(statusDot(data.status || 'online'))
+    sd.appendChild(document.createTextNode(statusLabel(data.status || 'online')))
+
+    // bio
+    document.querySelector('#profile-bio-display').textContent = data.bio || ''
+
+    // own profile controls
+    const isOwnProfile = data.username === username
+    const editBtn = document.querySelector('#profile-edit-btn')
+    editBtn.style.display = isOwnProfile ? '' : 'none'
+
+    editBtn.onclick = () => {
+        const editSection = document.querySelector('#profile-edit')
+        editSection.style.display = editSection.style.display === 'none' ? 'flex' : 'none'
+        if (editSection.style.display === 'flex') {
+            document.querySelector('#profile-username-input').value = data.username
+
+            // build status picker
+            const pickerWrap = document.querySelector('#profile-status-picker')
+            pickerWrap.innerHTML = ''
+            let selectedStatus = data.status || 'online'
+            STATUS_OPTIONS.forEach(opt => {
+                const btn = document.createElement('button')
+                btn.type = 'button'
+                btn.className = 'status-option' + (opt.value === selectedStatus ? ' active' : '')
+                btn.dataset.value = opt.value
+                btn.appendChild(statusDot(opt.value))
+                btn.appendChild(document.createTextNode(opt.label))
+                btn.addEventListener('click', () => {
+                    selectedStatus = opt.value
+                    pickerWrap.querySelectorAll('.status-option').forEach(b => b.classList.toggle('active', b.dataset.value === opt.value))
+                    pickerWrap.dataset.selected = opt.value
+                })
+                pickerWrap.appendChild(btn)
+            })
+            pickerWrap.dataset.selected = selectedStatus
+
+            const bioInput = document.querySelector('#profile-bio-input')
+            bioInput.value = data.bio || ''
+            bioInput.disabled = data.isGuest
+            bioInput.placeholder = data.isGuest ? "guests can't set a bio" : 'bio (optional)'
+        }
+    }
+
+    if (panel.dataset.editOnLoad === '1') {
+        delete panel.dataset.editOnLoad
+        editBtn.onclick()
+    }
+})
+
+document.querySelector('#profile-save-btn').addEventListener('click', () => {
+    const newName = document.querySelector('#profile-username-input').value.trim()
+    const picker = document.querySelector('#profile-status-picker')
+    const newStatus = picker.dataset.selected || 'online'
+    const newBio = document.querySelector('#profile-bio-input').value.trim()
+    if (newName && newName !== username) socket.emit('setUsername', newName)
+    if (newStatus !== myStatus) socket.emit('setStatus', newStatus)
+    if (newBio !== myBio) socket.emit('setBio', newBio)
+    document.querySelector('#profile-edit').style.display = 'none'
+})
+
+document.querySelector('#profile-close').addEventListener('click', () => {
+    profilePanel.style.display = 'none'
+})
+
+document.addEventListener('click', (e) => {
+    if (profilePanel.style.display !== 'none' &&
+        !profilePanel.contains(e.target) &&
+        e.target !== document.querySelector('#profile-btn')) {
+        profilePanel.style.display = 'none'
+    }
+})
 
 // custom emoji picker
 const emojiPicker = document.querySelector('#emoji-picker')
@@ -563,13 +732,11 @@ socket.on('connect', () => {
 socket.on('savedUsername', (name) => {
     const nameToUse = name || username
     username = nameToUse
-    document.querySelector('#username-input').value = nameToUse
     socket.emit('setUsername', nameToUse)
     if (nameToUse.startsWith('guest-')) {
-        document.querySelector('#username-input').disabled = true
-        document.querySelector('#username-form button[type="submit"]').disabled = true
         avatarBtn.style.display = 'none'
     }
+    updateProfileBtn()
 })
 
 socket.on('disconnect', () => {
@@ -673,6 +840,8 @@ function renderMessage(data) {
         placeholder.style.backgroundColor = `hsl(${nameHash(ausername) % 360}, 55%, 38%)`
         avatarCol.appendChild(placeholder)
     }
+    avatarCol.style.cursor = 'pointer'
+    avatarCol.addEventListener('click', () => openProfile(ausername))
     li.appendChild(avatarCol)
 
     // right: body
@@ -691,6 +860,8 @@ function renderMessage(data) {
     namespan.appendChild(nametext)
     if (data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
     if (data.verified && !data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
+    namespan.style.cursor = 'pointer'
+    namespan.addEventListener('click', () => openProfile(ausername))
     header.appendChild(namespan)
 
     const timespan = document.createElement('span')
@@ -923,6 +1094,7 @@ socket.on('userlist', (users) => {
     ul.innerHTML = `<strong>online (${users.length})</strong><br>`
     users.forEach(u => {
         const div = document.createElement('div')
+        div.appendChild(statusDot(u.status || 'online'))
         const inner = document.createElement('span')
         inner.textContent = u.username
         inner.style.display = 'inline-block'
@@ -933,6 +1105,8 @@ socket.on('userlist', (users) => {
         } else if (u.verified) {
             div.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 12, 'this user has been verified'))
         }
+        div.style.cursor = 'pointer'
+        div.addEventListener('click', () => openProfile(u.username))
         ul.appendChild(div)
     })
 })

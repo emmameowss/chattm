@@ -25,7 +25,8 @@ import {
     getStoredUsername, saveUsername, getEmailByUsername,
     getAvatar, setAvatar, deleteAvatar,
     getCustomEmoji, addCustomEmoji, removeCustomEmoji,
-    isVerified, setVerified, removeVerified
+    isVerified, setVerified, removeVerified,
+    getProfileData, setProfileBio, setProfileStatus
 } from './db.js'
 
 const httpServer = createServer()
@@ -283,7 +284,8 @@ function emitUserList() {
             avatar: s.cachedAvatar ?? null,
             guest: s.userEmail.endsWith('@guest'),
             isOwner: s.userEmail === process.env.OWNER_EMAIL,
-            verified: isVerified(s.userEmail)
+            verified: isVerified(s.userEmail),
+            status: getProfileData(s.userEmail).status ?? null
         })
     }
     io.emit('userlist', users)
@@ -354,6 +356,41 @@ io.on('connection', socket => {
     }
     socket.cachedAvatar = getAvatar(socket.userEmail)
     socket.emit('savedAvatar', socket.cachedAvatar)
+    socket.emit('savedProfile', getProfileData(socket.userEmail))
+
+    socket.on('setStatus', (status) => {
+        const s = String(status ?? '').slice(0, 100)
+        setProfileStatus(socket.userEmail, s)
+        emitUserList()
+        socket.emit('savedProfile', getProfileData(socket.userEmail))
+    })
+
+    socket.on('setBio', (bio) => {
+        if (socket.userEmail.endsWith('@guest')) return
+        const b = String(bio ?? '').slice(0, 300)
+        setProfileBio(socket.userEmail, b)
+        socket.emit('savedProfile', getProfileData(socket.userEmail))
+    })
+
+    socket.on('getProfile', (reqUsername) => {
+        let email = null
+        for (const [, s] of io.sockets.sockets) {
+            if (s.username === reqUsername) { email = s.userEmail; break }
+        }
+        if (!email) email = getEmailByUsername(reqUsername)
+        if (!email) { socket.emit('profileData', null); return }
+        const profile = getProfileData(email)
+        socket.emit('profileData', {
+            username: reqUsername,
+            bio: email.endsWith('@guest') ? "i'm a guest on chat™" : (profile.bio ?? ''),
+            status: profile.status ?? '',
+            color: getColor(email),
+            avatar: getAvatar(email),
+            verified: isVerified(email),
+            isOwner: email === process.env.OWNER_EMAIL,
+            isGuest: email.endsWith('@guest'),
+        })
+    })
 
     socket.on('setAvatar', (url) => {
         if (socket.userEmail.endsWith('@guest')) return

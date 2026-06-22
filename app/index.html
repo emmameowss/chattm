@@ -17,10 +17,7 @@
 <body>
     <h1>chat™</h1>
     <form id="username-form">
-        <input type="text" id="username-input" placeholder="set a username" maxlength="20">
-        <button type="submit" title="set username"><i class="ti ti-check"></i><span class="btn-label"> set</span></button>
-        <!-- <input type="color" id="color-input" style="display: none;">
-        <button type="button" id="color-btn" disabled="true" title="pick name color"><i class="ti ti-palette"></i></button> -->
+        <button type="button" id="profile-btn"></button>
         <div class="divider"></div>
         <button type="button" id="more-btn"><i class="ti ti-dots-vertical"></i></button>
         <div id="more-menu">
@@ -46,6 +43,20 @@
             </div>
         </div>
     </form>
+    <div id="profile-panel" style="display:none">
+        <button type="button" id="profile-close">&times;</button>
+        <div id="profile-avatar-wrap"></div>
+        <div id="profile-name-row"></div>
+        <div id="profile-status-display"></div>
+        <div id="profile-bio-display"></div>
+        <div id="profile-edit" style="display:none">
+            <input id="profile-username-input" maxlength="20" placeholder="username" autocomplete="off">
+            <div id="profile-status-picker" class="status-picker"></div>
+            <textarea id="profile-bio-input" maxlength="300" placeholder="bio (optional)"></textarea>
+            <button type="button" id="profile-save-btn">save</button>
+        </div>
+        <button type="button" id="profile-edit-btn" style="display:none"><i class="ti ti-pencil"></i> edit profile</button>
+    </div>
     <div id="userlist"></div>
     <div id="bottom-hints">
       <p id="command-suggestion" style="display:none;"></p>

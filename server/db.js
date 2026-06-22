@@ -83,6 +83,12 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS verified_users (
     email TEXT PRIMARY KEY
   );
+
+  CREATE TABLE IF NOT EXISTS profiles (
+    email TEXT PRIMARY KEY,
+    bio TEXT,
+    status TEXT
+  );
 `)
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -164,6 +170,11 @@ const stmts = {
   isVerified: db.prepare(`SELECT 1 FROM verified_users WHERE email = ?`),
   setVerified: db.prepare(`INSERT OR IGNORE INTO verified_users (email) VALUES (?)`),
   removeVerified: db.prepare(`DELETE FROM verified_users WHERE email = ?`),
+
+  // Profiles
+  getProfileData: db.prepare(`SELECT bio, status FROM profiles WHERE email = ?`),
+  setProfileBio: db.prepare(`INSERT INTO profiles (email, bio) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET bio = excluded.bio`),
+  setProfileStatus: db.prepare(`INSERT INTO profiles (email, status) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET status = excluded.status`),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -423,6 +434,21 @@ export function setVerified(email) {
 
 export function removeVerified(email) {
   stmts.removeVerified.run(email)
+}
+
+// ─── Profile API ─────────────────────────────────────────────────────────────
+
+export function getProfileData(email) {
+  const row = stmts.getProfileData.get(email)
+  return { bio: row?.bio ?? null, status: row?.status ?? null }
+}
+
+export function setProfileBio(email, bio) {
+  stmts.setProfileBio.run(email, bio)
+}
+
+export function setProfileStatus(email, status) {
+  stmts.setProfileStatus.run(email, status)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────
