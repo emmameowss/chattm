@@ -657,23 +657,23 @@ function renderMessage(data) {
 
     const namespan = document.createElement('span')
     namespan.className = 'msg-username'
-    if (data.isToken) {
-        const crown = document.createElement('span')
-        crown.textContent = '♛ '
-        crown.style.color = 'hotpink'
-        namespan.appendChild(crown)
-    }
-    if (data.isGuest) {
-        const badge = document.createElement('i')
-        badge.className = 'ti ti-user'
-        badge.style.cssText = 'font-size:10px;margin-right:4px'
-        applyFlagColor(badge, color)
-        namespan.appendChild(badge)
-    }
     const nametext = document.createElement('span')
     applyFlagColor(nametext, color)
     nametext.textContent = ausername
     namespan.appendChild(nametext)
+    if (data.isToken) {
+        const verified = document.createElement('img')
+        verified.src = 'https://cdn.chattm.app/emojis/verified.png'
+        verified.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-left:4px'
+        namespan.appendChild(verified)
+    }
+    if (data.isGuest) {
+        const badge = document.createElement('i')
+        badge.className = 'ti ti-user'
+        badge.style.cssText = 'font-size:10px;margin-left:4px'
+        applyFlagColor(badge, color)
+        namespan.appendChild(badge)
+    }
     header.appendChild(namespan)
 
     const timespan = document.createElement('span')
@@ -911,17 +911,17 @@ socket.on('userlist', (users) => {
         inner.style.display = 'inline-block'
         applyFlagColor(inner, u.color || getNameColor(u.username))
         div.appendChild(inner)
+        if (u.isOwner) {
+            const verified = document.createElement('img')
+            verified.src = 'https://cdn.chattm.app/emojis/verified.png'
+            verified.style.cssText = 'width:12px;height:12px;vertical-align:middle;margin-left:4px'
+            div.appendChild(verified)
+        }
         if (u.guest) {
             const badge = document.createElement('span')
             badge.className = 'ti ti-user'
-            badge.style.cssText = 'font-size:10px;color:var(--pink);margin-right:8px'
-            div.insertBefore(badge, inner)
-        }
-        if (u.isOwner) {
-            const crown = document.createElement('span')
-            crown.textContent = '♛'
-            crown.style.cssText = 'color:hotpink;margin-right:8px;font-size:10px'
-            div.insertBefore(crown, inner)
+            badge.style.cssText = 'font-size:10px;color:var(--pink);margin-left:4px'
+            div.appendChild(badge)
         }
         ul.appendChild(div)
     })
