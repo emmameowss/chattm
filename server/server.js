@@ -373,23 +373,34 @@ io.on('connection', socket => {
     })
 
     socket.on('getProfile', (reqUsername) => {
-        let email = null
-        for (const [, s] of io.sockets.sockets) {
-            if (s.username === reqUsername) { email = s.userEmail; break }
+        if (!reqUsername || typeof reqUsername !== 'string') {
+            socket.emit('profileData', null)
+            return
         }
-        if (!email) email = getEmailByUsername(reqUsername)
-        if (!email) { socket.emit('profileData', null); return }
-        const profile = getProfileData(email)
-        socket.emit('profileData', {
-            username: reqUsername,
-            bio: email.endsWith('@guest') ? "i'm a guest on chat™" : (profile.bio ?? ''),
-            status: profile.status ?? '',
-            color: getColor(email),
-            avatar: getAvatar(email),
-            verified: isVerified(email),
-            isOwner: email === process.env.OWNER_EMAIL,
-            isGuest: email.endsWith('@guest'),
-        })
+        try {
+            let email = null
+            for (const [, s] of io.sockets.sockets) {
+                if (s.username === reqUsername) { email = s.userEmail; break }
+            }
+            if (!email) email = getEmailByUsername(reqUsername)
+            // guests: username is "guest-xxxxx", email is "guest-xxxxx@guest"
+            if (!email && /^guest-[a-f0-9]+$/.test(reqUsername)) email = `${reqUsername}@guest`
+            if (!email) { socket.emit('profileData', null); return }
+            const profile = getProfileData(email)
+            socket.emit('profileData', {
+                username: reqUsername,
+                bio: email.endsWith('@guest') ? "i'm a guest on chat™" : (profile.bio ?? ''),
+                status: profile.status ?? '',
+                color: getColor(email),
+                avatar: getAvatar(email),
+                verified: isVerified(email),
+                isOwner: email === process.env.OWNER_EMAIL,
+                isGuest: email.endsWith('@guest'),
+            })
+        } catch (e) {
+            console.error('getProfile error:', e)
+            socket.emit('profileData', null)
+        }
     })
 
     socket.on('setAvatar', (url) => {

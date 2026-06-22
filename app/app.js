@@ -444,7 +444,10 @@ function openProfile(targetUsername, editMode = false) {
 }
 
 socket.on('profileData', (data) => {
-    if (!data) return
+    if (!data) {
+        document.querySelector('#profile-status-display').textContent = 'profile not found'
+        return
+    }
     const panel = profilePanel
     const color = data.color || getNameColor(data.username)
 
