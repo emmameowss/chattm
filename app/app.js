@@ -388,7 +388,7 @@ function renderEmojiPicker() {
 socket.on('emoji', map => { customEmoji = map; renderEmojiPicker() })
 socket.on('emojiUpdate', map => {
     customEmoji = map
-    if (emojiPicker.style.display !== 'none') renderEmojiPicker()
+    renderEmojiPicker()
 })
 
 emojiBtn.addEventListener('click', (e) => {
