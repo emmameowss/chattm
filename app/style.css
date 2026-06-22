@@ -185,6 +185,7 @@ button:active {
   gap: 4px;
   z-index: 300;
   height: 260px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
