@@ -693,7 +693,7 @@ function renderEmojiPicker() {
         btn.type = 'button'
         btn.title = shortcode
         const img = document.createElement('img')
-        img.src = url
+        img.dataset.src = url  // lazy — only load when picker opens
         btn.appendChild(img)
         btn.addEventListener('click', () => {
             const input = document.querySelector('#message-input')
@@ -718,7 +718,15 @@ socket.on('emojiUpdate', map => {
 emojiBtn.addEventListener('click', (e) => {
     e.stopPropagation()
     if (!Object.keys(customEmoji).length) return
-    emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'grid' : 'none'
+    const opening = emojiPicker.style.display === 'none'
+    emojiPicker.style.display = opening ? 'grid' : 'none'
+    if (opening) {
+        // lazy-load images now that the picker is visible
+        emojiPicker.querySelectorAll('img[data-src]').forEach(img => {
+            img.src = img.dataset.src
+            delete img.dataset.src
+        })
+    }
 })
 
 document.addEventListener('click', (e) => {
