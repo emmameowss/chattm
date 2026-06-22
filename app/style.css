@@ -442,6 +442,11 @@ button:active {
   width: 100%;
 }
 
+#profile-edit-btn:disabled:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
 #profile-edit-actions {
   gap: 6px;
 }
