@@ -1231,9 +1231,7 @@ function makeUserlistEntry(u) {
         const pl = document.createElement('div')
         pl.className = 'ul-avatar ul-avatar-placeholder'
         pl.textContent = (u.username || '?')[0]
-        pl.style.backgroundColor = u.online
-            ? `hsl(${nameHash(u.username) % 360}, 55%, 38%)`
-            : 'var(--border)'
+        pl.style.backgroundColor = `hsl(${nameHash(u.username) % 360}, 55%, 38%)`
         avWrap.appendChild(pl)
     }
     const dot = document.createElement('span')
@@ -1246,7 +1244,7 @@ function makeUserlistEntry(u) {
     info.className = 'ul-info'
     const nameEl = document.createElement('span')
     nameEl.className = 'ul-name'
-    if (u.online) applyFlagColor(nameEl, u.color || getNameColor(u.username))
+    applyFlagColor(nameEl, u.color || getNameColor(u.username))
     nameEl.textContent = u.username
     info.appendChild(nameEl)
     if (u.isOwner) info.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 11, 'this user is verified to be the owner of chat™'))

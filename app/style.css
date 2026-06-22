@@ -698,6 +698,9 @@ a:hover {
   gap: 2px;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg);
+  scrollbar-width: thin;
 }
 
 .ul-section {
@@ -721,7 +724,7 @@ a:hover {
 
 .ul-entry:hover { background: var(--surface); }
 
-.ul-offline { opacity: 0.45; }
+.ul-offline { opacity: 0.5; filter: grayscale(0.4); }
 
 .ul-avatar-wrap {
   position: relative;
