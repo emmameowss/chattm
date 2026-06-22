@@ -7,6 +7,7 @@ db.pragma('journal_mode = WAL')
 try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0") } catch {}
+try { db.exec("ALTER TABLE profiles ADD COLUMN pronouns TEXT") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -173,7 +174,7 @@ const stmts = {
   removeVerified: db.prepare(`DELETE FROM verified_users WHERE email = ?`),
 
   // Profiles
-  getProfileData: db.prepare(`SELECT bio, status FROM profiles WHERE email = ?`),
+  getProfileData: db.prepare(`SELECT bio, status, pronouns FROM profiles WHERE email = ?`),
   setProfileBio: db.prepare(`INSERT INTO profiles (email, bio) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET bio = excluded.bio`),
   setProfileStatus: db.prepare(`INSERT INTO profiles (email, status) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET status = excluded.status`),
   setProfilePronouns: db.prepare(`INSERT INTO profiles (email, pronouns) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET pronouns = excluded.pronouns`),
