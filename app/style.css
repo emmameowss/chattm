@@ -591,9 +591,10 @@ button:active {
   margin-right: 5px;
   vertical-align: middle;
 }
-.status-dot.online  { background: #3ba55c; }
-.status-dot.idle    { background: #faa61a; }
-.status-dot.dnd     { background: #ed4245; }
+.status-dot.online   { background: #3ba55c; }
+.status-dot.idle     { background: #faa61a; }
+.status-dot.dnd      { background: #ed4245; }
+.status-dot.offline  { background: #72767d; }
 
 .status-picker {
   display: flex;

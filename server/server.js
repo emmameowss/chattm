@@ -426,6 +426,7 @@ io.on('connection', socket => {
             if (!email && /^guest-[a-f0-9]+$/.test(reqUsername)) email = `${reqUsername}@guest`
             if (!email) { socket.emit('profileData', null); return }
             const profile = getProfileData(email)
+            const isOnline = [...io.sockets.sockets.values()].some(s => s.userEmail === email && s.username)
             socket.emit('profileData', {
                 username: reqUsername,
                 bio: email.endsWith('@guest') ? "i'm a guest on chat™" : (profile.bio ?? ''),
@@ -436,6 +437,7 @@ io.on('connection', socket => {
                 verified: isVerified(email),
                 isOwner: email === process.env.OWNER_EMAIL,
                 isGuest: email.endsWith('@guest'),
+                online: isOnline,
             })
         } catch (e) {
             console.error('getProfile error:', e)

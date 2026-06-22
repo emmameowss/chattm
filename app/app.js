@@ -578,7 +578,16 @@ socket.on('profileData', (data) => {
     }
 
 
-    renderStatusDisplay(data.status || 'online', isOwnProfile)
+    if (!data.online && !isOwnProfile) {
+        const sd = document.querySelector('#profile-status-display')
+        sd.innerHTML = ''
+        sd.appendChild(statusDot('offline'))
+        sd.appendChild(document.createTextNode('Offline'))
+        sd.style.cursor = ''
+        sd.onclick = null
+    } else {
+        renderStatusDisplay(data.status || 'online', isOwnProfile)
+    }
 
     // bio
     document.querySelector('#profile-bio-display').textContent = data.bio || ''
