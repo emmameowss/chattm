@@ -433,10 +433,7 @@ socket.on('savedProfile', (data) => {
     // refresh panel if showing own profile
     const panel = document.querySelector('#profile-panel')
     if (panel.style.display !== 'none' && panel.dataset.profileUsername === username) {
-        const sd = document.querySelector('#profile-status-display')
-        sd.innerHTML = ''
-        sd.appendChild(statusDot(myStatus))
-        sd.appendChild(document.createTextNode(statusLabel(myStatus)))
+        renderStatusDisplay(myStatus, true)
         document.querySelector('#profile-bio-display').textContent = myBio
     }
 })
@@ -509,6 +506,47 @@ function renderProfileAvatarWrap(avatarUrl, editable = false) {
     avWrap.appendChild(inner)
 }
 
+function renderStatusDisplay(currentStatus, editable = false) {
+    const sd = document.querySelector('#profile-status-display')
+    sd.innerHTML = ''
+    sd.appendChild(statusDot(currentStatus || 'online'))
+    sd.appendChild(document.createTextNode(statusLabel(currentStatus || 'online')))
+
+    if (!editable) { sd.style.cursor = ''; sd.onclick = null; return }
+
+    const chevron = document.createElement('i')
+    chevron.className = 'ti ti-chevron-down'
+    chevron.style.cssText = 'font-size:11px;color:var(--muted);margin-left:3px'
+    sd.appendChild(chevron)
+    sd.style.cursor = 'pointer'
+    sd.title = 'change status'
+    sd.style.position = 'relative'
+
+    let dropdown = document.createElement('div')
+    dropdown.className = 'status-dropdown'
+    dropdown.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;z-index:600;min-width:170px;display:none;flex-direction:column;gap:2px;box-shadow:0 4px 16px rgba(0,0,0,0.4)'
+    STATUS_OPTIONS.forEach(opt => {
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.dataset.value = opt.value
+        btn.className = 'status-option' + (opt.value === (currentStatus || 'online') ? ' active' : '')
+        btn.appendChild(statusDot(opt.value))
+        btn.appendChild(document.createTextNode(opt.label))
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            socket.emit('setStatus', opt.value)
+            myStatus = opt.value
+            dropdown.style.display = 'none'
+        })
+        dropdown.appendChild(btn)
+    })
+    sd.appendChild(dropdown)
+    sd.onclick = (e) => {
+        e.stopPropagation()
+        dropdown.style.display = dropdown.style.display === 'none' ? 'flex' : 'none'
+    }
+}
+
 socket.on('profileData', (data) => {
     if (!data) {
         document.querySelector('#profile-status-display').textContent = 'profile not found'
@@ -539,49 +577,8 @@ socket.on('profileData', (data) => {
         updateProfileBtn()
     }
 
-    function renderStatusDisplay(currentStatus) {
-        const sd = document.querySelector('#profile-status-display')
-        sd.innerHTML = ''
-        sd.appendChild(statusDot(currentStatus || 'online'))
-        sd.appendChild(document.createTextNode(statusLabel(currentStatus || 'online')))
 
-        if (!isOwnProfile) return
-        const chevron = document.createElement('i')
-        chevron.className = 'ti ti-chevron-down'
-        chevron.style.cssText = 'font-size:11px;color:var(--muted);margin-left:3px'
-        sd.appendChild(chevron)
-        sd.style.cursor = 'pointer'
-        sd.title = 'change status'
-
-        // dropdown
-        const dropdown = document.createElement('div')
-        dropdown.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;z-index:600;min-width:170px;display:none;flex-direction:column;gap:2px;box-shadow:0 4px 16px rgba(0,0,0,0.4)'
-        STATUS_OPTIONS.forEach(opt => {
-            const btn = document.createElement('button')
-            btn.type = 'button'
-            btn.className = 'status-option' + (opt.value === (currentStatus || 'online') ? ' active' : '')
-            btn.appendChild(statusDot(opt.value))
-            btn.appendChild(document.createTextNode(opt.label))
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation()
-                socket.emit('setStatus', opt.value)
-                myStatus = opt.value
-                dropdown.style.display = 'none'
-                renderStatusDisplay(opt.value)
-            })
-            dropdown.appendChild(btn)
-        })
-        sd.style.position = 'relative'
-        sd.appendChild(dropdown)
-
-        sd.onclick = (e) => {
-            e.stopPropagation()
-            dropdown.style.display = dropdown.style.display === 'none' ? 'flex' : 'none'
-        }
-        document.addEventListener('click', () => { dropdown.style.display = 'none' }, { once: true })
-    }
-
-    renderStatusDisplay(data.status || 'online')
+    renderStatusDisplay(data.status || 'online', isOwnProfile)
 
     // bio
     document.querySelector('#profile-bio-display').textContent = data.bio || ''
@@ -658,6 +655,11 @@ function closeProfile() {
 document.querySelector('#profile-close').addEventListener('click', closeProfile)
 
 document.addEventListener('click', (e) => {
+    // close any open status dropdown
+    const dropdown = document.querySelector('.status-dropdown')
+    if (dropdown && !dropdown.contains(e.target) && !document.querySelector('#profile-status-display')?.contains(e.target)) {
+        dropdown.style.display = 'none'
+    }
     if (suppressProfileClose) return
     if (profilePanel.style.display !== 'none' &&
         !profilePanel.contains(e.target) &&
