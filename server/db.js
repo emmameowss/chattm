@@ -8,6 +8,7 @@ try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } ca
 try { db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0") } catch {}
 try { db.exec("ALTER TABLE profiles ADD COLUMN pronouns TEXT") } catch {}
+try { db.exec("ALTER TABLE profiles ADD COLUMN last_seen INTEGER") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -178,6 +179,8 @@ const stmts = {
   setProfileBio: db.prepare(`INSERT INTO profiles (email, bio) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET bio = excluded.bio`),
   setProfileStatus: db.prepare(`INSERT INTO profiles (email, status) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET status = excluded.status`),
   setProfilePronouns: db.prepare(`INSERT INTO profiles (email, pronouns) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET pronouns = excluded.pronouns`),
+  setLastSeen: db.prepare(`INSERT INTO profiles (email, last_seen) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET last_seen = excluded.last_seen`),
+  getRecentUsers: db.prepare(`SELECT p.email, p.last_seen, u.username FROM profiles p JOIN usernames u ON u.email = p.email WHERE p.last_seen > ? AND u.email NOT LIKE '%@guest' ORDER BY p.last_seen DESC LIMIT 100`),
 }
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -456,6 +459,14 @@ export function setProfileStatus(email, status) {
 
 export function setProfilePronouns(email, pronouns) {
   stmts.setProfilePronouns.run(email, pronouns)
+}
+
+export function setLastSeen(email) {
+  stmts.setLastSeen.run(email, Date.now())
+}
+
+export function getRecentUsers(cutoffMs) {
+  return stmts.getRecentUsers.all(cutoffMs)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

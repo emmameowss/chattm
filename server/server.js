@@ -26,7 +26,7 @@ import {
     getAvatar, setAvatar, deleteAvatar,
     getCustomEmoji, addCustomEmoji, removeCustomEmoji,
     isVerified, setVerified, removeVerified,
-    getProfileData, setProfileBio, setProfileStatus, setProfilePronouns
+    getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers
 } from './db.js'
 
 const httpServer = createServer()
@@ -275,9 +275,14 @@ setInterval(() => {
 }, 10 * 1000)
 
 function emitUserList() {
+    const onlineEmails = new Set()
     const users = []
+
     for (const [id, s] of io.sockets.sockets) {
-        if (s.username) users.push({
+        if (!s.username) continue
+        onlineEmails.add(s.userEmail)
+        const profile = getProfileData(s.userEmail)
+        users.push({
             username: s.username,
             email: s.userEmail,
             color: getColor(s.userEmail),
@@ -285,9 +290,29 @@ function emitUserList() {
             guest: s.userEmail.endsWith('@guest'),
             isOwner: s.userEmail === process.env.OWNER_EMAIL,
             verified: isVerified(s.userEmail),
-            status: getProfileData(s.userEmail).status ?? null
+            status: profile.status ?? 'online',
+            online: true,
         })
     }
+
+    // include recent non-guest offline users (active in last 30 days)
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+    for (const row of getRecentUsers(cutoff)) {
+        if (onlineEmails.has(row.email)) continue
+        const profile = getProfileData(row.email)
+        users.push({
+            username: row.username,
+            email: row.email,
+            color: getColor(row.email),
+            avatar: getAvatar(row.email),
+            guest: false,
+            isOwner: row.email === process.env.OWNER_EMAIL,
+            verified: isVerified(row.email),
+            status: profile.status ?? 'online',
+            online: false,
+        })
+    }
+
     io.emit('userlist', users)
 }
 
@@ -324,6 +349,7 @@ io.on('connection', socket => {
     socket.userIP = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address
     let lastMessage = 0
     console.log(`${socket.userEmail} connected`)
+    if (!socket.userEmail.endsWith('@guest')) setLastSeen(socket.userEmail)
     io.emit('usercount', io.engine.clientsCount)
     // send emoji map before history so shortcodes render correctly
     socket.emit('emoji', getCustomEmoji())

@@ -1215,27 +1215,71 @@ socket.on('maintenance', (enabled, reason) => {
 // user list client side stuff
 let onlineUsernames = []
 
+function makeUserlistEntry(u) {
+    const div = document.createElement('div')
+    div.className = 'ul-entry' + (u.online ? '' : ' ul-offline')
+
+    // avatar with status dot overlay
+    const avWrap = document.createElement('div')
+    avWrap.className = 'ul-avatar-wrap'
+    if (u.avatar) {
+        const img = document.createElement('img')
+        img.src = u.avatar
+        img.className = 'ul-avatar'
+        avWrap.appendChild(img)
+    } else {
+        const pl = document.createElement('div')
+        pl.className = 'ul-avatar ul-avatar-placeholder'
+        pl.textContent = (u.username || '?')[0]
+        pl.style.backgroundColor = u.online
+            ? `hsl(${nameHash(u.username) % 360}, 55%, 38%)`
+            : 'var(--border)'
+        avWrap.appendChild(pl)
+    }
+    const dot = document.createElement('span')
+    dot.className = `ul-status-dot ${u.online ? (u.status || 'online') : 'offline'}`
+    avWrap.appendChild(dot)
+    div.appendChild(avWrap)
+
+    // name + badges
+    const info = document.createElement('div')
+    info.className = 'ul-info'
+    const nameEl = document.createElement('span')
+    nameEl.className = 'ul-name'
+    if (u.online) applyFlagColor(nameEl, u.color || getNameColor(u.username))
+    nameEl.textContent = u.username
+    info.appendChild(nameEl)
+    if (u.isOwner) info.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 11, 'this user is verified to be the owner of chat™'))
+    else if (u.verified) info.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 11, 'this user has been verified'))
+    div.appendChild(info)
+
+    div.addEventListener('click', (e) => { e.stopPropagation(); openProfile(u.username) })
+    return div
+}
+
 socket.on('userlist', (users) => {
-    onlineUsernames = users.map(u => u.username).filter(Boolean)
+    onlineUsernames = users.filter(u => u.online).map(u => u.username).filter(Boolean)
     const ul = document.querySelector('#userlist')
-    ul.innerHTML = `<strong>online (${users.length})</strong><br>`
-    users.forEach(u => {
-        const div = document.createElement('div')
-        div.appendChild(statusDot(u.status || 'online'))
-        const inner = document.createElement('span')
-        inner.textContent = u.username
-        inner.style.display = 'inline-block'
-        applyFlagColor(inner, u.color || getNameColor(u.username))
-        div.appendChild(inner)
-        if (u.isOwner) {
-            div.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 12, 'this user is verified to be the owner of chat™'))
-        } else if (u.verified) {
-            div.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 12, 'this user has been verified'))
-        }
-        div.style.cursor = 'pointer'
-        div.addEventListener('click', (e) => { e.stopPropagation(); openProfile(u.username) })
-        ul.appendChild(div)
-    })
+    ul.innerHTML = ''
+
+    const online = users.filter(u => u.online)
+    const offline = users.filter(u => !u.online)
+
+    if (online.length) {
+        const header = document.createElement('div')
+        header.className = 'ul-section'
+        header.textContent = `online — ${online.length}`
+        ul.appendChild(header)
+        online.forEach(u => ul.appendChild(makeUserlistEntry(u)))
+    }
+
+    if (offline.length) {
+        const header = document.createElement('div')
+        header.className = 'ul-section'
+        header.textContent = `offline — ${offline.length}`
+        ul.appendChild(header)
+        offline.forEach(u => ul.appendChild(makeUserlistEntry(u)))
+    }
 })
 
 // file input stuff
