@@ -278,7 +278,7 @@ function updateProfileBtn() {
 }
 
 updateProfileBtn()
-document.querySelector('#profile-btn').addEventListener('click', () => openProfile(username))
+document.querySelector('#profile-btn').addEventListener('click', (e) => { e.stopPropagation(); openProfile(username) })
 
 // move socket joined/left stuff after intialiing socket
 /* unneeded
@@ -889,7 +889,7 @@ function renderMessage(data) {
         avatarCol.appendChild(placeholder)
     }
     avatarCol.style.cursor = 'pointer'
-    avatarCol.addEventListener('click', () => openProfile(ausername))
+    avatarCol.addEventListener('click', (e) => { e.stopPropagation(); openProfile(ausername) })
     li.appendChild(avatarCol)
 
     // right: body
@@ -909,7 +909,7 @@ function renderMessage(data) {
     if (data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
     if (data.verified && !data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
     namespan.style.cursor = 'pointer'
-    namespan.addEventListener('click', () => openProfile(ausername))
+    namespan.addEventListener('click', (e) => { e.stopPropagation(); openProfile(ausername) })
     header.appendChild(namespan)
 
     const timespan = document.createElement('span')
@@ -1154,7 +1154,7 @@ socket.on('userlist', (users) => {
             div.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 12, 'this user has been verified'))
         }
         div.style.cursor = 'pointer'
-        div.addEventListener('click', () => openProfile(u.username))
+        div.addEventListener('click', (e) => { e.stopPropagation(); openProfile(u.username) })
         ul.appendChild(div)
     })
 })
