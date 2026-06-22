@@ -1198,6 +1198,7 @@ function openStats() {
 document.querySelector('#stats-btn').addEventListener('click', (e) => {
     e.stopPropagation()
     moreMenu.classList.remove('open')
+    userlist.style.top = ''
     openStats()
 })
 

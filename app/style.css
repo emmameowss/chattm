@@ -316,14 +316,14 @@ button:active {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.6);
-  z-index: 499;
+  z-index: 1000;
 }
 
 #stats-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.6);
-  z-index: 499;
+  z-index: 1000;
 }
 
 #stats-panel {
@@ -336,7 +336,7 @@ button:active {
   border-radius: var(--radius);
   padding: 24px;
   width: 280px;
-  z-index: 500;
+  z-index: 1001;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
@@ -394,7 +394,7 @@ button:active {
   border-radius: var(--radius);
   padding: 24px;
   width: 300px;
-  z-index: 500;
+  z-index: 1001;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
@@ -1054,7 +1054,7 @@ body:has(#dev-banner) #version-status {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.6);
-  z-index: 500;
+  z-index: 1001;
   display: flex;
   align-items: center;
   justify-content: center;
