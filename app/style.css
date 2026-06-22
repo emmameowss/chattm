@@ -393,13 +393,16 @@ button:active {
 
 .avatar-remove-btn {
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 0 10px;
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--danger);
   cursor: pointer;
   white-space: nowrap;
+  height: 24px;
+  line-height: 24px;
+  display: block;
 }
 
 .avatar-remove-btn:hover { background: var(--danger-dim); }
@@ -498,6 +501,7 @@ button:active {
   background: none;
   border-color: var(--border);
   color: var(--muted);
+  text-align: center;
 }
 
 .status-dot {
