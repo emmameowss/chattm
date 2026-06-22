@@ -52,6 +52,7 @@ async function syncEmojisFromS3() {
     if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) return
     try {
         const existing = getCustomEmoji()
+        const found = new Set()
         let continuationToken
         let added = 0
         do {
@@ -67,6 +68,7 @@ async function syncEmojisFromS3() {
                 const name = filename.slice(0, ext ? -ext.length : undefined)
                 if (!name) continue
                 const shortcode = `:${name}:`
+                found.add(shortcode)
                 if (!existing[shortcode]) {
                     addCustomEmoji(shortcode, `${process.env.AWS_S3_PUBLIC_URL}/${obj.Key}`)
                     added++
@@ -74,7 +76,17 @@ async function syncEmojisFromS3() {
             }
             continuationToken = res.IsTruncated ? res.NextContinuationToken : null
         } while (continuationToken)
-        if (added) console.log(`synced ${added} new emoji(s) from S3`)
+
+        // remove DB entries no longer present on S3
+        let removed = 0
+        for (const shortcode of Object.keys(existing)) {
+            if (!found.has(shortcode)) {
+                removeCustomEmoji(shortcode)
+                removed++
+            }
+        }
+
+        if (added || removed) console.log(`emoji sync: +${added} added, -${removed} removed`)
     } catch (e) {
         console.log('emoji S3 sync failed:', e.message)
     }
