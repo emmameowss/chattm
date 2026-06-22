@@ -615,15 +615,22 @@ document.querySelector('#profile-cancel-btn').addEventListener('click', () => {
     document.querySelector('#profile-edit-actions').style.display = 'none'
 })
 
-document.querySelector('#profile-close').addEventListener('click', () => {
-    profilePanel.style.display = 'none'; document.querySelector('#profile-backdrop').style.display = 'none'
-})
+function closeProfile() {
+    profilePanel.style.display = 'none'
+    document.querySelector('#profile-backdrop').style.display = 'none'
+    document.querySelector('#profile-edit').style.display = 'none'
+    document.querySelector('#profile-edit-actions').style.display = 'none'
+    document.querySelector('#profile-edit-btn').style.display = 'none'
+    renderProfileAvatarWrap(myAvatar, false)
+}
+
+document.querySelector('#profile-close').addEventListener('click', closeProfile)
 
 document.addEventListener('click', (e) => {
     if (profilePanel.style.display !== 'none' &&
         !profilePanel.contains(e.target) &&
         e.target !== document.querySelector('#profile-btn')) {
-        profilePanel.style.display = 'none'; document.querySelector('#profile-backdrop').style.display = 'none'
+        closeProfile()
     }
 })
 
