@@ -86,7 +86,10 @@ async function syncEmojisFromS3() {
             }
         }
 
-        if (added || removed) console.log(`emoji sync: +${added} added, -${removed} removed`)
+        if (added || removed) {
+            console.log(`emoji sync: +${added} added, -${removed} removed`)
+            io.emit('emojiUpdate', getCustomEmoji())
+        }
     } catch (e) {
         console.log('emoji S3 sync failed:', e.message)
     }
@@ -724,7 +727,6 @@ io.on('connection', socket => {
         }
         if (data.text?.startsWith('/reloademojis') && socket.userEmail === process.env.OWNER_EMAIL) {
             await syncEmojisFromS3()
-            io.emit('emojiUpdate', getCustomEmoji())
             socket.emit('commandError', 'emoji sync complete')
             return
         }
