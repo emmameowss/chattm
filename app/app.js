@@ -448,28 +448,32 @@ function openProfile(targetUsername, editMode = false) {
 function renderProfileAvatarWrap(avatarUrl, editable = false) {
     const avWrap = document.querySelector('#profile-avatar-wrap')
     avWrap.innerHTML = ''
-    avWrap.style.cursor = editable ? 'pointer' : ''
-    avWrap.title = editable ? 'click to change avatar' : ''
+    avWrap.onclick = null
+
+    // inner: relative container so overlay sits on top of avatar
+    const inner = document.createElement('div')
+    inner.style.cssText = 'position:relative;display:inline-block'
 
     if (avatarUrl) {
         const img = document.createElement('img')
         img.src = avatarUrl
         img.className = 'profile-avatar'
-        avWrap.appendChild(img)
+        inner.appendChild(img)
     } else {
         const pl = document.createElement('div')
         pl.className = 'profile-avatar-placeholder'
         pl.textContent = (username || '?')[0]
         pl.style.backgroundColor = `hsl(${nameHash(username) % 360}, 55%, 38%)`
-        avWrap.appendChild(pl)
+        inner.appendChild(pl)
     }
 
     if (editable) {
         const overlay = document.createElement('div')
         overlay.className = 'avatar-edit-overlay'
         overlay.innerHTML = '<i class="ti ti-camera"></i>'
-        avWrap.appendChild(overlay)
-        avWrap.onclick = (e) => { e.stopPropagation(); avatarInput.click() }
+        inner.appendChild(overlay)
+        inner.style.cursor = 'pointer'
+        inner.addEventListener('click', (e) => { e.stopPropagation(); avatarInput.click() })
 
         if (avatarUrl) {
             const removeBtn = document.createElement('button')
@@ -477,11 +481,13 @@ function renderProfileAvatarWrap(avatarUrl, editable = false) {
             removeBtn.className = 'avatar-remove-btn'
             removeBtn.textContent = 'remove'
             removeBtn.addEventListener('click', (e) => { e.stopPropagation(); socket.emit('deleteAvatar') })
+            avWrap.appendChild(inner)
             avWrap.appendChild(removeBtn)
+            return
         }
-    } else {
-        avWrap.onclick = null
     }
+
+    avWrap.appendChild(inner)
 }
 
 socket.on('profileData', (data) => {
