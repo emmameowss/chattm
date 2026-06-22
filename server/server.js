@@ -9,7 +9,7 @@ import { readFile, appendFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
 import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
 import {
     getHistory, addMessage, deleteMessage, clearMessages,
     getSession, saveSession, deleteSession,
@@ -46,6 +46,40 @@ const s3 = new S3Client({
 
 // migrate from legacy files on first run
 await migrateFromFiles()
+
+// sync emojis from S3 emojis/ folder into DB on startup
+async function syncEmojisFromS3() {
+    if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) return
+    try {
+        const existing = getCustomEmoji()
+        let continuationToken
+        let added = 0
+        do {
+            const res = await s3.send(new ListObjectsV2Command({
+                Bucket: process.env.AWS_S3_BUCKET,
+                Prefix: 'emojis/',
+                ContinuationToken: continuationToken
+            }))
+            for (const obj of res.Contents ?? []) {
+                const filename = obj.Key.split('/').pop()
+                if (!filename) continue
+                const ext = extname(filename)
+                const name = filename.slice(0, ext ? -ext.length : undefined)
+                if (!name) continue
+                const shortcode = `:${name}:`
+                if (!existing[shortcode]) {
+                    addCustomEmoji(shortcode, `${process.env.AWS_S3_PUBLIC_URL}/${obj.Key}`)
+                    added++
+                }
+            }
+            continuationToken = res.IsTruncated ? res.NextContinuationToken : null
+        } while (continuationToken)
+        if (added) console.log(`synced ${added} new emoji(s) from S3`)
+    } catch (e) {
+        console.log('emoji S3 sync failed:', e.message)
+    }
+}
+await syncEmojisFromS3()
 
 const msgcooldown = 1000
 const lastmessage = {}
