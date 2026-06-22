@@ -246,13 +246,11 @@ const MAX_SIZE = 50 * 1024 * 1024 // 10mb limit to images
 // profile button (replaces old username form)
 let myBio = ''
 let myStatus = ''
+let myAvatar = null
 
 function updateProfileBtn() {
     const btn = document.querySelector('#profile-btn')
     btn.innerHTML = ''
-    const cachedAv = document.querySelector('#avatar-remove-btn').style.display !== 'none'
-        ? document.querySelector('#avatar-remove-btn').dataset.avatarUrl || null
-        : null
     if (myAvatar) {
         const img = document.createElement('img')
         img.src = myAvatar
@@ -267,6 +265,7 @@ function updateProfileBtn() {
     btn.appendChild(document.createTextNode(username))
 }
 
+updateProfileBtn()
 document.querySelector('#profile-btn').addEventListener('click', () => openProfile(username))
 
 // move socket joined/left stuff after intialiing socket
