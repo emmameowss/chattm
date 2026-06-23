@@ -28,12 +28,7 @@
            <button type="button" id="signout"><i class="ti ti-logout"></i> sign out</button>
            <div id="version-status"></div>
            <div class="menu-divider" id="owner-divider" style="display:none"></div>
-            <div id="owner-tools" style="display:none">
-                <button type="button" id="owner-mutechat-btn"><i class="ti ti-microphone-off"></i> toggle chat mute</button>
-                <button type="button" id="owner-maintenance-btn"><i class="ti ti-tool"></i> toggle maintenance</button>
-                <button type="button" id="owner-clear-btn"><i class="ti ti-trash"></i> clear chat</button>
-                <button type="button" id="owner-refresh-version-btn"><i class="ti ti-refresh"></i> refresh version status</button>
-            </div>
+           <button type="button" id="admin-btn" style="display:none"><i class="ti ti-shield-lock"></i> admin</button>
         </div>
     </form>
     <div id="stats-backdrop" style="display:none"></div>
@@ -54,6 +49,19 @@
                     <button type="button" id="theme-btn"><i class="ti ti-sun"></i> light mode</button>
                     <button type="button" title="mute notification sound" id="mute-btn"><span class="mute-label">mute sound</span></button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <div id="admin-backdrop" style="display:none"></div>
+    <div id="admin-panel" style="display:none">
+        <div id="admin-inner">
+            <button type="button" id="admin-close">&times;</button>
+            <h2>admin</h2>
+            <div id="admin-content">
+                <button type="button" id="owner-mutechat-btn"><i class="ti ti-microphone-off"></i> toggle chat mute</button>
+                <button type="button" id="owner-maintenance-btn"><i class="ti ti-tool"></i> toggle maintenance</button>
+                <button type="button" id="owner-clear-btn"><i class="ti ti-trash"></i> clear chat</button>
+                <button type="button" id="owner-refresh-version-btn"><i class="ti ti-refresh"></i> refresh version status</button>
             </div>
         </div>
     </div>

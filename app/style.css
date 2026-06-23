@@ -438,6 +438,73 @@ button:active {
 .stat-value { font-weight: 500; color: var(--text); }
 .stats-loading { color: var(--muted); font-size: 12px; font-style: italic; text-align: center; display: block; }
 
+#admin-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+}
+
+#admin-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+}
+
+#admin-inner {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 300px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+#admin-panel h2 {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 16px;
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+#admin-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+#admin-close:hover { color: var(--text); }
+
+#admin-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#admin-content button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+#admin-content button:hover {
+  background: var(--danger-dim);
+}
+
 #settings-backdrop {
   position: fixed;
   inset: 0;
@@ -1142,6 +1209,15 @@ body:has(#dev-banner) #version-status {
   text-align: left;
 }
 
+#admin-btn {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+#admin-btn:hover {
+  background: var(--danger-dim);
+}
+
 #more-menu .menu-divider {
   height: 9px;
   flex-shrink: 0;
@@ -1169,19 +1245,6 @@ body:has(#dev-banner) #version-status {
   content: '\ece9';
 }
 
-#owner-tools {
-  flex-direction: column;
-  gap: 4px;
-}
-
-#owner-tools button {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-#owner-tools button:hover {
-  background: var(--danger-dim);
-}
 
 #modal-overlay {
   position: fixed;

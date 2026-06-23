@@ -1591,21 +1591,40 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
     }
     if (isOwner) {
         document.querySelector('#owner-divider').style.display = 'block'
-        document.querySelector('#owner-tools').style.display = 'flex'
+        document.querySelector('#admin-btn').style.display = ''
     }
 
     if (color) userColor = color
 })
 
+const adminPanel = document.querySelector('#admin-panel')
+const adminBackdrop = document.querySelector('#admin-backdrop')
+function openAdmin() {
+    adminPanel.style.display = 'block'
+    adminBackdrop.style.display = 'block'
+    moreMenu.classList.remove('open')
+    userlist.style.top = ''
+}
+function closeAdmin() {
+    adminPanel.style.display = 'none'
+    adminBackdrop.style.display = 'none'
+}
+document.querySelector('#admin-btn').addEventListener('click', openAdmin)
+document.querySelector('#admin-close').addEventListener('click', closeAdmin)
+adminBackdrop.addEventListener('click', closeAdmin)
+
 document.querySelector('#owner-mutechat-btn').addEventListener('click', () => {
     socket.emit('message', {text: chatMutedb ? '/unmutechat' : '/mutechat'})
+    closeAdmin()
 })
 document.querySelector('#owner-maintenance-btn').addEventListener('click', async () => {
+    closeAdmin()
     const reason = await showModal({message: "maintenance reason (leave blank to turn off):", withInput: true})
     if (reason === null) return
     socket.emit('message', {text: `/maintenance ${reason}`})
 })
 document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
+    closeAdmin()
     const confirmed = await showModal({message: "clear all chat history? this can't be reversed"})
     if (confirmed) {
         socket.emit('message', {text: '/clear'})
@@ -1615,6 +1634,7 @@ document.querySelector('#owner-refresh-version-btn').addEventListener('click', (
     loadVersionStatus(true)
     showStatus('refreshing version status...', 'pink')
     setTimeout(hideStatus, 1500)
+    closeAdmin()
 })
 
 // mute chat
