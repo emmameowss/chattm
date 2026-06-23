@@ -1380,6 +1380,7 @@ body:has(#dev-banner) #version-status {
   z-index: 1100;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 #emoji-suggest-box {
@@ -1389,6 +1390,8 @@ body:has(#dev-banner) #version-status {
   padding: 20px;
   width: 300px;
   max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
