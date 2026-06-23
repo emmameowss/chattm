@@ -181,6 +181,8 @@ const stmts = {
   countUsers: db.prepare(`SELECT COUNT(DISTINCT email) AS n FROM sessions WHERE email NOT LIKE '%@guest'`),
   countMessages: db.prepare(`SELECT COUNT(*) AS n FROM messages WHERE system = 0`),
   countEmoji: db.prepare(`SELECT COUNT(*) AS n FROM custom_emoji`),
+  incrTotalMessages: db.prepare(`INSERT INTO settings (key, value) VALUES ('total_messages_sent', '1') ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)`),
+  getTotalMessages: db.prepare(`SELECT value FROM settings WHERE key = 'total_messages_sent'`),
 
   // Profiles
   getProfileData: db.prepare(`SELECT bio, status, pronouns FROM profiles WHERE email = ?`),
@@ -240,6 +242,7 @@ export function addMessage(msg) {
     avatar_url: msg.avatar ?? null,
     is_verified: msg.verified ? 1 : 0,
   })
+  if (!msg.system) stmts.incrTotalMessages.run()
   // trim to max
   const { n } = stmts.countMessages.get()
   if (n > MAX_HISTORY) {
@@ -487,9 +490,10 @@ export function setLastSeen(email) {
 }
 
 export function getDbStats() {
+  const totalRow = stmts.getTotalMessages.get()
   return {
     users: stmts.countUsers.get().n,
-    messages: stmts.countMessages.get().n,
+    messages: totalRow ? parseInt(totalRow.value, 10) : stmts.countMessages.get().n,
     emoji: stmts.countEmoji.get().n,
   }
 }
