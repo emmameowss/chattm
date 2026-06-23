@@ -345,6 +345,7 @@ let myStatus = ''
 let myPronouns = ''
 let myAvatar = null
 let myVerified = false
+let myColor = null
 
 function updateProfileBtn() {
     const btn = document.querySelector('#profile-btn')
@@ -360,7 +361,10 @@ function updateProfileBtn() {
         pl.style.backgroundColor = `hsl(${nameHash(username) % 360}, 55%, 38%)`
         btn.appendChild(pl)
     }
-    btn.appendChild(document.createTextNode(username))
+    const nameSpan = document.createElement('span')
+    nameSpan.textContent = username
+    applyFlagColor(nameSpan, myColor || getNameColor(username))
+    btn.appendChild(nameSpan)
     if (isOwner) {
         const badge = document.createElement('img')
         badge.src = 'https://cdn.chattm.app/verified_owner.png'
@@ -1616,7 +1620,7 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
         document.querySelector('#admin-btn').style.display = ''
     }
 
-    if (color) userColor = color
+    if (color) { myColor = color; updateProfileBtn() }
 })
 
 const adminPanel = document.querySelector('#admin-panel')
@@ -1761,6 +1765,8 @@ socket.on('status', (status) => {
 
 // color status
 socket.on('colorChanged', (color) => {
+    myColor = color
+    updateProfileBtn()
     const display = color.startsWith('flag:') ? color.slice(5) : color
     showStatus(`name color changed to ${display}`, 'pink')
     setTimeout(hideStatus, 3000)
