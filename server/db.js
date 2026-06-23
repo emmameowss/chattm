@@ -99,17 +99,14 @@ try { db.exec("ALTER TABLE profiles ADD COLUMN last_seen INTEGER") } catch {}
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 
-const MAX_HISTORY = 100
-
 const stmts = {
   insertMessage: db.prepare(`
     INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url, is_verified)
     VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url, @is_verified)
   `),
-  getMessages: db.prepare(`SELECT * FROM messages ORDER BY time ASC`),
+  getMessages: db.prepare(`SELECT * FROM (SELECT * FROM messages ORDER BY time DESC LIMIT 100) ORDER BY time ASC`),
+  getAllMessages: db.prepare(`SELECT * FROM messages ORDER BY time ASC`),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
-  countMessages: db.prepare(`SELECT COUNT(*) as n FROM messages`),
-  oldestMessageId: db.prepare(`SELECT id FROM messages ORDER BY time ASC LIMIT 1`),
   clearMessages: db.prepare(`DELETE FROM messages`),
 
   // Sessions
@@ -208,6 +205,28 @@ const stmts = {
 
 // ─── Message API ─────────────────────────────────────────────────────────────
 
+function mapMessageRow(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    text: row.text,
+    image: row.image,
+    ownerEmail: row.owner_email,
+    time: row.time,
+    isToken: !!row.is_token,
+    isGuest: !!row.is_guest,
+    color: row.color,
+    system: !!row.system,
+    mentions: JSON.parse(row.mentions || '[]'),
+    avatar: row.avatar_url ?? null,
+    verified: !!row.is_verified,
+  }
+}
+
+export function getAllHistory() {
+  return stmts.getAllMessages.all().map(mapMessageRow)
+}
+
 export function getHistory() {
   return stmts.getMessages.all().map(row => ({
     id: row.id,
@@ -243,12 +262,6 @@ export function addMessage(msg) {
     is_verified: msg.verified ? 1 : 0,
   })
   if (!msg.system) stmts.incrTotalMessages.run()
-  // trim to max
-  const { n } = stmts.countMessages.get()
-  if (n > MAX_HISTORY) {
-    const oldest = stmts.oldestMessageId.get()
-    if (oldest) stmts.deleteMessage.run(oldest.id)
-  }
 }
 
 export function deleteMessage(id) {

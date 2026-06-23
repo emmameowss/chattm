@@ -26,7 +26,8 @@ import {
     getAvatar, setAvatar, deleteAvatar,
     getCustomEmoji, addCustomEmoji, removeCustomEmoji,
     isVerified, setVerified, removeVerified,
-    getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats
+    getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats,
+    getAllHistory
 } from './db.js'
 
 const httpServer = createServer()
@@ -1280,7 +1281,7 @@ httpServer.on('request', async (req, res) => {
             res.end(JSON.stringify({ error: 'rate limited' }))
             return
         }
-        const messages = getHistory()
+        const messages = getAllHistory()
             .filter(m => !m.system)
             .map(({ ownerEmail, isToken, isGuest, system, mentions, verified, ...m }) => m)
         res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' })
