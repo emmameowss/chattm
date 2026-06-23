@@ -1722,6 +1722,7 @@ body:has(#dev-banner) #version-status {
   padding: 6px 6px;
   border-radius: var(--radius);
   cursor: pointer;
+  justify-content: space-between;
 }
 
 .admin-emoji-row:hover {
@@ -1741,6 +1742,7 @@ body:has(#dev-banner) #version-status {
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+  flex: 1;
 }
 
 .admin-emoji-shortcode {

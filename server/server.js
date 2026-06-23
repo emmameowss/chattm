@@ -1364,8 +1364,12 @@ httpServer.on('request', async (req, res) => {
             res.end(JSON.stringify({ error: 'unauthorized' }))
             return
         }
+        const base = process.env.AWS_S3_PUBLIC_URL
+        const mpeItems = getPendingEmojisByEmail(mpeSession.email).map(r => ({
+            ...r, url: base ? `${base}/${r.s3_key}` : r.url
+        }))
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(getPendingEmojisByEmail(mpeSession.email)))
+        res.end(JSON.stringify(mpeItems))
         return
     }
 
@@ -1377,8 +1381,12 @@ httpServer.on('request', async (req, res) => {
             res.end(JSON.stringify({ error: 'forbidden' }))
             return
         }
+        const base = process.env.AWS_S3_PUBLIC_URL
+        const peItems = getPendingEmojis().map(r => ({
+            ...r, url: base ? `${base}/${r.s3_key}` : r.url
+        }))
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(getPendingEmojis()))
+        res.end(JSON.stringify(peItems))
         return
     }
 
