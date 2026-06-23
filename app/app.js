@@ -238,7 +238,7 @@ if (!session) {
         <a href="/login"><button><i class="ti ti-login-2"></i> login with Hack Club</button></a>
         ${guestsOff
             ? '<button disabled style="opacity:0.6;cursor:not-allowed"><i class="ti ti-user"></i> continue as guest</button>'
-            : '<button id="guest-btn"><i class="ti ti-user"></i> continue as guest</button><div id="guest-name-form" style="display:none;flex-direction:column;gap:8px;margin-top:4px"><input id="guest-name-input" type="text" placeholder="choose a username" maxlength="20" autocomplete="off"><p id="guest-name-error" style="display:none;color:var(--pink);margin:0;font-size:0.85em"></p><button id="guest-name-submit">enter chat</button></div>'}
+            : '<button id="guest-btn"><i class="ti ti-user"></i> continue as guest</button><div id="guest-name-form" style="display:none;flex-direction:column;gap:8px;margin-top:4px"><input id="guest-name-input" type="text" placeholder="choose a username" maxlength="20" autocomplete="new-password"><p id="guest-name-error" style="display:none;color:var(--pink);margin:0;font-size:0.85em"></p><button id="guest-name-submit">enter chat</button></div>'}
         ${kickedReason ? `<p style="color: var(--pink)">you've been kicked: ${kickedReason}</p>` : ''}
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
         ${guestsOff ? '<p style="color: var(--muted)">guest logins are currently disabled</p>' : ''}

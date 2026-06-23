@@ -941,6 +941,17 @@ body.login-page a button:hover {
   background: var(--pink-dim);
 }
 
+#guest-btn {
+  border-color: var(--pink);
+  color: var(--pink);
+  opacity: 0.7;
+}
+
+#guest-btn:hover {
+  background: var(--pink-dim);
+  opacity: 1;
+}
+
 #command-suggestion {
   font-size: 12px;
   color: var(--muted);
