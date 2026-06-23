@@ -185,10 +185,11 @@ const stmts = {
   removeCustomEmoji: db.prepare(`DELETE FROM custom_emoji WHERE shortcode = ?`),
 
   // Pending emoji suggestions
-  addPendingEmoji: db.prepare(`INSERT INTO pending_emojis (id, shortcode, s3_key, url, submitter_email, submitter_username, notes, submitted_at) VALUES (@id, @shortcode, @s3_key, @url, @submitter_email, @submitter_username, @notes, @submitted_at)`),
+  addPendingEmoji: db.prepare(`INSERT INTO pending_emojis (id, shortcode, s3_key, url, submitter_email, submitter_username, notes, submitted_at, status, review_reason) VALUES (@id, @shortcode, @s3_key, @url, @submitter_email, @submitter_username, @notes, @submitted_at, @status, @review_reason)`),
   getPendingEmojis: db.prepare(`SELECT * FROM pending_emojis ORDER BY submitted_at ASC`),
   getPendingEmojisByEmail: db.prepare(`SELECT * FROM pending_emojis WHERE submitter_email = ? ORDER BY submitted_at ASC`),
   getPendingEmojiById: db.prepare(`SELECT * FROM pending_emojis WHERE id = ?`),
+  getPendingEmojiByShortcode: db.prepare(`SELECT id FROM pending_emojis WHERE shortcode = ? AND status = 'pending' LIMIT 1`),
   updatePendingEmoji: db.prepare(`UPDATE pending_emojis SET status = @status, s3_key = @s3_key, url = @url, review_reason = @review_reason WHERE id = @id`),
   deletePendingEmoji: db.prepare(`DELETE FROM pending_emojis WHERE id = ?`),
 
@@ -251,21 +252,7 @@ export function getAllHistory() {
 }
 
 export function getHistory() {
-  return stmts.getMessages.all().map(row => ({
-    id: row.id,
-    username: row.username,
-    text: row.text,
-    image: row.image,
-    ownerEmail: row.owner_email,
-    time: row.time,
-    isToken: !!row.is_token,
-    isGuest: !!row.is_guest,
-    color: row.color,
-    system: !!row.system,
-    mentions: JSON.parse(row.mentions || '[]'),
-    avatar: row.avatar_url ?? null,
-    verified: !!row.is_verified,
-  }))
+  return stmts.getMessages.all().map(mapMessageRow)
 }
 
 export function addMessage(msg) {
@@ -490,8 +477,16 @@ export function removeCustomEmoji(shortcode) {
 
 // ─── Pending Emoji API ───────────────────────────────────────────────────────
 
+export function getPendingEmojiByShortcode(shortcode) {
+  return stmts.getPendingEmojiByShortcode.get(shortcode) ?? null
+}
+
 export function addPendingEmoji(data) {
-  stmts.addPendingEmoji.run(data)
+  stmts.addPendingEmoji.run({
+    status: 'pending',
+    review_reason: null,
+    ...data,
+  })
 }
 
 export function getPendingEmojis() {

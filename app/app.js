@@ -878,12 +878,15 @@ function closeEmojiSuggest() {
     emojiSuggestError.textContent = ''
 }
 
+let emojiSuggestBlobUrl = null
 emojiSuggestFile.addEventListener('change', () => {
     const file = emojiSuggestFile.files[0]
     if (!file) return
     emojiSuggestFileText.textContent = file.name
+    if (emojiSuggestBlobUrl) URL.revokeObjectURL(emojiSuggestBlobUrl)
+    emojiSuggestBlobUrl = URL.createObjectURL(file)
     const img = document.createElement('img')
-    img.src = URL.createObjectURL(file)
+    img.src = emojiSuggestBlobUrl
     emojiSuggestPreview.innerHTML = ''
     emojiSuggestPreview.appendChild(img)
 })
@@ -953,6 +956,7 @@ async function loadMyPendingEmojis() {
     myEmojiList.innerHTML = '<div class="my-emoji-empty">loading...</div>'
     try {
         const res = await fetch(`/my-pending-emojis?session=${encodeURIComponent(session || '')}`)
+        if (!res.ok) throw new Error(await res.text())
         const items = await res.json()
         myEmojiList.innerHTML = ''
         if (!items.length) {
@@ -1047,8 +1051,7 @@ document.querySelector('#my-emoji-add-btn').addEventListener('click', () => {
 })
 
 document.addEventListener('click', (e) => {
-    const addBtn = document.querySelector('#emoji-suggest-open-btn')
-    if (!myEmojiPanel.contains(e.target) && e.target !== addBtn) {
+    if (!myEmojiPanel.contains(e.target) && e.target.id !== 'emoji-suggest-open-btn') {
         closeMyEmojiPanel()
     }
 })
@@ -1921,6 +1924,7 @@ function setAdminTab(tab) {
     } else if (tab === 'emoji') {
         adminEmojiList.style.display = 'flex'
         adminTabEmoji.classList.add('active')
+        pendingEmojisDirty = true
         renderPendingEmojis()
     }
 }
@@ -1954,7 +1958,11 @@ function makeAdminEmojiRow(item) {
     return row
 }
 
+let pendingEmojisDirty = true
+
 async function renderPendingEmojis() {
+    if (!pendingEmojisDirty) return
+    pendingEmojisDirty = false
     adminEmojiList.innerHTML = '<div class="admin-emoji-loading">loading...</div>'
     try {
         const res = await fetch(`/pending-emojis?session=${encodeURIComponent(session || '')}`)
@@ -1996,7 +2004,7 @@ function showPendingEmojiDetail(item) {
     backBtn.addEventListener('click', () => {
         adminEmojiDetail.style.display = 'none'
         adminEmojiList.style.display = 'flex'
-        renderPendingEmojis()
+        if (pendingEmojisDirty) renderPendingEmojis()
     })
     adminEmojiDetail.appendChild(backBtn)
 
@@ -2064,6 +2072,7 @@ function showPendingEmojiDetail(item) {
                     body: JSON.stringify({ id: item.id, session, reason: reasonInput.value.trim() || null })
                 })
                 if (res.ok) {
+                    pendingEmojisDirty = true
                     adminEmojiDetail.style.display = 'none'
                     adminEmojiList.style.display = 'flex'
                     renderPendingEmojis()
@@ -2085,6 +2094,7 @@ function showPendingEmojiDetail(item) {
                     body: JSON.stringify({ id: item.id, session, reason: reasonInput.value.trim() || null })
                 })
                 if (res.ok) {
+                    pendingEmojisDirty = true
                     adminEmojiDetail.style.display = 'none'
                     adminEmojiList.style.display = 'flex'
                     renderPendingEmojis()

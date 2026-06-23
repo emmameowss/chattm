@@ -28,7 +28,7 @@ import {
     isVerified, setVerified, removeVerified,
     getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats,
     getAllHistory,
-    addPendingEmoji, getPendingEmojis, getPendingEmojisByEmail, getPendingEmojiById, updatePendingEmoji, deletePendingEmoji
+    addPendingEmoji, getPendingEmojis, getPendingEmojisByEmail, getPendingEmojiById, getPendingEmojiByShortcode, updatePendingEmoji, deletePendingEmoji
 } from './db.js'
 
 const httpServer = createServer()
@@ -136,6 +136,7 @@ let versionCacheTime = 0
 let statsCache = null
 let statsCacheTime = 0
 let statsFetchPromise = null
+let messagesCache = null
 
 const types = {
     '.html': 'text/html',
@@ -1278,17 +1279,17 @@ httpServer.on('request', async (req, res) => {
 
     if (url.pathname === '/suggest-emoji') {
         if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
-        const suggestIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
-        if (!checkRateLimit(suggestIp, 'suggest-emoji', 5, 60 * 60 * 1000)) {
-            res.writeHead(429, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({ error: 'rate limited - max 5 suggestions per hour' }))
-            return
-        }
         const suggestSessionId = url.searchParams.get('session')
         const suggestSession = suggestSessionId ? getSession(suggestSessionId) : null
         if (!suggestSession || suggestSession.guest) {
             res.writeHead(401, { 'content-type': 'application/json' })
             res.end(JSON.stringify({ error: 'must be logged in to suggest emojis' }))
+            return
+        }
+        const suggestIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        if (!checkRateLimit(suggestIp, 'suggest-emoji', 5, 60 * 60 * 1000)) {
+            res.writeHead(429, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'rate limited - max 5 suggestions per hour' }))
             return
         }
         const form = formidable({ maxFileSize: 2 * 1024 * 1024 })
@@ -1308,7 +1309,7 @@ httpServer.on('request', async (req, res) => {
                     return
                 }
                 const existing = getCustomEmoji()
-                if (existing[shortcode]) {
+                if (existing[shortcode] || getPendingEmojiByShortcode(shortcode)) {
                     res.writeHead(409, { 'content-type': 'application/json' })
                     res.end(JSON.stringify({ error: 'that shortcode is already in use' }))
                     return
@@ -1341,25 +1342,19 @@ httpServer.on('request', async (req, res) => {
                 const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${s3Key}`
                 const id = randomUUID()
                 const now = Date.now()
+                const pendingRow = {
+                    id, shortcode, s3_key: s3Key, url: publicUrl,
+                    submitter_email: suggestSession.email,
+                    submitter_username: submitterUsername || null,
+                    notes: notes || null,
+                    submitted_at: now,
+                }
                 if (isOwnerSubmit) {
                     addCustomEmoji(shortcode, publicUrl)
-                    addPendingEmoji({
-                        id, shortcode, s3_key: s3Key, url: publicUrl,
-                        submitter_email: suggestSession.email,
-                        submitter_username: submitterUsername || null,
-                        notes: notes || null,
-                        submitted_at: now
-                    })
-                    updatePendingEmoji(id, 'accepted', s3Key, publicUrl, 'auto-approved')
+                    addPendingEmoji({ ...pendingRow, status: 'accepted', review_reason: 'auto-approved' })
                     io.emit('emojiUpdate', getCustomEmoji())
                 } else {
-                    addPendingEmoji({
-                        id, shortcode, s3_key: s3Key, url: publicUrl,
-                        submitter_email: suggestSession.email,
-                        submitter_username: submitterUsername || null,
-                        notes: notes || null,
-                        submitted_at: now
-                    })
+                    addPendingEmoji(pendingRow)
                 }
                 res.writeHead(200, { 'content-type': 'application/json' })
                 res.end(JSON.stringify({ ok: true, autoApproved: isOwnerSubmit }))
@@ -1505,11 +1500,15 @@ httpServer.on('request', async (req, res) => {
             res.end(JSON.stringify({ error: 'rate limited' }))
             return
         }
-        const messages = getAllHistory()
-            .filter(m => !m.system)
-            .map(({ ownerEmail, isToken, isGuest, system, mentions, verified, ...m }) => m)
+        const now2 = Date.now()
+        if (!messagesCache || now2 - messagesCache.at > 5000) {
+            const all = getAllHistory()
+                .filter(m => !m.system)
+                .map(({ ownerEmail, isToken, isGuest, system, mentions, verified, ...m }) => m)
+            messagesCache = { at: now2, body: JSON.stringify({ messages: all }) }
+        }
         res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' })
-        res.end(JSON.stringify({ messages }))
+        res.end(messagesCache.body)
         return
     }
 
