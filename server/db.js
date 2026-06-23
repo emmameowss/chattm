@@ -183,6 +183,7 @@ const stmts = {
   // Pending emoji suggestions
   addPendingEmoji: db.prepare(`INSERT INTO pending_emojis (id, shortcode, s3_key, url, submitter_email, submitter_username, notes, submitted_at) VALUES (@id, @shortcode, @s3_key, @url, @submitter_email, @submitter_username, @notes, @submitted_at)`),
   getPendingEmojis: db.prepare(`SELECT * FROM pending_emojis ORDER BY submitted_at ASC`),
+  getPendingEmojisByEmail: db.prepare(`SELECT * FROM pending_emojis WHERE submitter_email = ? ORDER BY submitted_at ASC`),
   getPendingEmojiById: db.prepare(`SELECT * FROM pending_emojis WHERE id = ?`),
   deletePendingEmoji: db.prepare(`DELETE FROM pending_emojis WHERE id = ?`),
 
@@ -490,6 +491,10 @@ export function addPendingEmoji(data) {
 
 export function getPendingEmojis() {
   return stmts.getPendingEmojis.all()
+}
+
+export function getPendingEmojisByEmail(email) {
+  return stmts.getPendingEmojisByEmail.all(email)
 }
 
 export function getPendingEmojiById(id) {

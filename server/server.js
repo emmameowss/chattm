@@ -28,7 +28,7 @@ import {
     isVerified, setVerified, removeVerified,
     getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats,
     getAllHistory,
-    addPendingEmoji, getPendingEmojis, getPendingEmojiById, deletePendingEmoji
+    addPendingEmoji, getPendingEmojis, getPendingEmojisByEmail, getPendingEmojiById, deletePendingEmoji
 } from './db.js'
 
 const httpServer = createServer()
@@ -283,7 +283,7 @@ function emitUserList() {
     const onlineEmails = new Set()
     const users = []
 
-    // online users: use data already cached on the socket — zero DB reads
+    // online users: use data already cached on the socket - zero DB reads
     for (const [id, s] of io.sockets.sockets) {
         if (!s.username) continue
         onlineEmails.add(s.userEmail)
@@ -300,7 +300,7 @@ function emitUserList() {
         })
     }
 
-    // offline users: single JOIN query — all fields in one SELECT
+    // offline users: single JOIN query - all fields in one SELECT
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
     for (const row of getRecentUsers(cutoff)) {
         if (onlineEmails.has(row.email)) continue
@@ -542,7 +542,7 @@ io.on('connection', socket => {
                     addBan(socket.userEmail, banReason)
                     addIpBan(socket.userIP)
                     await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${socket.userIP}\n`)
-                    await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) auto-banned, 5th strike triggered by "${hit}" — message: ${data.text}\n`)
+                    await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) auto-banned, 5th strike triggered by "${hit}" - message: ${data.text}\n`)
                     socket.emit('banned', banReason)
                     socket.skipLeaveMessage = true
                     socket.disconnect()
@@ -1280,7 +1280,7 @@ httpServer.on('request', async (req, res) => {
         const suggestIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
         if (!checkRateLimit(suggestIp, 'suggest-emoji', 5, 60 * 60 * 1000)) {
             res.writeHead(429, { 'content-type': 'application/json' })
-            res.end(JSON.stringify({ error: 'rate limited — max 5 suggestions per hour' }))
+            res.end(JSON.stringify({ error: 'rate limited - max 5 suggestions per hour' }))
             return
         }
         const suggestSessionId = url.searchParams.get('session')
@@ -1303,7 +1303,7 @@ httpServer.on('request', async (req, res) => {
                 const submitterUsername = (fields.username?.[0] ?? '').trim()
                 if (!/^:[a-z0-9_-]+:$/.test(shortcode)) {
                     res.writeHead(400, { 'content-type': 'application/json' })
-                    res.end(JSON.stringify({ error: 'invalid shortcode — use format :name: with lowercase letters, numbers, - or _' }))
+                    res.end(JSON.stringify({ error: 'invalid shortcode - use format :name: with lowercase letters, numbers, - or _' }))
                     return
                 }
                 const existing = getCustomEmoji()
@@ -1353,6 +1353,19 @@ httpServer.on('request', async (req, res) => {
                 res.end(JSON.stringify({ error: e.message }))
             }
         })
+        return
+    }
+
+    if (url.pathname === '/my-pending-emojis') {
+        const mpeSessionId = url.searchParams.get('session')
+        const mpeSession = mpeSessionId ? getSession(mpeSessionId) : null
+        if (!mpeSession) {
+            res.writeHead(401, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'unauthorized' }))
+            return
+        }
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify(getPendingEmojisByEmail(mpeSession.email)))
         return
     }
 

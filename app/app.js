@@ -788,9 +788,10 @@ function renderEmojiPicker() {
     suggestBtn.title = 'suggest an emoji'
     suggestBtn.textContent = '+'
     suggestBtn.id = 'emoji-suggest-open-btn'
-    suggestBtn.addEventListener('click', () => {
+    suggestBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
         emojiPicker.style.display = 'none'
-        openEmojiSuggest()
+        openMyEmojiPanel()
     })
     emojiPicker.appendChild(suggestBtn)
     const entries = Object.entries(customEmoji)
@@ -799,7 +800,7 @@ function renderEmojiPicker() {
         btn.type = 'button'
         btn.title = shortcode
         const img = document.createElement('img')
-        img.dataset.src = url  // lazy — only load when picker opens
+        img.dataset.src = url  // lazy - only load when picker opens
         btn.appendChild(img)
         btn.addEventListener('click', () => {
             const input = document.querySelector('#message-input')
@@ -908,11 +909,125 @@ document.querySelector('#emoji-suggest-submit').addEventListener('click', async 
         closeEmojiSuggest()
         showStatus('emoji suggestion submitted', 'pink')
         setTimeout(hideStatus, 2000)
+        if (document.querySelector('#my-emoji-panel').style.display !== 'none') loadMyPendingEmojis()
     } catch (e) {
-        emojiSuggestError.textContent = 'network error — please try again'
+        emojiSuggestError.textContent = 'network error - please try again'
     } finally {
         btn.disabled = false
         btn.textContent = 'submit'
+    }
+})
+
+// my emoji panel
+const myEmojiPanel = document.querySelector('#my-emoji-panel')
+const myEmojiList = document.querySelector('#my-emoji-list')
+const myEmojiDetail = document.querySelector('#my-emoji-detail')
+
+function openMyEmojiPanel() {
+    myEmojiDetail.style.display = 'none'
+    myEmojiList.style.display = 'flex'
+    myEmojiPanel.style.display = 'flex'
+    loadMyPendingEmojis()
+}
+
+function closeMyEmojiPanel() {
+    myEmojiPanel.style.display = 'none'
+    myEmojiDetail.style.display = 'none'
+    myEmojiList.style.display = 'flex'
+}
+
+async function loadMyPendingEmojis() {
+    myEmojiList.innerHTML = '<div class="my-emoji-empty">loading...</div>'
+    try {
+        const res = await fetch(`/my-pending-emojis?session=${encodeURIComponent(session || '')}`)
+        const items = await res.json()
+        myEmojiList.innerHTML = ''
+        if (!items.length) {
+            myEmojiList.innerHTML = '<div class="my-emoji-empty">no pending suggestions</div>'
+            return
+        }
+        for (const item of items) {
+            const row = document.createElement('div')
+            row.className = 'my-emoji-row'
+            const img = document.createElement('img')
+            img.src = item.url
+            img.className = 'my-emoji-thumb'
+            row.appendChild(img)
+            const info = document.createElement('div')
+            info.className = 'my-emoji-info'
+            const sc = document.createElement('span')
+            sc.className = 'my-emoji-shortcode'
+            sc.textContent = item.shortcode
+            info.appendChild(sc)
+            const ts = document.createElement('span')
+            ts.className = 'my-emoji-date'
+            ts.textContent = new Date(item.submitted_at).toLocaleDateString()
+            info.appendChild(ts)
+            row.appendChild(info)
+            const badge = document.createElement('span')
+            badge.className = 'my-emoji-status'
+            badge.textContent = 'pending'
+            row.appendChild(badge)
+            row.addEventListener('click', () => showMyEmojiDetail(item))
+            myEmojiList.appendChild(row)
+        }
+    } catch {
+        myEmojiList.innerHTML = '<div class="my-emoji-empty">failed to load</div>'
+    }
+}
+
+function showMyEmojiDetail(item) {
+    myEmojiList.style.display = 'none'
+    myEmojiDetail.style.display = 'flex'
+    myEmojiDetail.innerHTML = ''
+
+    const backBtn = document.createElement('button')
+    backBtn.type = 'button'
+    backBtn.className = 'my-emoji-back'
+    backBtn.textContent = '← back'
+    backBtn.addEventListener('click', () => {
+        myEmojiDetail.style.display = 'none'
+        myEmojiList.style.display = 'flex'
+    })
+    myEmojiDetail.appendChild(backBtn)
+
+    const img = document.createElement('img')
+    img.src = item.url
+    img.className = 'my-emoji-detail-img'
+    myEmojiDetail.appendChild(img)
+
+    const sc = document.createElement('div')
+    sc.className = 'my-emoji-detail-shortcode'
+    sc.textContent = item.shortcode
+    myEmojiDetail.appendChild(sc)
+
+    const ts = document.createElement('div')
+    ts.className = 'my-emoji-detail-meta'
+    ts.textContent = `submitted ${new Date(item.submitted_at).toLocaleString()}`
+    myEmojiDetail.appendChild(ts)
+
+    if (item.notes) {
+        const notes = document.createElement('div')
+        notes.className = 'my-emoji-detail-notes'
+        notes.textContent = item.notes
+        myEmojiDetail.appendChild(notes)
+    }
+
+    const statusEl = document.createElement('div')
+    statusEl.className = 'my-emoji-detail-status'
+    statusEl.textContent = 'status: pending review'
+    myEmojiDetail.appendChild(statusEl)
+}
+
+document.querySelector('#my-emoji-add-btn').addEventListener('click', () => {
+    closeMyEmojiPanel()
+    openEmojiSuggest()
+})
+
+document.addEventListener('click', (e) => {
+    const addBtn = document.querySelector('#emoji-suggest-open-btn')
+    if (!myEmojiPanel.contains(e.target) && e.target !== addBtn) {
+        closeMyEmojiPanel()
     }
 })
 
@@ -1094,7 +1209,7 @@ document.addEventListener('visibilitychange', () => {
     }
 })
 
-let lastMsgMeta = null  // { username, time } — for message grouping
+let lastMsgMeta = null  // { username, time } - for message grouping
 
 function makeBadge(src, size, tooltip) {
     const wrap = document.createElement('span')
@@ -1722,7 +1837,7 @@ function renderAdminUsers() {
         if (!arr.length) return
         const header = document.createElement('div')
         header.className = 'admin-user-section'
-        header.textContent = `${label} — ${arr.length}`
+        header.textContent = `${label} - ${arr.length}`
         adminUsersList.appendChild(header)
         for (const u of arr) {
             const row = document.createElement('div')
