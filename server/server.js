@@ -373,7 +373,8 @@ io.on('connection', socket => {
     }
 
     if (socket.userEmail.endsWith('@guest')) {
-        const guestUsername = socket.userEmail.replace('@guest', '')
+        const saved = getStoredUsername(socket.userEmail)
+        const guestUsername = saved || socket.userEmail.replace('@guest', '')
         socket.username = guestUsername
         socket.emit('savedUsername', guestUsername)
         emitUserList()
@@ -1187,16 +1188,19 @@ httpServer.on('request', async (req, res) => {
             return
         }
         const guestId = randomBytes(3).toString('hex')
+        const guestEmail = `guest-${guestId}@guest`
         const today = new Date().toISOString().slice(0,10)
         const sessionid = randomBytes(32).toString('hex')
         const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
         await appendFile('login.log', `${new Date().toISOString()}: guest-${guestId} signed in from ${ip}\n`)
         saveSession(sessionid, {
-            email: `guest-${guestId}@guest`,
+            email: guestEmail,
             guest: true,
             expires: today,
             ip
         })
+        const rawUsername = url.searchParams.get('username')
+        if (rawUsername && isValidUsername(rawUsername)) saveUsername(guestEmail, rawUsername)
         const redirectUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/#session=${sessionid}`
         res.writeHead(302, {Location: redirectUrl})
         res.end()

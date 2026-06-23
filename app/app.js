@@ -238,7 +238,7 @@ if (!session) {
         <a href="/login"><button><i class="ti ti-login-2"></i> login with Hack Club</button></a>
         ${guestsOff
             ? '<button disabled style="opacity:0.6;cursor:not-allowed"><i class="ti ti-user"></i> continue as guest</button>'
-            : '<a href="/guest"><button><i class="ti ti-user"></i> continue as guest</button></a>'}
+            : '<button id="guest-btn"><i class="ti ti-user"></i> continue as guest</button><div id="guest-name-form" style="display:none;flex-direction:column;gap:8px;margin-top:4px"><input id="guest-name-input" type="text" placeholder="choose a username" maxlength="20" autocomplete="off"><p id="guest-name-error" style="display:none;color:var(--pink);margin:0;font-size:0.85em"></p><button id="guest-name-submit">enter chat</button></div>'}
         ${kickedReason ? `<p style="color: var(--pink)">you've been kicked: ${kickedReason}</p>` : ''}
         ${sessionStorage.getItem('authDenied') ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ''}
         ${guestsOff ? '<p style="color: var(--muted)">guest logins are currently disabled</p>' : ''}
@@ -248,6 +248,30 @@ if (!session) {
     sessionStorage.removeItem('kickedReason')
     sessionStorage.removeItem('authDenied')
     sessionStorage.removeItem('rateLimited')
+    if (!guestsOff) {
+        const guestBtn = document.getElementById('guest-btn')
+        const guestForm = document.getElementById('guest-name-form')
+        const guestInput = document.getElementById('guest-name-input')
+        const guestError = document.getElementById('guest-name-error')
+        guestBtn.addEventListener('click', () => {
+            guestBtn.style.display = 'none'
+            guestForm.style.display = 'flex'
+            guestInput.focus()
+        })
+        function submitGuestName() {
+            const name = guestInput.value.trim()
+            if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
+                guestError.textContent = name ? 'username can only contain letters, numbers, and hyphens (max 20 chars)' : 'please enter a username'
+                guestError.style.display = 'block'
+                guestInput.focus()
+                return
+            }
+            guestError.style.display = 'none'
+            window.location.href = '/guest?username=' + encodeURIComponent(name)
+        }
+        document.getElementById('guest-name-submit').addEventListener('click', submitGuestName)
+        guestInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitGuestName() })
+    }
     throw new Error('not authenticated')
 }
 
