@@ -1326,7 +1326,10 @@ httpServer.on('request', async (req, res) => {
                 }
                 const fileBuffer = await readFile(file.filepath)
                 const ext = extname(file.originalFilename || '') || '.png'
-                const s3Key = `pending_emojis/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
+                const isOwnerSubmit = suggestSession.email === process.env.OWNER_EMAIL
+                const s3Key = isOwnerSubmit
+                    ? `emojis/${shortcode.replace(/:/g, '')}${ext}`
+                    : `pending_emojis/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
                 await s3.send(new PutObjectCommand({
                     Bucket: process.env.AWS_S3_BUCKET,
                     Key: s3Key,
@@ -1335,18 +1338,30 @@ httpServer.on('request', async (req, res) => {
                     ACL: 'public-read'
                 }))
                 const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${s3Key}`
-                addPendingEmoji({
-                    id: randomUUID(),
-                    shortcode,
-                    s3_key: s3Key,
-                    url: publicUrl,
-                    submitter_email: suggestSession.email,
-                    submitter_username: submitterUsername || null,
-                    notes: notes || null,
-                    submitted_at: Date.now()
-                })
+                const id = randomUUID()
+                const now = Date.now()
+                if (isOwnerSubmit) {
+                    addCustomEmoji(shortcode, publicUrl)
+                    addPendingEmoji({
+                        id, shortcode, s3_key: s3Key, url: publicUrl,
+                        submitter_email: suggestSession.email,
+                        submitter_username: submitterUsername || null,
+                        notes: notes || null,
+                        submitted_at: now
+                    })
+                    updatePendingEmoji(id, 'accepted', s3Key, publicUrl, 'auto-approved')
+                    io.emit('emojiUpdate', getCustomEmoji())
+                } else {
+                    addPendingEmoji({
+                        id, shortcode, s3_key: s3Key, url: publicUrl,
+                        submitter_email: suggestSession.email,
+                        submitter_username: submitterUsername || null,
+                        notes: notes || null,
+                        submitted_at: now
+                    })
+                }
                 res.writeHead(200, { 'content-type': 'application/json' })
-                res.end(JSON.stringify({ ok: true }))
+                res.end(JSON.stringify({ ok: true, autoApproved: isOwnerSubmit }))
             } catch (e) {
                 console.error('suggest-emoji error:', e)
                 res.writeHead(500, { 'content-type': 'application/json' })

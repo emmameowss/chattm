@@ -907,7 +907,7 @@ document.querySelector('#emoji-suggest-submit').addEventListener('click', async 
             return
         }
         closeEmojiSuggest()
-        showStatus('emoji suggestion submitted', 'pink')
+        showStatus(json.autoApproved ? 'emoji added!' : 'emoji suggestion submitted', 'pink')
         setTimeout(hideStatus, 2000)
         if (document.querySelector('#my-emoji-panel').style.display !== 'none') loadMyPendingEmojis()
     } catch (e) {
