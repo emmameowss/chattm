@@ -1273,6 +1273,21 @@ httpServer.on('request', async (req, res) => {
         return
     }
 
+    if (url.pathname === '/messages') {
+        const messagesIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        if (!checkRateLimit(messagesIp, 'messages', 10, 60 * 1000)) {
+            res.writeHead(429, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'rate limited' }))
+            return
+        }
+        const messages = getHistory()
+            .filter(m => !m.system)
+            .map(({ ownerEmail, isToken, isGuest, system, mentions, verified, ...m }) => m)
+        res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' })
+        res.end(JSON.stringify({ messages }))
+        return
+    }
+
     if (url.pathname === '/privacy') {
         const content = await readFile('../app/privacy.html') // privacy.html is not included in this repo or project in general as it's mostly ai generated so it's not fair to include it in both this project or time stats
         res.writeHead(200, {"content-type": 'text/html'})
