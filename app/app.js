@@ -289,18 +289,41 @@ if (!session) {
     throw new Error('not authenticated')
 }
 
-if (session) {
-    /* not needed anymore
-    if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        showStatus('ui not optimised for mobile', 'pink')
-    }
-        */
-    if (sessionStorage.getItem('newlogin')) {
-        sessionStorage.removeItem('newlogin')
-        showStatus("welcome to chat™, set your username above if you haven't", 'pink')
-        setTimeout(hideStatus, 3000)
-    }
+function showUsernameSetupPanel() {
+    return new Promise((resolve) => {
+        const backdrop = document.querySelector('#username-setup-backdrop')
+        const panel = document.querySelector('#username-setup-panel')
+        const input = document.querySelector('#username-setup-input')
+        const error = document.querySelector('#username-setup-error')
+        backdrop.style.display = 'block'
+        panel.style.display = 'flex'
+        input.focus()
+        function trySubmit() {
+            const name = input.value.trim()
+            if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
+                error.textContent = name ? 'only letters, numbers, and hyphens (max 20 chars)' : 'please enter a username'
+                error.style.display = 'block'
+                input.focus()
+                return
+            }
+            backdrop.style.display = 'none'
+            panel.style.display = 'none'
+            resolve(name)
+        }
+        document.querySelector('#username-setup-submit').addEventListener('click', trySubmit)
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') trySubmit() })
+    })
+}
 
+if (session) {
+    sessionStorage.removeItem('newlogin')
+
+    let chosenUsername = null
+    try {
+        const me = await fetch(`/me?session=${encodeURIComponent(session)}`).then(r => r.json())
+        if (!me.guest && !me.username) chosenUsername = await showUsernameSetupPanel()
+    } catch {}
+    if (chosenUsername) username = chosenUsername
 
 const socket = io(
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'

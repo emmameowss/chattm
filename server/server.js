@@ -1067,6 +1067,15 @@ httpServer.on('request', async (req, res) => {
         return
     }
 
+    if (url.pathname === '/me') {
+        const sessionId = url.searchParams.get('session')
+        const s = getSession(sessionId)
+        if (!s) { res.writeHead(401); res.end('{}'); return }
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ username: getStoredUsername(s.email) ?? null, guest: !!s.guest }))
+        return
+    }
+
     if (url.pathname === '/signout') {
         const sessionId = url.searchParams.get('session')
         if (sessionId) {
