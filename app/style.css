@@ -460,6 +460,8 @@ button:active {
   border-radius: var(--radius);
   padding: 24px;
   width: 300px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
@@ -537,8 +539,6 @@ button:active {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 360px;
-  overflow-y: auto;
 }
 
 .admin-user-section {
@@ -1568,8 +1568,6 @@ body:has(#dev-banner) #version-status {
 #admin-emoji-detail {
   flex-direction: column;
   gap: 10px;
-  max-height: 400px;
-  overflow-y: auto;
 }
 
 .admin-emoji-back {
