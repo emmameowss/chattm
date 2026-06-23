@@ -1139,16 +1139,35 @@ function openMessageContextMenu(li, messageId) {
 
 document.addEventListener('click', (e) => {
     const ctxMenu = document.querySelector('#message-context-menu')
-    if (!ctxMenu.contains(e.target)) {
-        ctxMenu.classList.remove('open')
-    }
+    if (!ctxMenu.contains(e.target)) ctxMenu.classList.remove('open')
+    const adminCtxMenu = document.querySelector('#admin-user-context-menu')
+    if (!adminCtxMenu.contains(e.target)) adminCtxMenu.classList.remove('open')
 })
 
 document.addEventListener('contextmenu', (e) => {
-    if (!e.target.closest('li')) {
-        document.querySelector('#message-context-menu').classList.remove('open')
-    }
+    if (!e.target.closest('li')) document.querySelector('#message-context-menu').classList.remove('open')
+    if (!e.target.closest('.admin-user-row')) document.querySelector('#admin-user-context-menu').classList.remove('open')
 })
+
+function openAdminUserContextMenu(e, u) {
+    e.preventDefault()
+    const menu = document.querySelector('#admin-user-context-menu')
+    const verifyBtn = document.querySelector('#ctx-verify-btn')
+    const unverifyBtn = document.querySelector('#ctx-unverify-btn')
+    verifyBtn.style.display = u.verified ? 'none' : ''
+    unverifyBtn.style.display = u.verified ? '' : 'none'
+    verifyBtn.onclick = () => {
+        socket.emit('message', {text: `/verify ${u.email}`})
+        menu.classList.remove('open')
+    }
+    unverifyBtn.onclick = () => {
+        socket.emit('message', {text: `/unverify ${u.email}`})
+        menu.classList.remove('open')
+    }
+    menu.style.left = `${Math.min(e.clientX, window.innerWidth - 180)}px`
+    menu.style.top = `${Math.min(e.clientY, window.innerHeight - 80)}px`
+    menu.classList.add('open')
+}
 
 socket.on('messageDeleted', (messageId) => {
     const li = document.querySelector(`li[data-id="${messageId}"]`)
@@ -1651,6 +1670,7 @@ function renderAdminUsers() {
             info.appendChild(emailEl)
             row.appendChild(info)
             row.addEventListener('click', () => { closeAdmin(); openProfile(u.username) })
+            row.addEventListener('contextmenu', (e) => openAdminUserContextMenu(e, u))
             adminUsersList.appendChild(row)
         }
     }

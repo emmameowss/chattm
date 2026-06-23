@@ -1372,7 +1372,8 @@ body:has(#dev-banner) #version-status {
   color: var(--pink);
 }
 
-#message-context-menu {
+#message-context-menu,
+#admin-user-context-menu {
   display: none;
   position: fixed;
   background: var(--surface);
@@ -1382,15 +1383,17 @@ body:has(#dev-banner) #version-status {
   padding: 6px;
   gap: 4px;
   min-width: 160px;
-  z-index: 300;
+  z-index: 1100;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 
-#message-context-menu.open {
+#message-context-menu.open,
+#admin-user-context-menu.open {
   display: flex;
 }
 
-#message-context-menu button {
+#message-context-menu button,
+#admin-user-context-menu button {
   width: 100%;
   justify-content: flex-start;
   text-align: left;
