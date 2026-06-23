@@ -1020,6 +1020,12 @@ function showMyEmojiDetail(item) {
     statusEl.className = `my-emoji-detail-status my-emoji-detail-status-${status}`
     statusEl.textContent = `status: ${statusLabels[status] ?? status}`
     myEmojiDetail.appendChild(statusEl)
+    if (item.review_reason) {
+        const reasonEl = document.createElement('div')
+        reasonEl.className = 'my-emoji-detail-reason'
+        reasonEl.textContent = `reason: ${item.review_reason}`
+        myEmojiDetail.appendChild(reasonEl)
+    }
 }
 
 document.querySelector('#my-emoji-add-btn').addEventListener('click', () => {
@@ -2015,7 +2021,19 @@ function showPendingEmojiDetail(item) {
         statusEl.className = `admin-emoji-detail-status my-emoji-status-${status}`
         statusEl.textContent = statusLabels[status] ?? status
         adminEmojiDetail.appendChild(statusEl)
+        if (item.review_reason) {
+            const reasonEl = document.createElement('div')
+            reasonEl.className = 'admin-emoji-detail-reason'
+            reasonEl.textContent = `reason: ${item.review_reason}`
+            adminEmojiDetail.appendChild(reasonEl)
+        }
     } else {
+        const reasonInput = document.createElement('textarea')
+        reasonInput.className = 'admin-emoji-reason-input'
+        reasonInput.placeholder = 'reason (optional)'
+        reasonInput.maxLength = 300
+        adminEmojiDetail.appendChild(reasonInput)
+
         const actions = document.createElement('div')
         actions.className = 'admin-emoji-detail-actions'
 
@@ -2030,7 +2048,7 @@ function showPendingEmojiDetail(item) {
                 const res = await fetch('/admin/emoji/deny', {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ id: item.id, session })
+                    body: JSON.stringify({ id: item.id, session, reason: reasonInput.value.trim() || null })
                 })
                 if (res.ok) {
                     adminEmojiDetail.style.display = 'none'
@@ -2051,7 +2069,7 @@ function showPendingEmojiDetail(item) {
                 const res = await fetch('/admin/emoji/accept', {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ id: item.id, session })
+                    body: JSON.stringify({ id: item.id, session, reason: reasonInput.value.trim() || null })
                 })
                 if (res.ok) {
                     adminEmojiDetail.style.display = 'none'

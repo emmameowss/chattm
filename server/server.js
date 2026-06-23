@@ -1396,7 +1396,7 @@ httpServer.on('request', async (req, res) => {
         req.on('data', d => { body += d })
         req.on('end', async () => {
             try {
-                const { id, session: bodySession } = JSON.parse(body)
+                const { id, session: bodySession, reason: acceptReason } = JSON.parse(body)
                 const sessionId = bodySession || url.searchParams.get('session')
                 const sess = sessionId ? getSession(sessionId) : null
                 if (!sess || sess.email !== process.env.OWNER_EMAIL) {
@@ -1424,7 +1424,7 @@ httpServer.on('request', async (req, res) => {
                 }))
                 const newUrl = `${process.env.AWS_S3_PUBLIC_URL}/${destKey}`
                 addCustomEmoji(pending.shortcode, newUrl)
-                updatePendingEmoji(id, 'accepted', destKey, newUrl)
+                updatePendingEmoji(id, 'accepted', destKey, newUrl, acceptReason || null)
                 io.emit('emojiUpdate', getCustomEmoji())
                 res.writeHead(200, { 'content-type': 'application/json' })
                 res.end(JSON.stringify({ ok: true }))
@@ -1443,7 +1443,7 @@ httpServer.on('request', async (req, res) => {
         req.on('data', d => { body += d })
         req.on('end', async () => {
             try {
-                const { id, session: bodySession } = JSON.parse(body)
+                const { id, session: bodySession, reason: denyReason } = JSON.parse(body)
                 const sessionId = bodySession || url.searchParams.get('session')
                 const sess = sessionId ? getSession(sessionId) : null
                 if (!sess || sess.email !== process.env.OWNER_EMAIL) {
@@ -1470,7 +1470,7 @@ httpServer.on('request', async (req, res) => {
                     Key: pending.s3_key
                 }))
                 const deniedUrl = `${process.env.AWS_S3_PUBLIC_URL}/${deniedKey}`
-                updatePendingEmoji(id, 'denied', deniedKey, deniedUrl)
+                updatePendingEmoji(id, 'denied', deniedKey, deniedUrl, denyReason || null)
                 res.writeHead(200, { 'content-type': 'application/json' })
                 res.end(JSON.stringify({ ok: true }))
             } catch (e) {

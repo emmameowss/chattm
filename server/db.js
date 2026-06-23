@@ -110,6 +110,7 @@ try { db.exec("ALTER TABLE profiles ADD COLUMN last_seen INTEGER") } catch {}
 
 // pending_emojis column migrations
 try { db.exec("ALTER TABLE pending_emojis ADD COLUMN status TEXT DEFAULT 'pending'") } catch {}
+try { db.exec("ALTER TABLE pending_emojis ADD COLUMN review_reason TEXT") } catch {}
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 
@@ -188,7 +189,7 @@ const stmts = {
   getPendingEmojis: db.prepare(`SELECT * FROM pending_emojis ORDER BY submitted_at ASC`),
   getPendingEmojisByEmail: db.prepare(`SELECT * FROM pending_emojis WHERE submitter_email = ? ORDER BY submitted_at ASC`),
   getPendingEmojiById: db.prepare(`SELECT * FROM pending_emojis WHERE id = ?`),
-  updatePendingEmoji: db.prepare(`UPDATE pending_emojis SET status = @status, s3_key = @s3_key, url = @url WHERE id = @id`),
+  updatePendingEmoji: db.prepare(`UPDATE pending_emojis SET status = @status, s3_key = @s3_key, url = @url, review_reason = @review_reason WHERE id = @id`),
   deletePendingEmoji: db.prepare(`DELETE FROM pending_emojis WHERE id = ?`),
 
   // Verified users
@@ -505,8 +506,8 @@ export function getPendingEmojiById(id) {
   return stmts.getPendingEmojiById.get(id) ?? null
 }
 
-export function updatePendingEmoji(id, status, s3Key, url) {
-  stmts.updatePendingEmoji.run({ id, status, s3_key: s3Key, url })
+export function updatePendingEmoji(id, status, s3Key, url, reviewReason) {
+  stmts.updatePendingEmoji.run({ id, status, s3_key: s3Key, url, review_reason: reviewReason ?? null })
 }
 
 export function deletePendingEmoji(id) {
