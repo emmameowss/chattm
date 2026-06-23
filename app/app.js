@@ -943,10 +943,11 @@ async function loadMyPendingEmojis() {
         const items = await res.json()
         myEmojiList.innerHTML = ''
         if (!items.length) {
-            myEmojiList.innerHTML = '<div class="my-emoji-empty">no pending suggestions</div>'
+            myEmojiList.innerHTML = '<div class="my-emoji-empty">no suggestions yet</div>'
             return
         }
         for (const item of items) {
+            const status = item.status || 'pending'
             const row = document.createElement('div')
             row.className = 'my-emoji-row'
             const img = document.createElement('img')
@@ -965,8 +966,8 @@ async function loadMyPendingEmojis() {
             info.appendChild(ts)
             row.appendChild(info)
             const badge = document.createElement('span')
-            badge.className = 'my-emoji-status'
-            badge.textContent = 'pending'
+            badge.className = `my-emoji-status my-emoji-status-${status}`
+            badge.textContent = status
             row.appendChild(badge)
             row.addEventListener('click', () => showMyEmojiDetail(item))
             myEmojiList.appendChild(row)
@@ -1013,9 +1014,11 @@ function showMyEmojiDetail(item) {
         myEmojiDetail.appendChild(notes)
     }
 
+    const status = item.status || 'pending'
+    const statusLabels = { pending: 'pending review', accepted: 'accepted ✓', denied: 'denied' }
     const statusEl = document.createElement('div')
-    statusEl.className = 'my-emoji-detail-status'
-    statusEl.textContent = 'status: pending review'
+    statusEl.className = `my-emoji-detail-status my-emoji-detail-status-${status}`
+    statusEl.textContent = `status: ${statusLabels[status] ?? status}`
     myEmojiDetail.appendChild(statusEl)
 }
 
@@ -1903,36 +1906,59 @@ function setAdminTab(tab) {
     }
 }
 
+function makeAdminEmojiRow(item) {
+    const status = item.status || 'pending'
+    const row = document.createElement('div')
+    row.className = 'admin-emoji-row'
+    const img = document.createElement('img')
+    img.src = item.url
+    img.className = 'admin-emoji-thumb'
+    row.appendChild(img)
+    const info = document.createElement('div')
+    info.className = 'admin-emoji-info'
+    const sc = document.createElement('span')
+    sc.className = 'admin-emoji-shortcode'
+    sc.textContent = item.shortcode
+    info.appendChild(sc)
+    const sub = document.createElement('span')
+    sub.className = 'admin-emoji-submitter'
+    sub.textContent = `by ${item.submitter_username || item.submitter_email}`
+    info.appendChild(sub)
+    row.appendChild(info)
+    if (status !== 'pending') {
+        const badge = document.createElement('span')
+        badge.className = `my-emoji-status my-emoji-status-${status}`
+        badge.textContent = status
+        row.appendChild(badge)
+    }
+    row.addEventListener('click', () => showPendingEmojiDetail(item))
+    return row
+}
+
 async function renderPendingEmojis() {
     adminEmojiList.innerHTML = '<div class="admin-emoji-loading">loading...</div>'
     try {
         const res = await fetch(`/pending-emojis?session=${encodeURIComponent(session || '')}`)
         const items = await res.json()
         adminEmojiList.innerHTML = ''
+        const pending = items.filter(i => (i.status || 'pending') === 'pending')
+        const reviewed = items.filter(i => (i.status || 'pending') !== 'pending')
         if (!items.length) {
-            adminEmojiList.innerHTML = '<div class="admin-emoji-empty">no pending emoji suggestions</div>'
+            adminEmojiList.innerHTML = '<div class="admin-emoji-empty">no emoji suggestions</div>'
             return
         }
-        for (const item of items) {
-            const row = document.createElement('div')
-            row.className = 'admin-emoji-row'
-            const img = document.createElement('img')
-            img.src = item.url
-            img.className = 'admin-emoji-thumb'
-            row.appendChild(img)
-            const info = document.createElement('div')
-            info.className = 'admin-emoji-info'
-            const sc = document.createElement('span')
-            sc.className = 'admin-emoji-shortcode'
-            sc.textContent = item.shortcode
-            info.appendChild(sc)
-            const sub = document.createElement('span')
-            sub.className = 'admin-emoji-submitter'
-            sub.textContent = `by ${item.submitter_username || item.submitter_email}`
-            info.appendChild(sub)
-            row.appendChild(info)
-            row.addEventListener('click', () => showPendingEmojiDetail(item))
-            adminEmojiList.appendChild(row)
+        if (!pending.length) {
+            adminEmojiList.innerHTML = '<div class="admin-emoji-empty">no pending suggestions</div>'
+        }
+        for (const item of pending) adminEmojiList.appendChild(makeAdminEmojiRow(item))
+        if (reviewed.length) {
+            const details = document.createElement('details')
+            details.className = 'admin-emoji-reviewed'
+            const summary = document.createElement('summary')
+            summary.textContent = `reviewed (${reviewed.length})`
+            details.appendChild(summary)
+            for (const item of reviewed) details.appendChild(makeAdminEmojiRow(item))
+            adminEmojiList.appendChild(details)
         }
     } catch (e) {
         adminEmojiList.innerHTML = '<div class="admin-emoji-empty">failed to load</div>'
@@ -1982,54 +2008,63 @@ function showPendingEmojiDetail(item) {
         adminEmojiDetail.appendChild(notes)
     }
 
-    const actions = document.createElement('div')
-    actions.className = 'admin-emoji-detail-actions'
+    const status = item.status || 'pending'
+    if (status !== 'pending') {
+        const statusLabels = { accepted: 'accepted ✓', denied: 'denied' }
+        const statusEl = document.createElement('div')
+        statusEl.className = `admin-emoji-detail-status my-emoji-status-${status}`
+        statusEl.textContent = statusLabels[status] ?? status
+        adminEmojiDetail.appendChild(statusEl)
+    } else {
+        const actions = document.createElement('div')
+        actions.className = 'admin-emoji-detail-actions'
 
-    const denyBtn = document.createElement('button')
-    denyBtn.type = 'button'
-    denyBtn.className = 'admin-emoji-deny-btn'
-    denyBtn.textContent = 'deny'
-    denyBtn.addEventListener('click', async () => {
-        denyBtn.disabled = true
-        acceptBtn.disabled = true
-        try {
-            const res = await fetch('/admin/emoji/deny', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ id: item.id, session })
-            })
-            if (res.ok) {
-                adminEmojiDetail.style.display = 'none'
-                adminEmojiList.style.display = 'flex'
-                renderPendingEmojis()
-            }
-        } catch (e) { denyBtn.disabled = false; acceptBtn.disabled = false }
-    })
+        const denyBtn = document.createElement('button')
+        denyBtn.type = 'button'
+        denyBtn.className = 'admin-emoji-deny-btn'
+        denyBtn.textContent = 'deny'
+        denyBtn.addEventListener('click', async () => {
+            denyBtn.disabled = true
+            acceptBtn.disabled = true
+            try {
+                const res = await fetch('/admin/emoji/deny', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ id: item.id, session })
+                })
+                if (res.ok) {
+                    adminEmojiDetail.style.display = 'none'
+                    adminEmojiList.style.display = 'flex'
+                    renderPendingEmojis()
+                }
+            } catch (e) { denyBtn.disabled = false; acceptBtn.disabled = false }
+        })
 
-    const acceptBtn = document.createElement('button')
-    acceptBtn.type = 'button'
-    acceptBtn.className = 'admin-emoji-accept-btn'
-    acceptBtn.textContent = 'accept'
-    acceptBtn.addEventListener('click', async () => {
-        acceptBtn.disabled = true
-        denyBtn.disabled = true
-        try {
-            const res = await fetch('/admin/emoji/accept', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ id: item.id, session })
-            })
-            if (res.ok) {
-                adminEmojiDetail.style.display = 'none'
-                adminEmojiList.style.display = 'flex'
-                renderPendingEmojis()
-            }
-        } catch (e) { acceptBtn.disabled = false; denyBtn.disabled = false }
-    })
+        const acceptBtn = document.createElement('button')
+        acceptBtn.type = 'button'
+        acceptBtn.className = 'admin-emoji-accept-btn'
+        acceptBtn.textContent = 'accept'
+        acceptBtn.addEventListener('click', async () => {
+            acceptBtn.disabled = true
+            denyBtn.disabled = true
+            try {
+                const res = await fetch('/admin/emoji/accept', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ id: item.id, session })
+                })
+                if (res.ok) {
+                    adminEmojiDetail.style.display = 'none'
+                    adminEmojiList.style.display = 'flex'
+                    renderPendingEmojis()
+                }
+            } catch (e) { acceptBtn.disabled = false; denyBtn.disabled = false }
+        })
 
-    actions.appendChild(denyBtn)
-    actions.appendChild(acceptBtn)
-    adminEmojiDetail.appendChild(actions)
+        actions.appendChild(denyBtn)
+        actions.appendChild(acceptBtn)
+        adminEmojiDetail.appendChild(actions)
+    }
 }
 
 function openAdmin() {

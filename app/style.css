@@ -1456,6 +1456,16 @@ body:has(#dev-banner) #version-status {
   flex-shrink: 0;
 }
 
+.my-emoji-status-accepted {
+  color: #3ba55c;
+  border-color: #3ba55c;
+}
+
+.my-emoji-status-denied {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .my-emoji-empty {
   font-size: 11px;
   color: var(--muted);
@@ -1526,6 +1536,44 @@ body:has(#dev-banner) #version-status {
   color: var(--muted);
   text-align: center;
   font-style: italic;
+}
+
+.my-emoji-detail-status-accepted { color: #3ba55c; font-style: normal; }
+.my-emoji-detail-status-denied { color: var(--danger); font-style: normal; }
+
+.admin-emoji-detail-status {
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.admin-emoji-reviewed {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+}
+
+.admin-emoji-reviewed summary {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 2px;
+  user-select: none;
+  list-style: none;
+}
+
+.admin-emoji-reviewed summary::-webkit-details-marker { display: none; }
+
+.admin-emoji-reviewed summary::before {
+  content: '▸ ';
+  font-size: 9px;
+}
+
+.admin-emoji-reviewed[open] summary::before {
+  content: '▾ ';
 }
 
 /* emoji suggestion modal */

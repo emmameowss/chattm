@@ -28,7 +28,7 @@ import {
     isVerified, setVerified, removeVerified,
     getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats,
     getAllHistory,
-    addPendingEmoji, getPendingEmojis, getPendingEmojisByEmail, getPendingEmojiById, deletePendingEmoji
+    addPendingEmoji, getPendingEmojis, getPendingEmojisByEmail, getPendingEmojiById, updatePendingEmoji, deletePendingEmoji
 } from './db.js'
 
 const httpServer = createServer()
@@ -1416,7 +1416,7 @@ httpServer.on('request', async (req, res) => {
                 }))
                 const newUrl = `${process.env.AWS_S3_PUBLIC_URL}/${destKey}`
                 addCustomEmoji(pending.shortcode, newUrl)
-                deletePendingEmoji(id)
+                updatePendingEmoji(id, 'accepted', destKey, newUrl)
                 io.emit('emojiUpdate', getCustomEmoji())
                 res.writeHead(200, { 'content-type': 'application/json' })
                 res.end(JSON.stringify({ ok: true }))
@@ -1449,11 +1449,20 @@ httpServer.on('request', async (req, res) => {
                     res.end(JSON.stringify({ error: 'not found' }))
                     return
                 }
+                const filename = pending.s3_key.split('/').pop()
+                const deniedKey = `denied_emojis/${filename}`
+                await s3.send(new CopyObjectCommand({
+                    Bucket: process.env.AWS_S3_BUCKET,
+                    CopySource: `${process.env.AWS_S3_BUCKET}/${pending.s3_key}`,
+                    Key: deniedKey,
+                    ACL: 'public-read'
+                }))
                 await s3.send(new DeleteObjectCommand({
                     Bucket: process.env.AWS_S3_BUCKET,
                     Key: pending.s3_key
                 }))
-                deletePendingEmoji(id)
+                const deniedUrl = `${process.env.AWS_S3_PUBLIC_URL}/${deniedKey}`
+                updatePendingEmoji(id, 'denied', deniedKey, deniedUrl)
                 res.writeHead(200, { 'content-type': 'application/json' })
                 res.end(JSON.stringify({ ok: true }))
             } catch (e) {
