@@ -501,6 +501,9 @@ button:active {
 
 .admin-tab {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   padding: 5px 0;
   border-color: var(--border);
