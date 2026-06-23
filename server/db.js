@@ -80,6 +80,17 @@ db.exec(`
     url TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS pending_emojis (
+    id TEXT PRIMARY KEY,
+    shortcode TEXT NOT NULL,
+    s3_key TEXT NOT NULL,
+    url TEXT NOT NULL,
+    submitter_email TEXT,
+    submitter_username TEXT,
+    notes TEXT,
+    submitted_at INTEGER
+  );
+
   CREATE TABLE IF NOT EXISTS verified_users (
     email TEXT PRIMARY KEY
   );
@@ -168,6 +179,12 @@ const stmts = {
   getCustomEmoji: db.prepare(`SELECT shortcode, url FROM custom_emoji ORDER BY shortcode`),
   addCustomEmoji: db.prepare(`INSERT OR REPLACE INTO custom_emoji (shortcode, url) VALUES (?, ?)`),
   removeCustomEmoji: db.prepare(`DELETE FROM custom_emoji WHERE shortcode = ?`),
+
+  // Pending emoji suggestions
+  addPendingEmoji: db.prepare(`INSERT INTO pending_emojis (id, shortcode, s3_key, url, submitter_email, submitter_username, notes, submitted_at) VALUES (@id, @shortcode, @s3_key, @url, @submitter_email, @submitter_username, @notes, @submitted_at)`),
+  getPendingEmojis: db.prepare(`SELECT * FROM pending_emojis ORDER BY submitted_at ASC`),
+  getPendingEmojiById: db.prepare(`SELECT * FROM pending_emojis WHERE id = ?`),
+  deletePendingEmoji: db.prepare(`DELETE FROM pending_emojis WHERE id = ?`),
 
   // Verified users
   isVerified: db.prepare(`SELECT 1 FROM verified_users WHERE email = ?`),
@@ -463,6 +480,24 @@ export function addCustomEmoji(shortcode, url) {
 
 export function removeCustomEmoji(shortcode) {
   stmts.removeCustomEmoji.run(shortcode)
+}
+
+// ─── Pending Emoji API ───────────────────────────────────────────────────────
+
+export function addPendingEmoji(data) {
+  stmts.addPendingEmoji.run(data)
+}
+
+export function getPendingEmojis() {
+  return stmts.getPendingEmojis.all()
+}
+
+export function getPendingEmojiById(id) {
+  return stmts.getPendingEmojiById.get(id) ?? null
+}
+
+export function deletePendingEmoji(id) {
+  stmts.deletePendingEmoji.run(id)
 }
 
 // ─── Verified Users API ──────────────────────────────────────────────────────

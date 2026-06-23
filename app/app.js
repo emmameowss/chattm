@@ -783,11 +783,17 @@ const emojiBtn = document.querySelector('#emoji-btn')
 
 function renderEmojiPicker() {
     emojiPicker.innerHTML = ''
-    const entries = Object.entries(customEmoji)
-    if (!entries.length) {
+    const suggestBtn = document.createElement('button')
+    suggestBtn.type = 'button'
+    suggestBtn.title = 'suggest an emoji'
+    suggestBtn.textContent = '+'
+    suggestBtn.id = 'emoji-suggest-open-btn'
+    suggestBtn.addEventListener('click', () => {
         emojiPicker.style.display = 'none'
-        return
-    }
+        openEmojiSuggest()
+    })
+    emojiPicker.appendChild(suggestBtn)
+    const entries = Object.entries(customEmoji)
     for (const [shortcode, url] of entries) {
         const btn = document.createElement('button')
         btn.type = 'button'
@@ -817,7 +823,6 @@ socket.on('emojiUpdate', map => {
 
 emojiBtn.addEventListener('click', (e) => {
     e.stopPropagation()
-    if (!Object.keys(customEmoji).length) return
     const opening = emojiPicker.style.display === 'none'
     emojiPicker.style.display = opening ? 'grid' : 'none'
     if (opening) {
@@ -832,6 +837,82 @@ emojiBtn.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
     if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
         emojiPicker.style.display = 'none'
+    }
+})
+
+// emoji suggestion modal
+const emojiSuggestOverlay = document.querySelector('#emoji-suggest-overlay')
+const emojiSuggestShortcode = document.querySelector('#emoji-suggest-shortcode')
+const emojiSuggestFile = document.querySelector('#emoji-suggest-file')
+const emojiSuggestFileText = document.querySelector('#emoji-suggest-file-text')
+const emojiSuggestPreview = document.querySelector('#emoji-suggest-preview')
+const emojiSuggestNotes = document.querySelector('#emoji-suggest-notes')
+const emojiSuggestError = document.querySelector('#emoji-suggest-error')
+
+function openEmojiSuggest() {
+    emojiSuggestOverlay.style.display = 'flex'
+    emojiSuggestShortcode.focus()
+}
+
+function closeEmojiSuggest() {
+    emojiSuggestOverlay.style.display = 'none'
+    emojiSuggestShortcode.value = ''
+    emojiSuggestFile.value = ''
+    emojiSuggestFileText.textContent = 'choose image'
+    emojiSuggestPreview.innerHTML = ''
+    emojiSuggestNotes.value = ''
+    emojiSuggestError.textContent = ''
+}
+
+emojiSuggestFile.addEventListener('change', () => {
+    const file = emojiSuggestFile.files[0]
+    if (!file) return
+    emojiSuggestFileText.textContent = file.name
+    const img = document.createElement('img')
+    img.src = URL.createObjectURL(file)
+    emojiSuggestPreview.innerHTML = ''
+    emojiSuggestPreview.appendChild(img)
+})
+
+document.querySelector('#emoji-suggest-cancel').addEventListener('click', closeEmojiSuggest)
+
+document.querySelector('#emoji-suggest-submit').addEventListener('click', async () => {
+    emojiSuggestError.textContent = ''
+    const shortcode = emojiSuggestShortcode.value.trim()
+    if (!/^:[a-z0-9_-]+:$/.test(shortcode)) {
+        emojiSuggestError.textContent = 'shortcode must be in format :name: (lowercase, numbers, - or _)'
+        return
+    }
+    if (!emojiSuggestFile.files[0]) {
+        emojiSuggestError.textContent = 'please choose an image file'
+        return
+    }
+    const btn = document.querySelector('#emoji-suggest-submit')
+    btn.disabled = true
+    btn.textContent = 'submitting...'
+    try {
+        const formData = new FormData()
+        formData.append('file', emojiSuggestFile.files[0])
+        formData.append('shortcode', shortcode)
+        formData.append('notes', emojiSuggestNotes.value.trim())
+        formData.append('username', username || '')
+        const res = await fetch(`/suggest-emoji?session=${encodeURIComponent(session || '')}`, {
+            method: 'POST',
+            body: formData
+        })
+        const json = await res.json()
+        if (!res.ok) {
+            emojiSuggestError.textContent = json.error || 'submission failed'
+            return
+        }
+        closeEmojiSuggest()
+        showStatus('emoji suggestion submitted', 'pink')
+        setTimeout(hideStatus, 2000)
+    } catch (e) {
+        emojiSuggestError.textContent = 'network error — please try again'
+    } finally {
+        btn.disabled = false
+        btn.textContent = 'submit'
     }
 })
 
@@ -1627,8 +1708,11 @@ const adminPanel = document.querySelector('#admin-panel')
 const adminBackdrop = document.querySelector('#admin-backdrop')
 const adminContent = document.querySelector('#admin-content')
 const adminUsersList = document.querySelector('#admin-users-list')
+const adminEmojiList = document.querySelector('#admin-emoji-list')
+const adminEmojiDetail = document.querySelector('#admin-emoji-detail')
 const adminTabActions = document.querySelector('#admin-tab-actions')
 const adminTabUsers = document.querySelector('#admin-tab-users')
+const adminTabEmoji = document.querySelector('#admin-tab-emoji')
 
 function renderAdminUsers() {
     adminUsersList.innerHTML = ''
@@ -1683,18 +1767,154 @@ function renderAdminUsers() {
 }
 
 function setAdminTab(tab) {
+    adminContent.style.display = 'none'
+    adminUsersList.style.display = 'none'
+    adminEmojiList.style.display = 'none'
+    adminEmojiDetail.style.display = 'none'
+    adminTabActions.classList.remove('active')
+    adminTabUsers.classList.remove('active')
+    adminTabEmoji.classList.remove('active')
     if (tab === 'actions') {
         adminContent.style.display = 'flex'
-        adminUsersList.style.display = 'none'
         adminTabActions.classList.add('active')
-        adminTabUsers.classList.remove('active')
-    } else {
-        adminContent.style.display = 'none'
+    } else if (tab === 'users') {
         adminUsersList.style.display = 'flex'
-        adminTabActions.classList.remove('active')
         adminTabUsers.classList.add('active')
         renderAdminUsers()
+    } else if (tab === 'emoji') {
+        adminEmojiList.style.display = 'flex'
+        adminTabEmoji.classList.add('active')
+        renderPendingEmojis()
     }
+}
+
+async function renderPendingEmojis() {
+    adminEmojiList.innerHTML = '<div class="admin-emoji-loading">loading...</div>'
+    try {
+        const res = await fetch(`/pending-emojis?session=${encodeURIComponent(session || '')}`)
+        const items = await res.json()
+        adminEmojiList.innerHTML = ''
+        if (!items.length) {
+            adminEmojiList.innerHTML = '<div class="admin-emoji-empty">no pending emoji suggestions</div>'
+            return
+        }
+        for (const item of items) {
+            const row = document.createElement('div')
+            row.className = 'admin-emoji-row'
+            const img = document.createElement('img')
+            img.src = item.url
+            img.className = 'admin-emoji-thumb'
+            row.appendChild(img)
+            const info = document.createElement('div')
+            info.className = 'admin-emoji-info'
+            const sc = document.createElement('span')
+            sc.className = 'admin-emoji-shortcode'
+            sc.textContent = item.shortcode
+            info.appendChild(sc)
+            const sub = document.createElement('span')
+            sub.className = 'admin-emoji-submitter'
+            sub.textContent = `by ${item.submitter_username || item.submitter_email}`
+            info.appendChild(sub)
+            row.appendChild(info)
+            row.addEventListener('click', () => showPendingEmojiDetail(item))
+            adminEmojiList.appendChild(row)
+        }
+    } catch (e) {
+        adminEmojiList.innerHTML = '<div class="admin-emoji-empty">failed to load</div>'
+    }
+}
+
+function showPendingEmojiDetail(item) {
+    adminEmojiList.style.display = 'none'
+    adminEmojiDetail.style.display = 'flex'
+    adminEmojiDetail.innerHTML = ''
+
+    const backBtn = document.createElement('button')
+    backBtn.type = 'button'
+    backBtn.className = 'admin-emoji-back'
+    backBtn.textContent = '← back'
+    backBtn.addEventListener('click', () => {
+        adminEmojiDetail.style.display = 'none'
+        adminEmojiList.style.display = 'flex'
+        renderPendingEmojis()
+    })
+    adminEmojiDetail.appendChild(backBtn)
+
+    const img = document.createElement('img')
+    img.src = item.url
+    img.className = 'admin-emoji-detail-img'
+    adminEmojiDetail.appendChild(img)
+
+    const sc = document.createElement('div')
+    sc.className = 'admin-emoji-detail-shortcode'
+    sc.textContent = item.shortcode
+    adminEmojiDetail.appendChild(sc)
+
+    const sub = document.createElement('div')
+    sub.className = 'admin-emoji-detail-meta'
+    sub.textContent = `submitted by ${item.submitter_username || item.submitter_email}`
+    adminEmojiDetail.appendChild(sub)
+
+    const ts = document.createElement('div')
+    ts.className = 'admin-emoji-detail-meta'
+    ts.textContent = new Date(item.submitted_at).toLocaleString()
+    adminEmojiDetail.appendChild(ts)
+
+    if (item.notes) {
+        const notes = document.createElement('div')
+        notes.className = 'admin-emoji-detail-notes'
+        notes.textContent = item.notes
+        adminEmojiDetail.appendChild(notes)
+    }
+
+    const actions = document.createElement('div')
+    actions.className = 'admin-emoji-detail-actions'
+
+    const denyBtn = document.createElement('button')
+    denyBtn.type = 'button'
+    denyBtn.className = 'admin-emoji-deny-btn'
+    denyBtn.textContent = 'deny'
+    denyBtn.addEventListener('click', async () => {
+        denyBtn.disabled = true
+        acceptBtn.disabled = true
+        try {
+            const res = await fetch('/admin/emoji/deny', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ id: item.id, session })
+            })
+            if (res.ok) {
+                adminEmojiDetail.style.display = 'none'
+                adminEmojiList.style.display = 'flex'
+                renderPendingEmojis()
+            }
+        } catch (e) { denyBtn.disabled = false; acceptBtn.disabled = false }
+    })
+
+    const acceptBtn = document.createElement('button')
+    acceptBtn.type = 'button'
+    acceptBtn.className = 'admin-emoji-accept-btn'
+    acceptBtn.textContent = 'accept'
+    acceptBtn.addEventListener('click', async () => {
+        acceptBtn.disabled = true
+        denyBtn.disabled = true
+        try {
+            const res = await fetch('/admin/emoji/accept', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ id: item.id, session })
+            })
+            if (res.ok) {
+                adminEmojiDetail.style.display = 'none'
+                adminEmojiList.style.display = 'flex'
+                renderPendingEmojis()
+            }
+        } catch (e) { acceptBtn.disabled = false; denyBtn.disabled = false }
+    })
+
+    actions.appendChild(denyBtn)
+    actions.appendChild(acceptBtn)
+    adminEmojiDetail.appendChild(actions)
 }
 
 function openAdmin() {
@@ -1713,6 +1933,7 @@ document.querySelector('#admin-close').addEventListener('click', closeAdmin)
 adminBackdrop.addEventListener('click', closeAdmin)
 adminTabActions.addEventListener('click', () => setAdminTab('actions'))
 adminTabUsers.addEventListener('click', () => setAdminTab('users'))
+adminTabEmoji.addEventListener('click', () => setAdminTab('emoji'))
 
 document.querySelector('#owner-mutechat-btn').addEventListener('click', () => {
     socket.emit('message', {text: chatMutedb ? '/unmutechat' : '/mutechat'})

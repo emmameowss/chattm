@@ -60,6 +60,7 @@
             <div id="admin-tabs">
                 <button type="button" id="admin-tab-actions" class="admin-tab active">actions</button>
                 <button type="button" id="admin-tab-users" class="admin-tab">users</button>
+                <button type="button" id="admin-tab-emoji" class="admin-tab">emoji</button>
             </div>
             <div id="admin-content">
                 <button type="button" id="owner-mutechat-btn"><i class="ti ti-microphone-off"></i> toggle chat mute</button>
@@ -68,6 +69,8 @@
                 <button type="button" id="owner-refresh-version-btn"><i class="ti ti-refresh"></i> refresh version status</button>
             </div>
             <div id="admin-users-list" style="display:none"></div>
+            <div id="admin-emoji-list" style="display:none"></div>
+            <div id="admin-emoji-detail" style="display:none"></div>
         </div>
     </div>
     <div id="username-setup-backdrop" style="display:none"></div>
@@ -128,6 +131,23 @@
     </div>
   </div>
 </div>
+    <div id="emoji-suggest-overlay" style="display:none">
+        <div id="emoji-suggest-box">
+            <div id="emoji-suggest-title">suggest an emoji</div>
+            <input id="emoji-suggest-shortcode" type="text" placeholder=":shortcode:" maxlength="30" autocomplete="off">
+            <label id="emoji-suggest-file-label">
+                <span id="emoji-suggest-file-text">choose image</span>
+                <input id="emoji-suggest-file" type="file" accept="image/png,image/gif,image/webp,image/jpeg,image/svg+xml" style="display:none">
+            </label>
+            <div id="emoji-suggest-preview"></div>
+            <textarea id="emoji-suggest-notes" placeholder="notes (optional)" maxlength="200"></textarea>
+            <div id="emoji-suggest-error"></div>
+            <div id="emoji-suggest-buttons">
+                <button type="button" id="emoji-suggest-cancel">cancel</button>
+                <button type="button" id="emoji-suggest-submit">submit</button>
+            </div>
+        </div>
+    </div>
     <div id="message-context-menu">
        <button type="button" id="ctx-delete-btn"><i class="ti ti-trash"></i> delete message</button>
     </div>

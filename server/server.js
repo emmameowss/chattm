@@ -9,7 +9,7 @@ import { readFile, appendFile } from 'fs/promises'
 import { extname, normalize, resolve, sep } from 'path'
 import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
-import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import {
     getHistory, addMessage, deleteMessage, clearMessages,
     getSession, saveSession, deleteSession,
@@ -27,7 +27,8 @@ import {
     getCustomEmoji, addCustomEmoji, removeCustomEmoji,
     isVerified, setVerified, removeVerified,
     getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats,
-    getAllHistory
+    getAllHistory,
+    addPendingEmoji, getPendingEmojis, getPendingEmojiById, deletePendingEmoji
 } from './db.js'
 
 const httpServer = createServer()
@@ -1271,6 +1272,183 @@ httpServer.on('request', async (req, res) => {
         const vStatus = await getVersionStatus(forceRefresh)
         res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"})
         res.end(JSON.stringify(vStatus))
+        return
+    }
+
+    if (url.pathname === '/suggest-emoji') {
+        if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
+        const suggestIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress
+        if (!checkRateLimit(suggestIp, 'suggest-emoji', 5, 60 * 60 * 1000)) {
+            res.writeHead(429, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'rate limited — max 5 suggestions per hour' }))
+            return
+        }
+        const suggestSessionId = url.searchParams.get('session')
+        const suggestSession = suggestSessionId ? getSession(suggestSessionId) : null
+        if (!suggestSession || suggestSession.guest) {
+            res.writeHead(401, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'must be logged in to suggest emojis' }))
+            return
+        }
+        const form = formidable({ maxFileSize: 2 * 1024 * 1024 })
+        form.parse(req, async (err, fields, files) => {
+            if (err) {
+                res.writeHead(400, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ error: err.message }))
+                return
+            }
+            try {
+                const shortcode = (fields.shortcode?.[0] ?? '').trim()
+                const notes = (fields.notes?.[0] ?? '').trim().slice(0, 200)
+                const submitterUsername = (fields.username?.[0] ?? '').trim()
+                if (!/^:[a-z0-9_-]+:$/.test(shortcode)) {
+                    res.writeHead(400, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'invalid shortcode — use format :name: with lowercase letters, numbers, - or _' }))
+                    return
+                }
+                const existing = getCustomEmoji()
+                if (existing[shortcode]) {
+                    res.writeHead(409, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'that shortcode is already in use' }))
+                    return
+                }
+                if (!files.file?.[0]) {
+                    res.writeHead(400, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'no file uploaded' }))
+                    return
+                }
+                const file = files.file[0]
+                const imageTypes = ['image/png', 'image/gif', 'image/webp', 'image/jpeg', 'image/svg+xml']
+                if (!imageTypes.includes(file.mimetype)) {
+                    res.writeHead(400, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'only image files are allowed (PNG, GIF, WebP, JPEG, SVG)' }))
+                    return
+                }
+                const fileBuffer = await readFile(file.filepath)
+                const ext = extname(file.originalFilename || '') || '.png'
+                const s3Key = `pending_emojis/${Date.now()}-${randomBytes(6).toString('hex')}${ext}`
+                await s3.send(new PutObjectCommand({
+                    Bucket: process.env.AWS_S3_BUCKET,
+                    Key: s3Key,
+                    Body: fileBuffer,
+                    ContentType: file.mimetype,
+                    ACL: 'public-read'
+                }))
+                const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${s3Key}`
+                addPendingEmoji({
+                    id: randomUUID(),
+                    shortcode,
+                    s3_key: s3Key,
+                    url: publicUrl,
+                    submitter_email: suggestSession.email,
+                    submitter_username: submitterUsername || null,
+                    notes: notes || null,
+                    submitted_at: Date.now()
+                })
+                res.writeHead(200, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ ok: true }))
+            } catch (e) {
+                console.error('suggest-emoji error:', e)
+                res.writeHead(500, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ error: e.message }))
+            }
+        })
+        return
+    }
+
+    if (url.pathname === '/pending-emojis') {
+        const peSessionId = url.searchParams.get('session')
+        const peSession = peSessionId ? getSession(peSessionId) : null
+        if (!peSession || peSession.email !== process.env.OWNER_EMAIL) {
+            res.writeHead(403, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'forbidden' }))
+            return
+        }
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify(getPendingEmojis()))
+        return
+    }
+
+    if (url.pathname === '/admin/emoji/accept') {
+        if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
+        let body = ''
+        req.on('data', d => { body += d })
+        req.on('end', async () => {
+            try {
+                const { id, session: bodySession } = JSON.parse(body)
+                const sessionId = bodySession || url.searchParams.get('session')
+                const sess = sessionId ? getSession(sessionId) : null
+                if (!sess || sess.email !== process.env.OWNER_EMAIL) {
+                    res.writeHead(403, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'forbidden' }))
+                    return
+                }
+                const pending = getPendingEmojiById(id)
+                if (!pending) {
+                    res.writeHead(404, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'not found' }))
+                    return
+                }
+                const ext = extname(pending.s3_key)
+                const destKey = `emojis/${pending.shortcode.replace(/:/g, '')}${ext}`
+                await s3.send(new CopyObjectCommand({
+                    Bucket: process.env.AWS_S3_BUCKET,
+                    CopySource: `${process.env.AWS_S3_BUCKET}/${pending.s3_key}`,
+                    Key: destKey,
+                    ACL: 'public-read'
+                }))
+                await s3.send(new DeleteObjectCommand({
+                    Bucket: process.env.AWS_S3_BUCKET,
+                    Key: pending.s3_key
+                }))
+                const newUrl = `${process.env.AWS_S3_PUBLIC_URL}/${destKey}`
+                addCustomEmoji(pending.shortcode, newUrl)
+                deletePendingEmoji(id)
+                io.emit('emojiUpdate', getCustomEmoji())
+                res.writeHead(200, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ ok: true }))
+            } catch (e) {
+                console.error('emoji accept error:', e)
+                res.writeHead(500, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ error: e.message }))
+            }
+        })
+        return
+    }
+
+    if (url.pathname === '/admin/emoji/deny') {
+        if (req.method !== 'POST') { res.writeHead(405); res.end(); return }
+        let body = ''
+        req.on('data', d => { body += d })
+        req.on('end', async () => {
+            try {
+                const { id, session: bodySession } = JSON.parse(body)
+                const sessionId = bodySession || url.searchParams.get('session')
+                const sess = sessionId ? getSession(sessionId) : null
+                if (!sess || sess.email !== process.env.OWNER_EMAIL) {
+                    res.writeHead(403, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'forbidden' }))
+                    return
+                }
+                const pending = getPendingEmojiById(id)
+                if (!pending) {
+                    res.writeHead(404, { 'content-type': 'application/json' })
+                    res.end(JSON.stringify({ error: 'not found' }))
+                    return
+                }
+                await s3.send(new DeleteObjectCommand({
+                    Bucket: process.env.AWS_S3_BUCKET,
+                    Key: pending.s3_key
+                }))
+                deletePendingEmoji(id)
+                res.writeHead(200, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ ok: true }))
+            } catch (e) {
+                console.error('emoji deny error:', e)
+                res.writeHead(500, { 'content-type': 'application/json' })
+                res.end(JSON.stringify({ error: e.message }))
+            }
+        })
         return
     }
 
