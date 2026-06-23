@@ -682,7 +682,20 @@ socket.on('profileData', (data) => {
         const sd = document.querySelector('#profile-status-display')
         sd.innerHTML = ''
         sd.appendChild(statusDot('offline'))
-        sd.appendChild(document.createTextNode('Offline'))
+        const offlineText = document.createElement('span')
+        if (data.lastSeen) {
+            const diff = Date.now() - data.lastSeen
+            let rel
+            if (diff < 60000) rel = 'just now'
+            else if (diff < 3600000) rel = `${Math.floor(diff / 60000)}m ago`
+            else if (diff < 86400000) rel = `${Math.floor(diff / 3600000)}h ago`
+            else if (diff < 2592000000) rel = `${Math.floor(diff / 86400000)}d ago`
+            else rel = new Date(data.lastSeen).toLocaleDateString()
+            offlineText.textContent = `last seen ${rel}`
+        } else {
+            offlineText.textContent = 'Offline'
+        }
+        sd.appendChild(offlineText)
         sd.style.cursor = ''
         sd.onclick = null
     } else {

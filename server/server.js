@@ -441,6 +441,7 @@ io.on('connection', socket => {
                 isOwner: email === process.env.OWNER_EMAIL,
                 isGuest: email.endsWith('@guest'),
                 online: isOnline,
+                lastSeen: isOnline ? null : (profile.lastSeen ?? null),
             })
         } catch (e) {
             console.error('getProfile error:', e)

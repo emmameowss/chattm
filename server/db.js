@@ -205,7 +205,7 @@ const stmts = {
   getTotalMessages: db.prepare(`SELECT value FROM settings WHERE key = 'total_messages_sent'`),
 
   // Profiles
-  getProfileData: db.prepare(`SELECT bio, status, pronouns FROM profiles WHERE email = ?`),
+  getProfileData: db.prepare(`SELECT bio, status, pronouns, last_seen FROM profiles WHERE email = ?`),
   setProfileBio: db.prepare(`INSERT INTO profiles (email, bio) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET bio = excluded.bio`),
   setProfileStatus: db.prepare(`INSERT INTO profiles (email, status) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET status = excluded.status`),
   setProfilePronouns: db.prepare(`INSERT INTO profiles (email, pronouns) VALUES (?, ?) ON CONFLICT(email) DO UPDATE SET pronouns = excluded.pronouns`),
@@ -532,7 +532,7 @@ export function removeVerified(email) {
 
 export function getProfileData(email) {
   const row = stmts.getProfileData.get(email)
-  return { bio: row?.bio ?? null, status: row?.status ?? null, pronouns: row?.pronouns ?? null }
+  return { bio: row?.bio ?? null, status: row?.status ?? null, pronouns: row?.pronouns ?? null, lastSeen: row?.last_seen ?? null }
 }
 
 export function setProfileBio(email, bio) {
