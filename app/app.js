@@ -1416,7 +1416,10 @@ function makeUserlistEntry(u) {
     return div
 }
 
+let cachedAdminUsers = []
+
 socket.on('userlist', (users) => {
+    cachedAdminUsers = users
     onlineUsernames = users.filter(u => u.online).map(u => u.username).filter(Boolean)
     const ul = document.querySelector('#userlist')
     ul.innerHTML = ''
@@ -1599,6 +1602,77 @@ socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
 
 const adminPanel = document.querySelector('#admin-panel')
 const adminBackdrop = document.querySelector('#admin-backdrop')
+const adminContent = document.querySelector('#admin-content')
+const adminUsersList = document.querySelector('#admin-users-list')
+const adminTabActions = document.querySelector('#admin-tab-actions')
+const adminTabUsers = document.querySelector('#admin-tab-users')
+
+function renderAdminUsers() {
+    adminUsersList.innerHTML = ''
+    const hca = cachedAdminUsers.filter(u => !u.guest)
+    const guests = cachedAdminUsers.filter(u => u.guest)
+    function makeSection(label, arr) {
+        if (!arr.length) return
+        const header = document.createElement('div')
+        header.className = 'admin-user-section'
+        header.textContent = `${label} — ${arr.length}`
+        adminUsersList.appendChild(header)
+        for (const u of arr) {
+            const row = document.createElement('div')
+            row.className = 'admin-user-row'
+            const avWrap = document.createElement('div')
+            avWrap.className = 'ul-avatar-wrap'
+            if (u.avatar) {
+                const img = document.createElement('img')
+                img.src = u.avatar
+                img.className = 'ul-avatar'
+                avWrap.appendChild(img)
+            } else {
+                const pl = document.createElement('div')
+                pl.className = 'ul-avatar ul-avatar-placeholder'
+                pl.textContent = (u.username || '?')[0]
+                pl.style.backgroundColor = `hsl(${nameHash(u.username) % 360}, 55%, 38%)`
+                avWrap.appendChild(pl)
+            }
+            const dot = document.createElement('span')
+            dot.className = `ul-status-dot ${u.online ? (u.status || 'online') : 'offline'}`
+            avWrap.appendChild(dot)
+            row.appendChild(avWrap)
+            const info = document.createElement('div')
+            info.className = 'admin-user-info'
+            const nameEl = document.createElement('span')
+            nameEl.className = 'admin-user-name'
+            applyFlagColor(nameEl, u.color || getNameColor(u.username))
+            nameEl.textContent = u.username
+            info.appendChild(nameEl)
+            const emailEl = document.createElement('span')
+            emailEl.className = 'admin-user-email'
+            emailEl.textContent = u.email
+            info.appendChild(emailEl)
+            row.appendChild(info)
+            row.addEventListener('click', () => { closeAdmin(); openProfile(u.username) })
+            adminUsersList.appendChild(row)
+        }
+    }
+    makeSection('hack club', hca)
+    makeSection('guests', guests)
+}
+
+function setAdminTab(tab) {
+    if (tab === 'actions') {
+        adminContent.style.display = 'flex'
+        adminUsersList.style.display = 'none'
+        adminTabActions.classList.add('active')
+        adminTabUsers.classList.remove('active')
+    } else {
+        adminContent.style.display = 'none'
+        adminUsersList.style.display = 'flex'
+        adminTabActions.classList.remove('active')
+        adminTabUsers.classList.add('active')
+        renderAdminUsers()
+    }
+}
+
 function openAdmin() {
     adminPanel.style.display = 'block'
     adminBackdrop.style.display = 'block'
@@ -1608,10 +1682,13 @@ function openAdmin() {
 function closeAdmin() {
     adminPanel.style.display = 'none'
     adminBackdrop.style.display = 'none'
+    setAdminTab('actions')
 }
 document.querySelector('#admin-btn').addEventListener('click', openAdmin)
 document.querySelector('#admin-close').addEventListener('click', closeAdmin)
 adminBackdrop.addEventListener('click', closeAdmin)
+adminTabActions.addEventListener('click', () => setAdminTab('actions'))
+adminTabUsers.addEventListener('click', () => setAdminTab('users'))
 
 document.querySelector('#owner-mutechat-btn').addEventListener('click', () => {
     socket.emit('message', {text: chatMutedb ? '/unmutechat' : '/mutechat'})

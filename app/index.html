@@ -57,12 +57,17 @@
         <div id="admin-inner">
             <button type="button" id="admin-close">&times;</button>
             <h2>admin</h2>
+            <div id="admin-tabs">
+                <button type="button" id="admin-tab-actions" class="admin-tab active">actions</button>
+                <button type="button" id="admin-tab-users" class="admin-tab">users</button>
+            </div>
             <div id="admin-content">
                 <button type="button" id="owner-mutechat-btn"><i class="ti ti-microphone-off"></i> toggle chat mute</button>
                 <button type="button" id="owner-maintenance-btn"><i class="ti ti-tool"></i> toggle maintenance</button>
                 <button type="button" id="owner-clear-btn"><i class="ti ti-trash"></i> clear chat</button>
                 <button type="button" id="owner-refresh-version-btn"><i class="ti ti-refresh"></i> refresh version status</button>
             </div>
+            <div id="admin-users-list" style="display:none"></div>
         </div>
     </div>
     <div id="username-setup-backdrop" style="display:none"></div>

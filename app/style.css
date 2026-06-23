@@ -493,6 +493,31 @@ button:active {
   gap: 6px;
 }
 
+#admin-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.admin-tab {
+  flex: 1;
+  font-size: 12px;
+  padding: 5px 0;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.admin-tab.active {
+  border-color: var(--pink);
+  color: var(--pink);
+}
+
+.admin-tab:hover:not(.active) {
+  border-color: var(--text);
+  color: var(--text);
+  background: none;
+}
+
 #admin-content button {
   width: 100%;
   justify-content: flex-start;
@@ -503,6 +528,62 @@ button:active {
 
 #admin-content button:hover {
   background: var(--danger-dim);
+}
+
+#admin-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.admin-user-section {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 0 4px;
+}
+
+.admin-user-section:first-child {
+  padding-top: 0;
+}
+
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.admin-user-row:hover {
+  background: var(--bg);
+}
+
+.admin-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.admin-user-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-user-email {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #settings-backdrop {
