@@ -67,6 +67,41 @@ document.addEventListener('click', (e) => {
         userlist.style.top = ''
     }
 })
+
+// settings panel
+const settingsBtn = document.querySelector('#settings-btn')
+const settingsPanel = document.querySelector('#settings-panel')
+const settingsBackdrop = document.querySelector('#settings-backdrop')
+const settingsClose = document.querySelector('#settings-close')
+
+function openSettings() {
+    settingsPanel.style.display = 'block'
+    settingsBackdrop.style.display = 'block'
+    moreMenu.classList.remove('open')
+    userlist.style.top = ''
+}
+
+function closeSettings() {
+    settingsPanel.style.display = 'none'
+    settingsBackdrop.style.display = 'none'
+}
+
+settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    openSettings()
+})
+
+settingsClose.addEventListener('click', closeSettings)
+settingsBackdrop.addEventListener('click', closeSettings)
+
+document.addEventListener('click', (e) => {
+    if (settingsPanel.style.display !== 'none' &&
+        !settingsPanel.contains(e.target) &&
+        e.target !== settingsBtn) {
+        closeSettings()
+    }
+})
+
 function devInstanceBanner() {
     const devHosts = [
         'beta.chattm.app',

@@ -3,6 +3,7 @@ logs
 *.log
 bans.txt
 PRIVACY.md
+claude.md
 privacy.html
 ipbans.txt
 banreasons.json

@@ -21,12 +21,7 @@
         <div class="divider"></div>
         <button type="button" id="more-btn"><i class="ti ti-dots-vertical"></i></button>
         <div id="more-menu">
-           <button type="button" id="compact-btn"><i class="ti ti-layout-list"></i> compact mode</button>
-           <button type="button" id="tooltips-btn"><i class="ti ti-info-circle"></i> hide tooltips</button>
-           <button type="button" id="theme-btn"><i class="ti ti-sun"></i> light mode</button>
-           <button type="button" title="mute notification sound" id="mute-btn"><span class="mute-label">mute sound</span></button>
-           <!-- <button type="button" id="email-btn" title="email me" onclick="window.location.href='mailto:emma@csarcade.wiki'"><i class="ti ti-mail-forward"></i> email me</button> -->
-            <div class="menu-divider"></div>
+           <button type="button" id="settings-btn"><i class="ti ti-settings"></i> settings</button>
            <button type="button" id="stats-btn"><i class="ti ti-chart-bar"></i> stats</button>
            <a href="/privacy" target="_blank"><button type="button"><i class="ti ti-shield"></i> privacy</button></a>
            <!-- <a href="https://status.emmameowss.gay" target="_blank"><button type="button"><i class="ti ti-progress-check"></i> status</button></a> -->
@@ -46,6 +41,21 @@
         <button type="button" id="stats-close">&times;</button>
         <h2>chat™ stats</h2>
         <div id="stats-content"><span class="stats-loading">loading...</span></div>
+    </div>
+    <div id="settings-backdrop" style="display:none"></div>
+    <div id="settings-panel" style="display:none">
+        <div id="settings-inner">
+            <button type="button" id="settings-close">&times;</button>
+            <h2>settings</h2>
+            <div id="settings-content">
+                <div class="settings-group">
+                    <button type="button" id="compact-btn"><i class="ti ti-layout-list"></i> compact mode</button>
+                    <button type="button" id="tooltips-btn"><i class="ti ti-info-circle"></i> hide tooltips</button>
+                    <button type="button" id="theme-btn"><i class="ti ti-sun"></i> light mode</button>
+                    <button type="button" title="mute notification sound" id="mute-btn"><span class="mute-label">mute sound</span></button>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="profile-backdrop" style="display:none"></div>
     <input type="file" id="avatar-input" accept="image/*" style="display:none">
