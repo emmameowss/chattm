@@ -47,10 +47,6 @@ available at: https://chattm.app, currently supports images and text, please not
 - guest badge in userlist and messages
 - banner for dev instances
 - maintenance
-
-## planned features
-- ~~message history~~
-- ~~typing indicator~~
-- ~~maybe: sound effect for message~~
-- ~~link detection in messages~~
-- ~~file size notification~~
+- custom emojis
+- ability to suggest custom emojis
+- database stuff
