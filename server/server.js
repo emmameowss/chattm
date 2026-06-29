@@ -810,6 +810,17 @@ io.on('connection', socket => {
                 socket.emit('commandError', 'usage: /addemoji :shortcode: <url>')
                 return
             }
+            let parsedUrl
+            try {
+                parsedUrl = new URL(url)
+            } catch {
+                socket.emit('commandError', 'invalid url')
+                return
+            }
+            if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== 'cdn.chattm.app') {
+                socket.emit('commandError', 'emoji url must be a https://cdn.chattm.app link')
+                return
+            }
             addCustomEmoji(shortcode, url)
             io.emit('emojiUpdate', getCustomEmoji())
             socket.emit('commandError', `added emoji ${shortcode}`)
