@@ -26,6 +26,7 @@ import {
     getAvatar, setAvatar, deleteAvatar,
     getCustomEmoji, addCustomEmoji, removeCustomEmoji,
     isVerified, setVerified, removeVerified,
+    isRedVerified, setRedVerified, removeRedVerified,
     getProfileData, setProfileBio, setProfileStatus, setProfilePronouns, setLastSeen, getRecentUsers, getDbStats,
     getAllHistory,
     addPendingEmoji, getPendingEmojis, getPendingEmojisByEmail, getPendingEmojiById, getPendingEmojiByShortcode, updatePendingEmoji, deletePendingEmoji
@@ -123,7 +124,7 @@ setInterval(() => {
     }
 }, 10 * 60 * 1000)
 
-const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests', '/addemoji', '/removeemoji', '/reloademojis', '/verify', '/unverify']
+const ownercmds = ['/ban', '/removefilter', '/addfilter', '/reloadfilter', '/unban', '/mute', '/setcolor', '/unmute', '/resetstrikes', '/clear', '/announce', '/mutechat', '/unmutechat', '/maintenance', '/unbanip', '/whois', '/kick', '/noguests', '/allowguests', '/addemoji', '/removeemoji', '/reloademojis', '/verify', '/unverify', '/redverify', '/unredverify']
 
 let chatMuted = false
 let guestsDisabled = getSetting('guests_disabled') === '1'
@@ -296,6 +297,7 @@ function emitUserList() {
             guest: s.userEmail.endsWith('@guest'),
             isOwner: s.userEmail === process.env.OWNER_EMAIL,
             verified: s.cachedVerified ?? false,
+            redVerified: s.cachedRedVerified ?? false,
             status: s.cachedStatus ?? 'online',
             online: true,
         })
@@ -313,6 +315,7 @@ function emitUserList() {
             guest: false,
             isOwner: row.email === process.env.OWNER_EMAIL,
             verified: !!row.verified,
+            redVerified: !!row.red_verified,
             status: row.status ?? 'online',
             online: false,
         })
@@ -389,6 +392,7 @@ io.on('connection', socket => {
     socket.cachedAvatar = getAvatar(socket.userEmail)
     socket.cachedColor = getColor(socket.userEmail)
     socket.cachedVerified = isVerified(socket.userEmail)
+    socket.cachedRedVerified = isRedVerified(socket.userEmail)
     socket.cachedStatus = getProfileData(socket.userEmail).status ?? 'online'
     socket.emit('savedAvatar', socket.cachedAvatar)
     socket.emit('savedProfile', getProfileData(socket.userEmail))
@@ -439,6 +443,7 @@ io.on('connection', socket => {
                 color: getColor(email),
                 avatar: getAvatar(email),
                 verified: isVerified(email),
+                redVerified: isRedVerified(email),
                 isOwner: email === process.env.OWNER_EMAIL,
                 isGuest: email.endsWith('@guest'),
                 online: isOnline,
@@ -833,6 +838,26 @@ io.on('connection', socket => {
             socket.emit('commandError', `unverified ${targetEmail}`)
             return
         }
+        if (data.text?.startsWith('/redverify ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetEmail = data.text.slice(11).trim()
+            setRedVerified(targetEmail)
+            for (const [, s] of io.sockets.sockets) {
+                if (s.userEmail === targetEmail) s.cachedRedVerified = true
+            }
+            emitUserList()
+            socket.emit('commandError', `red verified ${targetEmail}`)
+            return
+        }
+        if (data.text?.startsWith('/unredverify ') && socket.userEmail === process.env.OWNER_EMAIL) {
+            const targetEmail = data.text.slice(13).trim()
+            removeRedVerified(targetEmail)
+            for (const [, s] of io.sockets.sockets) {
+                if (s.userEmail === targetEmail) s.cachedRedVerified = false
+            }
+            emitUserList()
+            socket.emit('commandError', `removed red verification from ${targetEmail}`)
+            return
+        }
         if (data.text?.startsWith('/whois ') && socket.userEmail === process.env.OWNER_EMAIL) {
             const targetUsername = data.text.slice(7).trim()
             let found = null
@@ -989,7 +1014,8 @@ io.on('connection', socket => {
             isGuest: socket.userEmail.endsWith('@guest'),
             color: getColor(socket.userEmail) ?? null,
             avatar: getAvatar(socket.userEmail) ?? null,
-            verified: isVerified(socket.userEmail)
+            verified: isVerified(socket.userEmail),
+            redVerified: isRedVerified(socket.userEmail)
         }
         const onlineNames = [...io.sockets.sockets.values()].map(s => s.username).filter(Boolean)
         const mentions = [...new Set(

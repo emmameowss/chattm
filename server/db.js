@@ -95,6 +95,10 @@ db.exec(`
     email TEXT PRIMARY KEY
   );
 
+  CREATE TABLE IF NOT EXISTS red_verified_users (
+    email TEXT PRIMARY KEY
+  );
+
   CREATE TABLE IF NOT EXISTS profiles (
     email TEXT PRIMARY KEY,
     bio TEXT,
@@ -198,6 +202,11 @@ const stmts = {
   setVerified: db.prepare(`INSERT OR IGNORE INTO verified_users (email) VALUES (?)`),
   removeVerified: db.prepare(`DELETE FROM verified_users WHERE email = ?`),
 
+  // Red verified users
+  isRedVerified: db.prepare(`SELECT 1 FROM red_verified_users WHERE email = ?`),
+  setRedVerified: db.prepare(`INSERT OR IGNORE INTO red_verified_users (email) VALUES (?)`),
+  removeRedVerified: db.prepare(`DELETE FROM red_verified_users WHERE email = ?`),
+
   // Stats
   countUsers: db.prepare(`SELECT COUNT(DISTINCT email) AS n FROM sessions WHERE email NOT LIKE '%@guest'`),
   countMessages: db.prepare(`SELECT COUNT(*) AS n FROM messages WHERE system = 0`),
@@ -216,12 +225,14 @@ const stmts = {
            p.status, p.bio, p.pronouns,
            c.color,
            a.url AS avatar,
-           CASE WHEN v.email IS NOT NULL THEN 1 ELSE 0 END AS verified
+           CASE WHEN v.email IS NOT NULL THEN 1 ELSE 0 END AS verified,
+           CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified
     FROM profiles p
     JOIN usernames u ON u.email = p.email
     LEFT JOIN colors c ON c.email = p.email
     LEFT JOIN avatars a ON a.email = p.email
     LEFT JOIN verified_users v ON v.email = p.email
+    LEFT JOIN red_verified_users rv ON rv.email = p.email
     WHERE p.last_seen > ? AND u.email NOT LIKE '%@guest'
     ORDER BY p.last_seen DESC LIMIT 100
   `),
@@ -521,6 +532,18 @@ export function setVerified(email) {
 
 export function removeVerified(email) {
   stmts.removeVerified.run(email)
+}
+
+export function isRedVerified(email) {
+  return !!stmts.isRedVerified.get(email)
+}
+
+export function setRedVerified(email) {
+  stmts.setRedVerified.run(email)
+}
+
+export function removeRedVerified(email) {
+  stmts.removeRedVerified.run(email)
 }
 
 // ─── Profile API ─────────────────────────────────────────────────────────────

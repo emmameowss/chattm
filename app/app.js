@@ -345,6 +345,7 @@ let myStatus = ''
 let myPronouns = ''
 let myAvatar = null
 let myVerified = false
+let myRedVerified = false
 let myColor = null
 
 function updateProfileBtn() {
@@ -370,6 +371,8 @@ function updateProfileBtn() {
         badge.src = 'https://cdn.chattm.app/verified_owner.png'
         badge.style.cssText = 'width:13px;height:13px;vertical-align:middle;margin-left:3px'
         btn.appendChild(badge)
+    } else if (myRedVerified) {
+        btn.appendChild(makeRedCheckBadge(13))
     } else if (myVerified) {
         const badge = document.createElement('img')
         badge.src = 'https://cdn.chattm.app/verified.png'
@@ -666,6 +669,7 @@ socket.on('profileData', (data) => {
     nameEl.textContent = data.username
     nameRow.appendChild(nameEl)
     if (data.isOwner) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
+    else if (data.redVerified) nameRow.appendChild(makeRedCheckBadge(14))
     else if (data.verified) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
 
     document.querySelector('#profile-pronouns-display').textContent = data.pronouns || ''
@@ -674,6 +678,7 @@ socket.on('profileData', (data) => {
     const isOwnProfile = data.username === username
     if (isOwnProfile) {
         myVerified = data.verified
+        myRedVerified = data.redVerified ?? false
         updateProfileBtn()
     }
 
@@ -1236,6 +1241,17 @@ document.addEventListener('visibilitychange', () => {
 
 let lastMsgMeta = null  // { username, time } - for message grouping
 
+function makeRedCheckBadge(size, tooltip = 'this user has a special red verification') {
+    const wrap = document.createElement('span')
+    wrap.className = 'badge-wrap'
+    wrap.dataset.tooltip = tooltip
+    const span = document.createElement('span')
+    span.textContent = '✔'
+    span.style.cssText = `color:#e53935;font-size:${size}px;vertical-align:middle;margin-left:4px;position:relative;top:-1px;line-height:1;font-weight:bold`
+    wrap.appendChild(span)
+    return wrap
+}
+
 function makeBadge(src, size, tooltip) {
     const wrap = document.createElement('span')
     wrap.className = 'badge-wrap'
@@ -1324,7 +1340,8 @@ function renderMessage(data) {
     nametext.textContent = ausername
     namespan.appendChild(nametext)
     if (data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
-    if (data.verified && !data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
+    else if (data.redVerified) namespan.appendChild(makeRedCheckBadge(14))
+    else if (data.verified) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 14, 'this user has been verified'))
     namespan.style.cursor = 'pointer'
     namespan.addEventListener('click', (e) => { e.stopPropagation(); openProfile(ausername) })
     header.appendChild(namespan)
@@ -1379,14 +1396,26 @@ function openAdminUserContextMenu(e, u) {
     const menu = document.querySelector('#admin-user-context-menu')
     const verifyBtn = document.querySelector('#ctx-verify-btn')
     const unverifyBtn = document.querySelector('#ctx-unverify-btn')
+    const redVerifyBtn = document.querySelector('#ctx-redverify-btn')
+    const unredVerifyBtn = document.querySelector('#ctx-unredverify-btn')
     verifyBtn.style.display = u.verified ? 'none' : ''
     unverifyBtn.style.display = u.verified ? '' : 'none'
+    redVerifyBtn.style.display = u.redVerified ? 'none' : ''
+    unredVerifyBtn.style.display = u.redVerified ? '' : 'none'
     verifyBtn.onclick = () => {
         socket.emit('message', {text: `/verify ${u.email}`})
         menu.classList.remove('open')
     }
     unverifyBtn.onclick = () => {
         socket.emit('message', {text: `/unverify ${u.email}`})
+        menu.classList.remove('open')
+    }
+    redVerifyBtn.onclick = () => {
+        socket.emit('message', {text: `/redverify ${u.email}`})
+        menu.classList.remove('open')
+    }
+    unredVerifyBtn.onclick = () => {
+        socket.emit('message', {text: `/unredverify ${u.email}`})
         menu.classList.remove('open')
     }
     menu.style.left = `${Math.min(e.clientX, window.innerWidth - 180)}px`
@@ -1653,6 +1682,7 @@ function makeUserlistEntry(u) {
     nameEl.textContent = u.username
     info.appendChild(nameEl)
     if (u.isOwner) info.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 11, 'this user is verified to be the owner of chat™'))
+    else if (u.redVerified) info.appendChild(makeRedCheckBadge(11))
     else if (u.verified) info.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 11, 'this user has been verified'))
     div.appendChild(info)
 
@@ -1724,7 +1754,7 @@ socket.on('clear', () => {
 })
 
 // command autocomplete
-const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]', '/addemoji [:shortcode:] [url]', '/removeemoji [:shortcode:]', '/reloademojis', '/verify [email]', '/unverify [email]']
+const commands = ["/whois [username]", '/noguests', '/setnick [oldname] [newname]', '/allowguests', '/removefilter [word]', '/addfilter [word]', '/reloadfilter', "/kick [username] [reason]", '/setcolor [username] [color]', '/resetstrikes [username]', "/clear", "/announce [text]", '/mute [username] [time] [reason]', '/unmute [username]', "/mutechat", "/status [text]", "/unmutechat", "/color [color|pride|trans|bi|lesbian|nb|gay]", "/colour [colour|pride|trans|bi|lesbian|nb|gay]", "/nick [name]", "/ban [username] [reason]", '/unban [email]', '/unbanip [ip]', '/addemoji [:shortcode:] [url]', '/removeemoji [:shortcode:]', '/reloademojis', '/verify [email]', '/unverify [email]', '/redverify [email]', '/unredverify [email]']
 
 // stores what to actually insert on Tab (may differ from displayed suggestion text)
 let suggestionInsert = null
