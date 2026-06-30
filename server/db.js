@@ -123,8 +123,18 @@ const stmts = {
     INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url, is_verified)
     VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url, @is_verified)
   `),
-  getMessages: db.prepare(`SELECT * FROM (SELECT * FROM messages ORDER BY time DESC LIMIT 100) ORDER BY time ASC`),
-  getAllMessages: db.prepare(`SELECT * FROM messages ORDER BY time ASC`),
+  getMessages: db.prepare(`
+    SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified
+    FROM (SELECT * FROM messages ORDER BY time DESC LIMIT 100) m
+    LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
+    ORDER BY m.time ASC
+  `),
+  getAllMessages: db.prepare(`
+    SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified
+    FROM messages m
+    LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
+    ORDER BY m.time ASC
+  `),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
   clearMessages: db.prepare(`DELETE FROM messages`),
 
@@ -255,6 +265,7 @@ function mapMessageRow(row) {
     mentions: JSON.parse(row.mentions || '[]'),
     avatar: row.avatar_url ?? null,
     verified: !!row.is_verified,
+    redVerified: !!row.red_verified,
   }
 }
 
