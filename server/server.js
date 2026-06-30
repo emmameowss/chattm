@@ -532,32 +532,7 @@ io.on('connection', socket => {
             return
         }
 
-        // filter
-        if (socket.userEmail !== process.env.OWNER_EMAIL) {
-            const hit = containsFilteredWord(data.text)
-            if (hit) {
-                const count = getStrikes(socket.userEmail) + 1
-                setStrikes(socket.userEmail, count)
-
-                if (count > 5) {
-                    const banReason = 'banned by server - too many automatic mutes'
-                    addBan(socket.userEmail, banReason)
-                    addIpBan(socket.userIP)
-                    await appendFile('bans.log', `${new Date().toISOString()}: also banned IP ${socket.userIP}\n`)
-                    await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) auto-banned, 5th strike triggered by "${hit}" - message: ${data.text}\n`)
-                    socket.emit('banned', banReason)
-                    socket.skipLeaveMessage = true
-                    socket.disconnect()
-                    return
-                }
-                const durationMs = 10 * 60 * 1000
-                setMute(socket.userEmail, `muted by server: word filter (strike ${count}/5)`, Date.now() + durationMs)
-                const m = getMute(socket.userEmail)
-                await appendFile('filter.log', `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) muted for 10m, strike ${count}/5, triggered by "${hit}" - message: ${data.text}\n`)
-                socket.emit('muted', { reason: m.reason, until: m.until })
-                return
-            }
-        }
+        // filter disabled
 
         const now = Date.now()
         if (lastmessage[socket.userEmail] && now - lastmessage[socket.userEmail] < msgcooldown) {
