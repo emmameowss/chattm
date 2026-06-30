@@ -181,6 +181,13 @@ const flags = {
     'flag:nb':          'linear-gradient(90deg,#fcf434,#fff,#9c59d1,#2c2c2c)'
 }
 
+function applyRedVerifiedColor(el) {
+    el.style.color = 'transparent'
+    el.style.backgroundImage = 'linear-gradient(135deg, #3d0a0f, #5a151c)'
+    el.style.backgroundClip = 'text'
+    el.style.webkitBackgroundClip = 'text'
+}
+
 function applyFlagColor(el, color) {
     const gradient = flags[color]
     if (gradient) {
@@ -364,7 +371,8 @@ function updateProfileBtn() {
     }
     const nameSpan = document.createElement('span')
     nameSpan.textContent = username
-    applyFlagColor(nameSpan, myColor || getNameColor(username))
+    if (myRedVerified) applyRedVerifiedColor(nameSpan)
+    else applyFlagColor(nameSpan, myColor || getNameColor(username))
     btn.appendChild(nameSpan)
     if (isOwner) {
         const badge = document.createElement('img')
@@ -665,7 +673,8 @@ socket.on('profileData', (data) => {
     const nameRow = document.querySelector('#profile-name-row')
     nameRow.innerHTML = ''
     const nameEl = document.createElement('span')
-    applyFlagColor(nameEl, color)
+    if (data.redVerified) applyRedVerifiedColor(nameEl)
+    else applyFlagColor(nameEl, color)
     nameEl.textContent = data.username
     nameRow.appendChild(nameEl)
     if (data.isOwner) nameRow.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
@@ -1336,7 +1345,8 @@ function renderMessage(data) {
     const namespan = document.createElement('span')
     namespan.className = 'msg-username'
     const nametext = document.createElement('span')
-    applyFlagColor(nametext, color)
+    if (data.redVerified) applyRedVerifiedColor(nametext)
+    else applyFlagColor(nametext, color)
     nametext.textContent = ausername
     namespan.appendChild(nametext)
     if (data.isToken) namespan.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 14, 'this user is verified to be the owner of chat™'))
@@ -1678,7 +1688,8 @@ function makeUserlistEntry(u) {
     info.className = 'ul-info'
     const nameEl = document.createElement('span')
     nameEl.className = 'ul-name'
-    applyFlagColor(nameEl, u.color || getNameColor(u.username))
+    if (u.redVerified) applyRedVerifiedColor(nameEl)
+    else applyFlagColor(nameEl, u.color || getNameColor(u.username))
     nameEl.textContent = u.username
     info.appendChild(nameEl)
     if (u.isOwner) info.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 11, 'this user is verified to be the owner of chat™'))
@@ -1691,6 +1702,11 @@ function makeUserlistEntry(u) {
 }
 
 let cachedAdminUsers = []
+let cachedAdminUsersWithEmails = []
+
+socket.on('adminUserlist', (users) => {
+    cachedAdminUsersWithEmails = users
+})
 
 socket.on('userlist', (users) => {
     cachedAdminUsers = users
@@ -1886,8 +1902,8 @@ const adminTabEmoji = document.querySelector('#admin-tab-emoji')
 
 function renderAdminUsers() {
     adminUsersList.innerHTML = ''
-    const hca = cachedAdminUsers.filter(u => !u.guest)
-    const guests = cachedAdminUsers.filter(u => u.guest)
+    const hca = cachedAdminUsersWithEmails.filter(u => !u.guest)
+    const guests = cachedAdminUsersWithEmails.filter(u => u.guest)
     function makeSection(label, arr) {
         if (!arr.length) return
         const header = document.createElement('div')
@@ -1919,7 +1935,8 @@ function renderAdminUsers() {
             info.className = 'admin-user-info'
             const nameEl = document.createElement('span')
             nameEl.className = 'admin-user-name'
-            applyFlagColor(nameEl, u.color || getNameColor(u.username))
+            if (u.redVerified) applyRedVerifiedColor(nameEl)
+            else applyFlagColor(nameEl, u.color || getNameColor(u.username))
             nameEl.textContent = u.username
             info.appendChild(nameEl)
             const emailEl = document.createElement('span')

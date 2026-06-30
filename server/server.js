@@ -321,7 +321,16 @@ function emitUserList() {
         })
     }
 
-    io.emit('userlist', users)
+    // strip emails before broadcasting to all clients
+    const publicUsers = users.map(({ email, ...rest }) => rest)
+    io.emit('userlist', publicUsers)
+
+    // send full data (with emails) only to the owner
+    for (const [, s] of io.sockets.sockets) {
+        if (s.userEmail === process.env.OWNER_EMAIL && s.username) {
+            s.emit('adminUserlist', users)
+        }
+    }
 }
 
 io.use((socket, next) => {
