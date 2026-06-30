@@ -1250,7 +1250,7 @@ document.addEventListener('visibilitychange', () => {
 
 let lastMsgMeta = null  // { username, time } - for message grouping
 
-function makeRedCheckBadge(size, tooltip = 'this user has special verification. you cannot get this.') {
+function makeRedCheckBadge(size, tooltip = 'this checkmark is only held by my girlfriend and z. you cannot get it.') {
     return makeBadge('https://cdn.chattm.app/verified_red.png', size, tooltip)
 }
 
