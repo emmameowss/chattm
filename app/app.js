@@ -1251,14 +1251,7 @@ document.addEventListener('visibilitychange', () => {
 let lastMsgMeta = null  // { username, time } - for message grouping
 
 function makeRedCheckBadge(size, tooltip = 'this user has a special red verification') {
-    const wrap = document.createElement('span')
-    wrap.className = 'badge-wrap'
-    wrap.dataset.tooltip = tooltip
-    const span = document.createElement('span')
-    span.textContent = '✔'
-    span.style.cssText = `background:linear-gradient(135deg,#3d0a0f,#5a151c);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:${size}px;vertical-align:middle;margin-left:4px;position:relative;top:-1px;line-height:1;font-weight:bold`
-    wrap.appendChild(span)
-    return wrap
+    return makeBadge('https://cdn.chattm.app/verified_red.png', size, tooltip)
 }
 
 function makeBadge(src, size, tooltip) {
