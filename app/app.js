@@ -1330,20 +1330,17 @@ function buildReplyRef(data) {
     return ref
 }
 
-function addHoverActions(li, data) {
-    if (data.system) return
-    const actions = document.createElement('div')
-    actions.className = 'msg-hover-actions'
-    const replyBtn = document.createElement('button')
-    replyBtn.type = 'button'
-    replyBtn.title = 'reply'
-    replyBtn.innerHTML = '<i class="ti ti-arrow-back-up"></i>'
-    replyBtn.addEventListener('click', (e) => {
+function makeReplyButton(data) {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'msg-hover-reply'
+    btn.title = 'reply'
+    btn.innerHTML = '<i class="ti ti-arrow-back-up"></i>'
+    btn.addEventListener('click', (e) => {
         e.stopPropagation()
         startReply(data.id)
     })
-    actions.appendChild(replyBtn)
-    li.appendChild(actions)
+    return btn
 }
 
 function makeRedCheckBadge(size, tooltip = 'this checkmark is only held by my girlfriend and z. you cannot get it.') {
@@ -1391,7 +1388,12 @@ function renderMessage(data) {
         li.className = 'msg-cont'
         li.dataset.id = data.id
         li.appendChild(buildMsgContent(data, color))
-        addHoverActions(li, data)
+        if (!data.system) {
+            const actions = document.createElement('div')
+            actions.className = 'msg-hover-actions'
+            actions.appendChild(makeReplyButton(data))
+            li.appendChild(actions)
+        }
         li.addEventListener('contextmenu', (e) => {
             e.preventDefault()
             openMessageContextMenu(li, data.id, ausername === username || isOwner)
@@ -1452,12 +1454,12 @@ function renderMessage(data) {
     timespan.className = 'msg-time'
     timespan.textContent = new Date(Number(data.time)).toLocaleString([], {hour: '2-digit', minute: '2-digit'})
     header.appendChild(timespan)
+    if (!data.system) header.appendChild(makeReplyButton(data))
     body.appendChild(header)
 
     body.appendChild(buildMsgContent(data, color))
     li.appendChild(body)
 
-    addHoverActions(li, data)
     li.addEventListener('contextmenu', (e) => {
         e.preventDefault()
         openMessageContextMenu(li, data.id, ausername === username || isOwner)

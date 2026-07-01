@@ -947,11 +947,13 @@ li.msg {
   padding: 6px 0 2px;
   align-items: flex-start;
   position: relative;
+  max-width: 640px;
 }
 
 li.msg-cont {
   padding: 1px 0 1px 46px; /* 36px avatar + 10px gap */
   position: relative;
+  max-width: 640px;
 }
 
 li.msg-flash {
@@ -966,23 +968,46 @@ li.msg-flash {
 .msg-hover-actions {
   display: none;
   position: absolute;
-  top: -12px;
-  right: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+  top: 0;
+  right: 4px;
 }
 
-li.msg:hover .msg-hover-actions,
 li.msg-cont:hover .msg-hover-actions {
   display: flex;
 }
 
-.msg-hover-actions button {
+.msg-hover-reply {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  padding: 0;
   border: none;
-  border-radius: 0;
-  padding: 4px 6px;
+  background: none;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+}
+
+.msg-hover-reply i {
+  font-size: 13px;
+}
+
+.msg-hover-reply:hover {
+  color: var(--pink);
+  background: var(--pink-dim);
+  border-color: transparent;
+}
+
+.msg-header .msg-hover-reply {
+  opacity: 0;
+  align-self: center;
+  transition: opacity 0.1s;
+}
+
+li.msg:hover .msg-header .msg-hover-reply {
+  opacity: 1;
 }
 
 .reply-ref {
