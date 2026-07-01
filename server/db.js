@@ -127,28 +127,37 @@ const stmts = {
   getMessages: db.prepare(`
     SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
            r.username AS reply_username, r.text AS reply_text, r.image AS reply_image,
-           r.color AS reply_color, r.avatar_url AS reply_avatar
+           r.color AS reply_color, r.avatar_url AS reply_avatar,
+           r.is_token AS reply_is_token, r.is_verified AS reply_is_verified,
+           CASE WHEN rv2.email IS NOT NULL THEN 1 ELSE 0 END AS reply_red_verified
     FROM (SELECT * FROM messages ORDER BY time DESC LIMIT 100) m
     LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
     LEFT JOIN messages r ON r.id = m.reply_to
+    LEFT JOIN red_verified_users rv2 ON rv2.email = r.owner_email
     ORDER BY m.time ASC
   `),
   getAllMessages: db.prepare(`
     SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
            r.username AS reply_username, r.text AS reply_text, r.image AS reply_image,
-           r.color AS reply_color, r.avatar_url AS reply_avatar
+           r.color AS reply_color, r.avatar_url AS reply_avatar,
+           r.is_token AS reply_is_token, r.is_verified AS reply_is_verified,
+           CASE WHEN rv2.email IS NOT NULL THEN 1 ELSE 0 END AS reply_red_verified
     FROM messages m
     LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
     LEFT JOIN messages r ON r.id = m.reply_to
+    LEFT JOIN red_verified_users rv2 ON rv2.email = r.owner_email
     ORDER BY m.time ASC
   `),
   getMessageById: db.prepare(`
     SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
            r.username AS reply_username, r.text AS reply_text, r.image AS reply_image,
-           r.color AS reply_color, r.avatar_url AS reply_avatar
+           r.color AS reply_color, r.avatar_url AS reply_avatar,
+           r.is_token AS reply_is_token, r.is_verified AS reply_is_verified,
+           CASE WHEN rv2.email IS NOT NULL THEN 1 ELSE 0 END AS reply_red_verified
     FROM messages m
     LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
     LEFT JOIN messages r ON r.id = m.reply_to
+    LEFT JOIN red_verified_users rv2 ON rv2.email = r.owner_email
     WHERE m.id = ?
   `),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
@@ -289,6 +298,9 @@ function mapMessageRow(row) {
       image: row.reply_image ?? null,
       color: row.reply_color ?? null,
       avatar: row.reply_avatar ?? null,
+      isToken: !!row.reply_is_token,
+      verified: !!row.reply_is_verified,
+      redVerified: !!row.reply_red_verified,
       deleted: row.reply_username == null,
     } : null,
   }

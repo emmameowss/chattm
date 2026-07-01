@@ -1309,12 +1309,22 @@ function buildReplyRef(data) {
             av.src = rt.avatar
             av.className = 'reply-ref-avatar'
             ref.appendChild(av)
+        } else {
+            const placeholder = document.createElement('div')
+            placeholder.className = 'reply-ref-avatar reply-ref-avatar-placeholder'
+            placeholder.textContent = (rt.username || '?')[0]
+            placeholder.style.backgroundColor = `hsl(${nameHash(rt.username) % 360}, 55%, 38%)`
+            ref.appendChild(placeholder)
         }
         const name = document.createElement('span')
         name.className = 'reply-ref-username'
         name.style.color = flags[rt.color] ? '' : (rt.color || getNameColor(rt.username))
         name.textContent = rt.username
         ref.appendChild(name)
+
+        if (rt.isToken) ref.appendChild(makeBadge('https://cdn.chattm.app/verified_owner.png', 12, 'this user is verified to be the owner of chat™'))
+        else if (rt.redVerified) ref.appendChild(makeRedCheckBadge(12))
+        else if (rt.verified) ref.appendChild(makeBadge('https://cdn.chattm.app/verified.png', 12, 'this user has been verified'))
 
         const snippet = document.createElement('span')
         snippet.className = 'reply-ref-snippet'

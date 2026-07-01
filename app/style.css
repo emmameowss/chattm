@@ -1037,9 +1037,29 @@ li.msg:hover .msg-header .msg-hover-reply {
   flex-shrink: 0;
 }
 
+.reply-ref-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  user-select: none;
+}
+
 .reply-ref-username {
   font-weight: 500;
   flex-shrink: 0;
+}
+
+.reply-ref .badge-wrap {
+  flex-shrink: 0;
+  margin-left: -3px;
+}
+
+.reply-ref .badge-wrap img {
+  top: -1px !important;
 }
 
 .reply-ref-snippet {
