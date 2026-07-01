@@ -7,6 +7,7 @@ db.pragma('journal_mode = WAL')
 try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0") } catch {}
+try { db.exec("ALTER TABLE messages ADD COLUMN reply_to TEXT") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -120,20 +121,35 @@ try { db.exec("ALTER TABLE pending_emojis ADD COLUMN review_reason TEXT") } catc
 
 const stmts = {
   insertMessage: db.prepare(`
-    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url, is_verified)
-    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url, @is_verified)
+    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url, is_verified, reply_to)
+    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url, @is_verified, @reply_to)
   `),
   getMessages: db.prepare(`
-    SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified
+    SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
+           r.username AS reply_username, r.text AS reply_text, r.image AS reply_image,
+           r.color AS reply_color, r.avatar_url AS reply_avatar
     FROM (SELECT * FROM messages ORDER BY time DESC LIMIT 100) m
     LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
+    LEFT JOIN messages r ON r.id = m.reply_to
     ORDER BY m.time ASC
   `),
   getAllMessages: db.prepare(`
-    SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified
+    SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
+           r.username AS reply_username, r.text AS reply_text, r.image AS reply_image,
+           r.color AS reply_color, r.avatar_url AS reply_avatar
     FROM messages m
     LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
+    LEFT JOIN messages r ON r.id = m.reply_to
     ORDER BY m.time ASC
+  `),
+  getMessageById: db.prepare(`
+    SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
+           r.username AS reply_username, r.text AS reply_text, r.image AS reply_image,
+           r.color AS reply_color, r.avatar_url AS reply_avatar
+    FROM messages m
+    LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
+    LEFT JOIN messages r ON r.id = m.reply_to
+    WHERE m.id = ?
   `),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
   clearMessages: db.prepare(`DELETE FROM messages`),
@@ -266,6 +282,15 @@ function mapMessageRow(row) {
     avatar: row.avatar_url ?? null,
     verified: !!row.is_verified,
     redVerified: !!row.red_verified,
+    replyTo: row.reply_to ? {
+      id: row.reply_to,
+      username: row.reply_username ?? null,
+      text: row.reply_text ?? null,
+      image: row.reply_image ?? null,
+      color: row.reply_color ?? null,
+      avatar: row.reply_avatar ?? null,
+      deleted: row.reply_username == null,
+    } : null,
   }
 }
 
@@ -275,6 +300,11 @@ export function getAllHistory() {
 
 export function getHistory() {
   return stmts.getMessages.all().map(mapMessageRow)
+}
+
+export function getMessageById(id) {
+  const row = stmts.getMessageById.get(id)
+  return row ? mapMessageRow(row) : null
 }
 
 export function addMessage(msg) {
@@ -292,6 +322,7 @@ export function addMessage(msg) {
     mentions: JSON.stringify(msg.mentions ?? []),
     avatar_url: msg.avatar ?? null,
     is_verified: msg.verified ? 1 : 0,
+    reply_to: msg.replyTo ?? null,
   })
   if (!msg.system) stmts.incrTotalMessages.run()
 }

@@ -11,7 +11,7 @@ import { execSync } from 'child_process'
 import { randomUUID } from 'crypto'
 import { S3Client, PutObjectCommand, ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import {
-    getHistory, addMessage, deleteMessage, clearMessages,
+    getHistory, addMessage, deleteMessage, clearMessages, getMessageById,
     getSession, saveSession, deleteSession,
     getColor, setColor, deleteColor,
     getMute, setMute, deleteMute, getExpiredMutes,
@@ -1013,6 +1013,7 @@ io.on('connection', socket => {
         }
         const timestamp = new Date().toISOString()
         await appendFile('messages.log', `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || '[image]'}\n`)
+        const replyTo = typeof data.replyTo === 'string' && getMessageById(data.replyTo) ? data.replyTo : null
         const message = {
             ...data,
             id: randomUUID(),
@@ -1024,7 +1025,8 @@ io.on('connection', socket => {
             color: getColor(socket.userEmail) ?? null,
             avatar: getAvatar(socket.userEmail) ?? null,
             verified: isVerified(socket.userEmail),
-            redVerified: isRedVerified(socket.userEmail)
+            redVerified: isRedVerified(socket.userEmail),
+            replyTo
         }
         const onlineNames = [...io.sockets.sockets.values()].map(s => s.username).filter(Boolean)
         const mentions = [...new Set(
@@ -1034,7 +1036,8 @@ io.on('connection', socket => {
         )]
         message.mentions = mentions
         addMessage(message)
-        const {ownerEmail, ...publicMessage} = message
+        const stored = getMessageById(message.id)
+        const {ownerEmail, ...publicMessage} = stored
         io.emit('message', publicMessage)
     })
 })

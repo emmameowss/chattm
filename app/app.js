@@ -1133,6 +1133,8 @@ async function sendMessageNew(e) {
 
     if (!textInput.value && !file) return
 
+    const replyTo = replyingTo ? replyingTo.id : null
+
     if (file) {
         if (file.size > MAX_SIZE) {
             showError('file too big (max is 50mb)')
@@ -1149,7 +1151,8 @@ async function sendMessageNew(e) {
         socket.emit('message', {
             username,
             text: isImage ? (textInput.value || null) : `${textInput.value ? textInput.value + ' ' : ''}${file.name}: ${url}`,
-            image: isImage ? url : null
+            image: isImage ? url : null,
+            replyTo
         })
         textInput.value = ''
         fileInput.value = ''
@@ -1159,10 +1162,12 @@ async function sendMessageNew(e) {
         socket.emit('message', {
             username,
             text: textInput.value,
-            image: null
+            image: null,
+            replyTo
         })
         textInput.value = ''
     }
+    if (replyingTo) cancelReply()
     textInput.focus()
 }
 
@@ -1250,6 +1255,97 @@ document.addEventListener('visibilitychange', () => {
 
 let lastMsgMeta = null  // { username, time } - for message grouping
 
+// ─── replies ─────────────────────────────────────────────────────────────
+
+let replyingTo = null
+
+function findMessageById(id) {
+    return renderedHistory.find(m => m.id === id)
+}
+
+function startReply(id) {
+    const msg = findMessageById(id)
+    if (!msg || msg.system) return
+    replyingTo = msg
+    document.querySelector('#reply-bar-username').textContent = msg.username
+    document.querySelector('#reply-bar').style.display = 'flex'
+    document.documentElement.classList.add('replying')
+    document.querySelector('#message-input').focus()
+}
+
+function cancelReply() {
+    replyingTo = null
+    document.querySelector('#reply-bar').style.display = 'none'
+    document.documentElement.classList.remove('replying')
+}
+
+document.querySelector('#reply-bar-cancel').addEventListener('click', cancelReply)
+
+function jumpToMessage(id) {
+    const li = document.querySelector(`li[data-id="${id}"]`)
+    if (!li) return
+    li.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    li.classList.add('msg-flash')
+    setTimeout(() => li.classList.remove('msg-flash'), 1200)
+}
+
+function buildReplyRef(data) {
+    const rt = data.replyTo
+    if (!rt) return null
+    const ref = document.createElement('div')
+    ref.className = 'reply-ref'
+    const icon = document.createElement('i')
+    icon.className = 'ti ti-arrow-back-up'
+    ref.appendChild(icon)
+
+    if (rt.deleted) {
+        ref.classList.add('reply-ref-deleted')
+        const text = document.createElement('span')
+        text.textContent = 'original message was deleted'
+        ref.appendChild(text)
+    } else {
+        if (rt.avatar) {
+            const av = document.createElement('img')
+            av.src = rt.avatar
+            av.className = 'reply-ref-avatar'
+            ref.appendChild(av)
+        }
+        const name = document.createElement('span')
+        name.className = 'reply-ref-username'
+        name.style.color = flags[rt.color] ? '' : (rt.color || getNameColor(rt.username))
+        name.textContent = rt.username
+        ref.appendChild(name)
+
+        const snippet = document.createElement('span')
+        snippet.className = 'reply-ref-snippet'
+        const text = rt.text ? rt.text.replace(/\s+/g, ' ').trim() : ''
+        snippet.textContent = text ? (text.length > 60 ? text.slice(0, 60) + '…' : text) : (rt.image ? '[image]' : '')
+        ref.appendChild(snippet)
+    }
+
+    ref.addEventListener('click', (e) => {
+        e.stopPropagation()
+        jumpToMessage(rt.id)
+    })
+    return ref
+}
+
+function addHoverActions(li, data) {
+    if (data.system) return
+    const actions = document.createElement('div')
+    actions.className = 'msg-hover-actions'
+    const replyBtn = document.createElement('button')
+    replyBtn.type = 'button'
+    replyBtn.title = 'reply'
+    replyBtn.innerHTML = '<i class="ti ti-arrow-back-up"></i>'
+    replyBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        startReply(data.id)
+    })
+    actions.appendChild(replyBtn)
+    li.appendChild(actions)
+}
+
 function makeRedCheckBadge(size, tooltip = 'this checkmark is only held by my girlfriend and z. you cannot get it.') {
     return makeBadge('https://cdn.chattm.app/verified_red.png', size, tooltip)
 }
@@ -1285,7 +1381,8 @@ function renderMessage(data) {
     const isContinuation = !document.documentElement.classList.contains('compact') &&
         lastMsgMeta &&
         lastMsgMeta.username === ausername &&
-        (data.time - lastMsgMeta.time) < 5 * 60 * 1000
+        (data.time - lastMsgMeta.time) < 5 * 60 * 1000 &&
+        !data.replyTo
 
     lastMsgMeta = { username: ausername, time: data.time }
 
@@ -1294,12 +1391,11 @@ function renderMessage(data) {
         li.className = 'msg-cont'
         li.dataset.id = data.id
         li.appendChild(buildMsgContent(data, color))
-        if (ausername === username || isOwner) {
-            li.addEventListener('contextmenu', (e) => {
-                e.preventDefault()
-                openMessageContextMenu(li, data.id)
-            })
-        }
+        addHoverActions(li, data)
+        li.addEventListener('contextmenu', (e) => {
+            e.preventDefault()
+            openMessageContextMenu(li, data.id, ausername === username || isOwner)
+        })
         appendMessage(li)
         return
     }
@@ -1331,6 +1427,9 @@ function renderMessage(data) {
     const body = document.createElement('div')
     body.className = 'msg-body'
 
+    const replyRef = buildReplyRef(data)
+    if (replyRef) body.appendChild(replyRef)
+
     // header row: username + badges + time
     const header = document.createElement('div')
     header.className = 'msg-header'
@@ -1358,24 +1457,30 @@ function renderMessage(data) {
     body.appendChild(buildMsgContent(data, color))
     li.appendChild(body)
 
-    if (ausername === username || isOwner) {
-        li.addEventListener('contextmenu', (e) => {
-            e.preventDefault()
-            openMessageContextMenu(li, data.id)
-        })
-    }
+    addHoverActions(li, data)
+    li.addEventListener('contextmenu', (e) => {
+        e.preventDefault()
+        openMessageContextMenu(li, data.id, ausername === username || isOwner)
+    })
 
     appendMessage(li)
 }
 
-function openMessageContextMenu(li, messageId) {
+function openMessageContextMenu(li, messageId, canDelete) {
     const menu = document.querySelector('#message-context-menu')
     const rect = li.getBoundingClientRect()
     menu.style.left = `${rect.left}px`
     menu.style.top = `${rect.bottom + 4}px`
     menu.classList.add('open')
 
+    const replyBtn = document.querySelector('#ctx-reply-btn')
+    replyBtn.onclick = () => {
+        startReply(messageId)
+        menu.classList.remove('open')
+    }
+
     const deleteBtn = document.querySelector('#ctx-delete-btn')
+    deleteBtn.style.display = canDelete ? '' : 'none'
     deleteBtn.onclick = () => {
         socket.emit('deleteMessage', messageId)
         menu.classList.remove('open')
@@ -1851,6 +1956,9 @@ document.querySelector('#message-input').addEventListener('keydown', (e) => {
             document.querySelector('#message-input').value = suggestionInsert
             hideSuggestion()
         }
+    }
+    if (e.key === 'Escape' && replyingTo) {
+        cancelReply()
     }
 })
 
