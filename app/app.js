@@ -1318,7 +1318,8 @@ function buildReplyRef(data) {
         }
         const name = document.createElement('span')
         name.className = 'reply-ref-username'
-        name.style.color = flags[rt.color] ? '' : (rt.color || getNameColor(rt.username))
+        if (rt.redVerified) applyRedVerifiedColor(name)
+        else applyFlagColor(name, rt.color || getNameColor(rt.username))
         name.textContent = rt.username
         ref.appendChild(name)
 
