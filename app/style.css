@@ -256,7 +256,7 @@ button:active {
   position: fixed;
   bottom: 0;
   left: 160px;
-  right: 0;
+  right: 180px;
   background: var(--bg);
   border-top: 1px solid var(--border);
   z-index: 100;
@@ -950,7 +950,7 @@ body::after {
   bottom: 0;
   width: 1px;
   background: var(--border);
-  z-index: 2;
+  z-index: 101;
   pointer-events: none;
 }
 body::before { left: 160px; }
@@ -2255,7 +2255,7 @@ body:has(#dev-banner) #version-status {
 
   #add-channel-btn { flex: 0 0 auto; margin-top: 0; white-space: nowrap; }
 
-  #composer-wrap { left: 0; }
+  #composer-wrap { left: 0; right: 0; }
 
   #userlist {
     position: fixed;
