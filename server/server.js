@@ -567,7 +567,7 @@ io.on('connection', socket => {
 
     socket.on('createChannel', (rawName) => {
         if (socket.userEmail !== process.env.OWNER_EMAIL) return
-        const name = String(rawName ?? '').trim().toLowerCase()
+        const name = String(rawName ?? '').trim().toLowerCase().replace(/\s+/g, '-')
         if (!/^[a-z0-9-]{1,24}$/.test(name)) return socket.emit('commandError', 'invalid channel name (use a-z, 0-9, - ; max 24)')
         if (channelExists(name)) return socket.emit('commandError', 'channel already exists')
         createChannel(name, socket.userEmail)

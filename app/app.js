@@ -1164,8 +1164,9 @@ function switchChannel(name) {
 }
 
 addChannelBtn.addEventListener('click', async () => {
-    const name = await showModal({message: 'channel name (a-z, 0-9, - ; max 24)', withInput: true})
-    if (name && name.trim()) socket.emit('createChannel', name.trim())
+    const raw = await showModal({message: 'channel name (a-z, 0-9, - ; max 24)', withInput: true})
+    const name = (raw ?? '').trim().toLowerCase().replace(/\s+/g, '-')
+    if (name) socket.emit('createChannel', name)
 })
 
 socket.on('channels', (names) => {
