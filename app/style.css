@@ -1249,7 +1249,7 @@ a:hover {
 #bottom-hints {
   position: fixed;
   bottom: 68px;
-  left: 20px;
+  left: 180px;
   display: flex;
   align-items: center;
   gap: 12px;
