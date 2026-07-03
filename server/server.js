@@ -605,7 +605,9 @@ io.on('connection', socket => {
         // filter disabled
 
         const now = Date.now()
-        if (lastmessage[socket.userEmail] && now - lastmessage[socket.userEmail] < msgcooldown) {
+        // verified users (and the owner) bypass the message cooldown
+        const bypassCooldown = socket.cachedVerified || socket.cachedRedVerified || socket.userEmail === process.env.OWNER_EMAIL
+        if (!bypassCooldown && lastmessage[socket.userEmail] && now - lastmessage[socket.userEmail] < msgcooldown) {
             socket.emit('commandError', 'slow down')
             return
         }
