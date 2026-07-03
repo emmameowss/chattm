@@ -968,12 +968,21 @@ ul {
   padding: 4px 8px;
 }
 
+#channels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .channel-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  padding: 6px 8px;
+  min-height: 30px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  line-height: 1;
   cursor: pointer;
   border-radius: var(--radius);
   color: var(--muted);
