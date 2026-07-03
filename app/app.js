@@ -453,7 +453,7 @@ compactbtn.addEventListener('click', () => {
     ul.innerHTML = ''
     lastMsgMeta = null
     renderedHistory.forEach(data => renderMessage(data))
-    window.scrollTo({ top: document.body.scrollHeight })
+    ul.scrollTop = ul.scrollHeight
 })
 
 const tooltipsbtn = document.querySelector('#tooltips-btn')
@@ -1121,7 +1121,7 @@ socket.on('history', (messages) => {
     atBottom = false  // suppress per-message scrolls during batch render
     messages.forEach(data => renderMessage(data))
     atBottom = true
-    window.scrollTo({ top: document.body.scrollHeight })
+    msgList.scrollTop = msgList.scrollHeight
 })
 
 // ─── Channels ───────────────────────────────────────────────────────────────
@@ -1239,15 +1239,16 @@ document.querySelector('#file-input').addEventListener('keydown', (e) => {
 })
 let atBottom = true
 let scrolling = false
-window.addEventListener('scroll', () => {
+const msgList = document.querySelector('ul')
+msgList.addEventListener('scroll', () => {
     if (scrolling) return
-    atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 150
+    atBottom = msgList.scrollTop + msgList.clientHeight >= msgList.scrollHeight - 150
 }, { passive: true })
 
 function scrollToBottom() {
     atBottom = true
     scrolling = true
-    window.scrollTo({ top: document.body.scrollHeight })
+    msgList.scrollTop = msgList.scrollHeight
     requestAnimationFrame(() => { scrolling = false })
 }
 

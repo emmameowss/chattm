@@ -111,7 +111,8 @@ html, body {
   font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.6;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 h1 {
@@ -931,14 +932,23 @@ button:active {
 .status-option.active { border-color: var(--pink); }
 
 ul {
-  padding-top: 50px;
   list-style: none;
-  padding: 70px 200px 90px 180px;
-  max-width: calc(100% - 340px);
+  position: fixed;
+  top: 52px;
+  left: 160px;
+  right: 180px;
+  bottom: 64px;
+  padding: 18px 20px;
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+html.replying ul {
+  bottom: 104px;
 }
 
 /* full-height dividers between channel list | chat | user list */
@@ -2230,7 +2240,11 @@ body:has(#dev-banner) #version-status {
   }
 
   ul {
-    padding: 78px 12px 130px 12px;
+    top: 64px;
+    left: 0;
+    right: 0;
+    bottom: 116px;
+    padding: 8px 12px;
     max-width: 100%;
   }
 
