@@ -1144,11 +1144,10 @@ function renderChannels() {
             del.className = 'channel-delete'
             del.textContent = '×'
             del.title = 'delete channel'
-            del.addEventListener('click', (e) => {
+            del.addEventListener('click', async (e) => {
                 e.stopPropagation()
-                if (confirm(`delete #${name}? all its messages will be removed.`)) {
-                    socket.emit('deleteChannel', name)
-                }
+                const ok = await showModal({message: `delete #${name}? all its messages will be removed.`})
+                if (ok) socket.emit('deleteChannel', name)
             })
             item.appendChild(del)
         }
@@ -1164,9 +1163,9 @@ function switchChannel(name) {
     socket.emit('switchChannel', name)
 }
 
-addChannelBtn.addEventListener('click', () => {
-    const name = prompt('channel name (a-z, 0-9, - ; max 24)')
-    if (name) socket.emit('createChannel', name)
+addChannelBtn.addEventListener('click', async () => {
+    const name = await showModal({message: 'channel name (a-z, 0-9, - ; max 24)', withInput: true})
+    if (name && name.trim()) socket.emit('createChannel', name.trim())
 })
 
 socket.on('channels', (names) => {
