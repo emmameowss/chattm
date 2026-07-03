@@ -966,6 +966,9 @@ body::after {
 body::before { left: 160px; }
 body::after { right: 180px; }
 
+body.login-page::before,
+body.login-page::after { display: none; }
+
 #channels {
   position: fixed;
   left: 0;
