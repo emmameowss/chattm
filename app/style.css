@@ -941,6 +941,21 @@ ul {
   gap: 2px;
 }
 
+/* full-height dividers between channel list | chat | user list */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+  z-index: 2;
+  pointer-events: none;
+}
+body::before { left: 160px; }
+body::after { right: 180px; }
+
 #channels {
   position: fixed;
   left: 0;
@@ -1300,6 +1315,7 @@ html.replying #bottom-hints {
   overflow-x: hidden;
   background: var(--bg);
   scrollbar-width: thin;
+  padding-left: 12px;
 }
 
 .ul-section {
@@ -2212,6 +2228,9 @@ body:has(#dev-banner) #version-status {
     max-width: 100%;
   }
 
+  body::before,
+  body::after { display: none; }
+
   #channels {
     position: fixed;
     top: 32px;
@@ -2225,6 +2244,7 @@ body:has(#dev-banner) #version-status {
     padding: 4px 12px;
     overflow-x: auto;
     overflow-y: hidden;
+    border-right: none;
     border-bottom: 1px solid var(--border);
     z-index: 99;
   }
@@ -2250,6 +2270,8 @@ body:has(#dev-banner) #version-status {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    border-left: none;
+    padding-left: 0;
   }
 
   #userlist strong {
