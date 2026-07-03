@@ -2442,6 +2442,7 @@ function showModal({message, withInput = false, defaultValue = ''}) {
             overlay.style.display = 'none'
             confirmBtn.removeEventListener('click', onConfirm)
             cancelBtn.removeEventListener('click', onCancel)
+            if (withInput) inputEl.removeEventListener('keydown', onKey)
             resolve(result)
         }
         function onConfirm() {
@@ -2450,8 +2451,13 @@ function showModal({message, withInput = false, defaultValue = ''}) {
         function onCancel() {
             cleanUp(withInput ? null : false)
         }
+        function onKey(e) {
+            if (e.key === 'Enter') { e.preventDefault(); onConfirm() }
+            else if (e.key === 'Escape') { e.preventDefault(); onCancel() }
+        }
         confirmBtn.addEventListener('click', onConfirm)
         cancelBtn.addEventListener('click', onCancel)
+        if (withInput) inputEl.addEventListener('keydown', onKey)
     })
 }
 
