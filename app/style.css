@@ -1009,12 +1009,16 @@ ul {
 #add-channel-btn {
   margin-top: 6px;
   padding: 6px 8px;
+  width: 100%;
   background: none;
   border: 1px dashed var(--border);
   border-radius: var(--radius);
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #add-channel-btn:hover { border-color: var(--pink); color: var(--pink); }
