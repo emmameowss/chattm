@@ -1067,6 +1067,13 @@ li.msg-cont {
   padding: 1px 0 1px 46px; /* 36px avatar + 10px gap */
   position: relative;
   max-width: 640px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+li.msg-cont .msg-content {
+  min-width: 0;
 }
 
 li.msg-flash {
@@ -1080,9 +1087,8 @@ li.msg-flash {
 
 .msg-hover-actions {
   display: none;
-  position: absolute;
-  top: 0;
-  right: 4px;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 li.msg-cont:hover .msg-hover-actions {
