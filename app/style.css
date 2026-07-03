@@ -255,7 +255,7 @@ button:active {
 #composer-wrap {
   position: fixed;
   bottom: 0;
-  left: 0;
+  left: 160px;
   right: 0;
   background: var(--bg);
   border-top: 1px solid var(--border);
@@ -933,13 +933,91 @@ button:active {
 ul {
   padding-top: 50px;
   list-style: none;
-  padding: 70px 200px 90px 20px;
-  max-width: calc(100% - 180px);
+  padding: 70px 200px 90px 180px;
+  max-width: calc(100% - 340px);
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+
+#channels {
+  position: fixed;
+  left: 0;
+  top: 52px;
+  width: 160px;
+  font-size: 12px;
+  color: var(--muted);
+  z-index: 1;
+  padding: 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg);
+  scrollbar-width: thin;
+}
+
+#channels-header {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 4px 8px;
+}
+
+.channel-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+
+.channel-item:hover { background: var(--border); }
+
+.channel-item.active {
+  color: var(--pink);
+  background: var(--pink-dim);
+}
+
+.channel-item .channel-name::before {
+  content: '#';
+  opacity: 0.5;
+  margin-right: 3px;
+}
+
+.channel-delete {
+  opacity: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.channel-item:hover .channel-delete { opacity: 0.7; }
+.channel-delete:hover { color: var(--pink); opacity: 1; }
+
+#add-channel-btn {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#add-channel-btn:hover { border-color: var(--pink); color: var(--pink); }
 
 li.msg {
   display: flex;
@@ -2110,9 +2188,34 @@ body:has(#dev-banner) #version-status {
   }
 
   ul {
-    padding: 44px 12px 130px 12px;
+    padding: 78px 12px 130px 12px;
     max-width: 100%;
   }
+
+  #channels {
+    position: fixed;
+    top: 32px;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-bottom: 1px solid var(--border);
+    z-index: 99;
+  }
+
+  #channels-header { display: none; }
+
+  .channel-item { flex: 0 0 auto; padding: 4px 8px; white-space: nowrap; }
+
+  #add-channel-btn { flex: 0 0 auto; margin-top: 0; white-space: nowrap; }
+
+  #composer-wrap { left: 0; }
 
   #userlist {
     position: fixed;

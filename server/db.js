@@ -8,6 +8,7 @@ try { db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'") } ca
 try { db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0") } catch {}
 try { db.exec("ALTER TABLE messages ADD COLUMN reply_to TEXT") } catch {}
+try { db.exec("ALTER TABLE messages ADD COLUMN channel TEXT DEFAULT 'main'") } catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -107,7 +108,16 @@ db.exec(`
     pronouns TEXT,
     last_seen INTEGER
   );
+
+  CREATE TABLE IF NOT EXISTS channels (
+    name TEXT PRIMARY KEY,
+    created_at INTEGER,
+    created_by TEXT
+  );
 `)
+
+// seed the default channel (idempotent)
+db.prepare(`INSERT OR IGNORE INTO channels (name, created_at, created_by) VALUES ('main', ?, 'system')`).run(Date.now())
 
 // profiles column migrations (run after CREATE TABLE so the table exists)
 try { db.exec("ALTER TABLE profiles ADD COLUMN pronouns TEXT") } catch {}
@@ -121,8 +131,8 @@ try { db.exec("ALTER TABLE pending_emojis ADD COLUMN review_reason TEXT") } catc
 
 const stmts = {
   insertMessage: db.prepare(`
-    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url, is_verified, reply_to)
-    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url, @is_verified, @reply_to)
+    INSERT OR REPLACE INTO messages (id, username, text, image, owner_email, time, is_token, is_guest, color, system, mentions, avatar_url, is_verified, reply_to, channel)
+    VALUES (@id, @username, @text, @image, @owner_email, @time, @is_token, @is_guest, @color, @system, @mentions, @avatar_url, @is_verified, @reply_to, @channel)
   `),
   getMessages: db.prepare(`
     SELECT m.*, CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
@@ -130,7 +140,7 @@ const stmts = {
            r.color AS reply_color, r.avatar_url AS reply_avatar,
            r.is_token AS reply_is_token, r.is_verified AS reply_is_verified,
            CASE WHEN rv2.email IS NOT NULL THEN 1 ELSE 0 END AS reply_red_verified
-    FROM (SELECT * FROM messages ORDER BY time DESC LIMIT 100) m
+    FROM (SELECT * FROM messages WHERE channel = ? ORDER BY time DESC LIMIT 100) m
     LEFT JOIN red_verified_users rv ON rv.email = m.owner_email
     LEFT JOIN messages r ON r.id = m.reply_to
     LEFT JOIN red_verified_users rv2 ON rv2.email = r.owner_email
@@ -161,7 +171,14 @@ const stmts = {
     WHERE m.id = ?
   `),
   deleteMessage: db.prepare(`DELETE FROM messages WHERE id = ?`),
-  clearMessages: db.prepare(`DELETE FROM messages`),
+  clearMessages: db.prepare(`DELETE FROM messages WHERE channel = ?`),
+
+  // Channels
+  listChannels: db.prepare(`SELECT name, created_at, created_by FROM channels ORDER BY created_at ASC`),
+  getChannel: db.prepare(`SELECT name FROM channels WHERE name = ?`),
+  insertChannel: db.prepare(`INSERT INTO channels (name, created_at, created_by) VALUES (?, ?, ?)`),
+  deleteChannel: db.prepare(`DELETE FROM channels WHERE name = ?`),
+  deleteChannelMessages: db.prepare(`DELETE FROM messages WHERE channel = ?`),
 
   // Sessions
   getSession: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
@@ -287,6 +304,7 @@ function mapMessageRow(row) {
     isGuest: !!row.is_guest,
     color: row.color,
     system: !!row.system,
+    channel: row.channel ?? 'main',
     mentions: JSON.parse(row.mentions || '[]'),
     avatar: row.avatar_url ?? null,
     verified: !!row.is_verified,
@@ -310,8 +328,28 @@ export function getAllHistory() {
   return stmts.getAllMessages.all().map(mapMessageRow)
 }
 
-export function getHistory() {
-  return stmts.getMessages.all().map(mapMessageRow)
+export function getHistory(channel = 'main') {
+  return stmts.getMessages.all(channel).map(mapMessageRow)
+}
+
+export function listChannels() {
+  return stmts.listChannels.all().map(r => ({ name: r.name, createdAt: r.created_at, createdBy: r.created_by }))
+}
+
+export function channelExists(name) {
+  return !!stmts.getChannel.get(name)
+}
+
+export function createChannel(name, email) {
+  stmts.insertChannel.run(name, Date.now(), email)
+}
+
+export function deleteChannel(name) {
+  const t = db.transaction(() => {
+    stmts.deleteChannelMessages.run(name)
+    stmts.deleteChannel.run(name)
+  })
+  t()
 }
 
 export function getMessageById(id) {
@@ -335,6 +373,7 @@ export function addMessage(msg) {
     avatar_url: msg.avatar ?? null,
     is_verified: msg.verified ? 1 : 0,
     reply_to: msg.replyTo ?? null,
+    channel: msg.channel ?? 'main',
   })
   if (!msg.system) stmts.incrTotalMessages.run()
 }
@@ -343,8 +382,8 @@ export function deleteMessage(id) {
   stmts.deleteMessage.run(id)
 }
 
-export function clearMessages() {
-  stmts.clearMessages.run()
+export function clearMessages(channel = 'main') {
+  stmts.clearMessages.run(channel)
 }
 
 // ─── Session API ─────────────────────────────────────────────────────────────

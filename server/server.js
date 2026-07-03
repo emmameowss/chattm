@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto'
 import { S3Client, PutObjectCommand, ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import {
     getHistory, addMessage, deleteMessage, clearMessages, getMessageById,
+    listChannels, channelExists, createChannel, deleteChannel,
     getSession, saveSession, deleteSession,
     getColor, setColor, deleteColor,
     getMute, setMute, deleteMute, getExpiredMutes,
@@ -281,13 +282,20 @@ setInterval(() => {
     }
 }, 10 * 1000)
 
-function emitUserList() {
+const roomOf = ch => 'channel:' + ch
+
+function emitAllUserLists() {
+    for (const c of listChannels()) emitUserList(c.name)
+}
+
+function emitUserList(channel = 'main') {
     const onlineEmails = new Set()
     const users = []
 
     // online users: use data already cached on the socket - zero DB reads
     for (const [id, s] of io.sockets.sockets) {
         if (!s.username) continue
+        if (s.currentChannel !== channel) continue
         onlineEmails.add(s.userEmail)
         users.push({
             username: s.username,
@@ -321,13 +329,13 @@ function emitUserList() {
         })
     }
 
-    // strip emails before broadcasting to all clients
+    // strip emails before broadcasting to this channel's clients
     const publicUsers = users.map(({ email, ...rest }) => rest)
-    io.emit('userlist', publicUsers)
+    io.to(roomOf(channel)).emit('userlist', publicUsers)
 
-    // send full data (with emails) only to the owner
+    // send full data (with emails) only to owners viewing this channel
     for (const [, s] of io.sockets.sockets) {
-        if (s.userEmail === process.env.OWNER_EMAIL && s.username) {
+        if (s.userEmail === process.env.OWNER_EMAIL && s.username && s.currentChannel === channel) {
             s.emit('adminUserlist', users)
         }
     }
@@ -368,13 +376,18 @@ io.on('connection', socket => {
     console.log(`${socket.userEmail} connected`)
     if (!socket.userEmail.endsWith('@guest')) setLastSeen(socket.userEmail)
     io.emit('usercount', io.engine.clientsCount)
+    // everyone starts in the default channel
+    socket.currentChannel = 'main'
+    socket.join(roomOf('main'))
     // send emoji map before history so shortcodes render correctly
     socket.emit('emoji', getCustomEmoji())
+    socket.emit('channels', listChannels().map(c => c.name))
     // strip ownerEmail before sending history to client
-    socket.emit('history', getHistory().map(({ ownerEmail, ...m }) => m))
+    socket.emit('history', getHistory(socket.currentChannel).map(({ ownerEmail, ...m }) => m))
     socket.emit('init', {
         isOwner: socket.userEmail === process.env.OWNER_EMAIL,
         chatMuted,
+        currentChannel: socket.currentChannel,
         uMuted: isMuted(socket.userEmail) ? getMute(socket.userEmail) : null
     })
     if (status) socket.emit('status', status)
@@ -392,7 +405,7 @@ io.on('connection', socket => {
         const guestUsername = saved || socket.userEmail.replace('@guest', '')
         socket.username = guestUsername
         socket.emit('savedUsername', guestUsername)
-        emitUserList()
+        emitUserList(socket.currentChannel)
     } else {
         const saved = getStoredUsername(socket.userEmail)
         if (saved) socket.username = saved
@@ -410,7 +423,7 @@ io.on('connection', socket => {
         const s = String(status ?? '').slice(0, 100)
         setProfileStatus(socket.userEmail, s)
         socket.cachedStatus = s
-        emitUserList()
+        emitUserList(socket.currentChannel)
         socket.emit('savedProfile', getProfileData(socket.userEmail))
     })
 
@@ -471,14 +484,14 @@ io.on('connection', socket => {
         setAvatar(socket.userEmail, url)
         socket.cachedAvatar = url
         socket.emit('savedAvatar', url)
-        emitUserList()
+        emitUserList(socket.currentChannel)
     })
 
     socket.on('deleteAvatar', () => {
         deleteAvatar(socket.userEmail)
         socket.cachedAvatar = null
         socket.emit('savedAvatar', null)
-        emitUserList()
+        emitUserList(socket.currentChannel)
     })
 
     socket.on('setUsername', (name) => {
@@ -496,16 +509,16 @@ io.on('connection', socket => {
             socket.broadcast.emit('userRenamedSys', {from: prevUser, to: name})
             socket.emit('userRenamed', { from: prevUser, to: name })
         }
-        emitUserList()
+        emitAllUserLists()
     })
 
     socket.on('typing', () => {
         if (!socket.username) return
-        socket.broadcast.emit('typing', socket.username)
+        socket.to(roomOf(socket.currentChannel)).emit('typing', socket.username)
     })
 
     socket.on('stopTyping', () => {
-        socket.broadcast.emit('stopTyping', socket.username)
+        socket.to(roomOf(socket.currentChannel)).emit('stopTyping', socket.username)
     })
 
     socket.on('userActive', () => {
@@ -518,11 +531,11 @@ io.on('connection', socket => {
         io.emit('usercount', io.engine.clientsCount)
         if (socket.username && !socket.skipLeaveMessage) {
         }
-        emitUserList()
+        emitUserList(socket.currentChannel)
     })
 
     socket.on('deleteMessage', (messageId) => {
-        const history = getHistory()
+        const history = getHistory(socket.currentChannel)
         const msg = history.find(m => m.id === messageId)
         if (!msg) return
 
@@ -534,7 +547,50 @@ io.on('connection', socket => {
             return
         }
         deleteMessage(messageId)
-        io.emit('messageDeleted', messageId)
+        io.to(roomOf(socket.currentChannel)).emit('messageDeleted', messageId)
+    })
+
+    socket.on('switchChannel', (name) => {
+        if (typeof name !== 'string' || !channelExists(name)) return
+        const prev = socket.currentChannel
+        if (prev === name) return
+        socket.to(roomOf(prev)).emit('stopTyping', socket.username)
+        socket.leave(roomOf(prev))
+        socket.join(roomOf(name))
+        socket.currentChannel = name
+        socket.emit('history', getHistory(name).map(({ ownerEmail, ...m }) => m))
+        socket.emit('switchedChannel', name)
+        // presence changed in both the old and the new channel
+        emitUserList(prev)
+        emitUserList(name)
+    })
+
+    socket.on('createChannel', (rawName) => {
+        if (socket.userEmail !== process.env.OWNER_EMAIL) return
+        const name = String(rawName ?? '').trim().toLowerCase()
+        if (!/^[a-z0-9-]{1,24}$/.test(name)) return socket.emit('commandError', 'invalid channel name (use a-z, 0-9, - ; max 24)')
+        if (channelExists(name)) return socket.emit('commandError', 'channel already exists')
+        createChannel(name, socket.userEmail)
+        io.emit('channels', listChannels().map(c => c.name))
+    })
+
+    socket.on('deleteChannel', (rawName) => {
+        if (socket.userEmail !== process.env.OWNER_EMAIL) return
+        const name = String(rawName ?? '').trim().toLowerCase()
+        if (name === 'main') return socket.emit('commandError', 'the main channel cannot be deleted')
+        if (!channelExists(name)) return
+        deleteChannel(name)
+        // move anyone viewing the deleted channel back to main
+        for (const [, s] of io.sockets.sockets) {
+            if (s.currentChannel !== name) continue
+            s.leave(roomOf(name))
+            s.join(roomOf('main'))
+            s.currentChannel = 'main'
+            s.emit('history', getHistory('main').map(({ ownerEmail, ...m }) => m))
+            s.emit('switchedChannel', 'main')
+        }
+        io.emit('channels', listChannels().map(c => c.name))
+        emitUserList('main')
     })
 
     socket.on('message', async (data) => {
@@ -666,7 +722,7 @@ io.on('connection', socket => {
             targetSocket.username = newName
             saveUsername(targetSocket.userEmail, newName)
             targetSocket.emit('savedUsername', newName)
-            emitUserList()
+            emitAllUserLists()
             socket.emit('commandError', `changed ${prevName}'s name to ${newName}`)
             return
         }
@@ -750,8 +806,8 @@ io.on('connection', socket => {
             return
         }
         if (data.text?.startsWith('/clear') && socket.userEmail === process.env.OWNER_EMAIL) {
-            clearMessages()
-            io.emit('clear')
+            clearMessages(socket.currentChannel)
+            io.to(roomOf(socket.currentChannel)).emit('clear')
             return
         }
 
@@ -833,7 +889,7 @@ io.on('connection', socket => {
             for (const [, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) s.cachedVerified = true
             }
-            emitUserList()
+            emitAllUserLists()
             socket.emit('commandError', `verified ${targetEmail}`)
             return
         }
@@ -843,7 +899,7 @@ io.on('connection', socket => {
             for (const [, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) s.cachedVerified = false
             }
-            emitUserList()
+            emitAllUserLists()
             socket.emit('commandError', `unverified ${targetEmail}`)
             return
         }
@@ -853,7 +909,7 @@ io.on('connection', socket => {
             for (const [, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) s.cachedRedVerified = true
             }
-            emitUserList()
+            emitAllUserLists()
             socket.emit('commandError', `red verified ${targetEmail}`)
             return
         }
@@ -863,7 +919,7 @@ io.on('connection', socket => {
             for (const [, s] of io.sockets.sockets) {
                 if (s.userEmail === targetEmail) s.cachedRedVerified = false
             }
-            emitUserList()
+            emitAllUserLists()
             socket.emit('commandError', `removed red verification from ${targetEmail}`)
             return
         }
@@ -901,7 +957,7 @@ io.on('connection', socket => {
                socket.broadcast.emit('userRenamedSys', {from: prevUser, to: nick}, isGuest)
                socket.emit('userRenamed', { from: prevUser, to: nick })
             }
-            emitUserList()
+            emitAllUserLists()
             return
         }
         // maintenance cmd
@@ -943,7 +999,7 @@ io.on('connection', socket => {
             setColor(socket.userEmail, color)
             socket.cachedColor = color
             socket.emit('colorChanged', color)
-            emitUserList()
+            emitUserList(socket.currentChannel)
             return
         }
         if (data.text?.startsWith('/addfilter ') && socket.userEmail === process.env.OWNER_EMAIL) {
@@ -1007,7 +1063,7 @@ io.on('connection', socket => {
                     s.emit('colorChanged', color)
                 }
             }
-            emitUserList()
+            emitAllUserLists()
             socket.emit('commandError', `set ${targetUsername}'s color to ${color.startsWith('flag:') ? color.slice(5) : color}`)
             return
         }
@@ -1020,6 +1076,7 @@ io.on('connection', socket => {
             ownerEmail: socket.userEmail,
             username: socket.username,
             time: Date.now(),
+            channel: socket.currentChannel,
             isToken: socket.userEmail === process.env.OWNER_EMAIL,
             isGuest: socket.userEmail.endsWith('@guest'),
             color: getColor(socket.userEmail) ?? null,
@@ -1028,7 +1085,9 @@ io.on('connection', socket => {
             redVerified: isRedVerified(socket.userEmail),
             replyTo
         }
-        const onlineNames = [...io.sockets.sockets.values()].map(s => s.username).filter(Boolean)
+        // only mention people currently present in this channel
+        const roomIds = io.sockets.adapter.rooms.get(roomOf(socket.currentChannel)) ?? new Set()
+        const onlineNames = [...roomIds].map(id => io.sockets.sockets.get(id)?.username).filter(Boolean)
         const mentions = [...new Set(
             [...(data.text || '').matchAll(/@([a-zA-Z0-9_]+)/g)]
                 .map(m => m[1])
@@ -1038,7 +1097,7 @@ io.on('connection', socket => {
         addMessage(message)
         const stored = getMessageById(message.id)
         const {ownerEmail, ...publicMessage} = stored
-        io.emit('message', publicMessage)
+        io.to(roomOf(socket.currentChannel)).emit('message', publicMessage)
     })
 })
 

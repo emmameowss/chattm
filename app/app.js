@@ -433,6 +433,8 @@ themebtn.addEventListener('click', () => {
 const compactbtn = document.querySelector('#compact-btn')
 let compactMode = localStorage.getItem('compactMode') === 'true'
 let renderedHistory = []  // for re-render on mode toggle
+let currentChannel = 'main'
+let channelList = ['main']
 
 function applyCompact() {
     document.documentElement.classList.toggle('compact', compactMode)
@@ -1113,12 +1115,70 @@ function activitya() {
 
 // message history
 socket.on('history', (messages) => {
+    document.querySelector('ul').innerHTML = ''  // clear (needed when switching channels)
     renderedHistory = messages
     lastMsgMeta = null
     atBottom = false  // suppress per-message scrolls during batch render
     messages.forEach(data => renderMessage(data))
     atBottom = true
     window.scrollTo({ top: document.body.scrollHeight })
+})
+
+// ─── Channels ───────────────────────────────────────────────────────────────
+const channelsListEl = document.querySelector('#channels-list')
+const addChannelBtn = document.querySelector('#add-channel-btn')
+
+function renderChannels() {
+    channelsListEl.innerHTML = ''
+    channelList.forEach(name => {
+        const item = document.createElement('div')
+        item.className = 'channel-item' + (name === currentChannel ? ' active' : '')
+        const label = document.createElement('span')
+        label.className = 'channel-name'
+        label.textContent = name
+        item.appendChild(label)
+        item.addEventListener('click', () => switchChannel(name))
+        if (isOwner && name !== 'main') {
+            const del = document.createElement('button')
+            del.type = 'button'
+            del.className = 'channel-delete'
+            del.textContent = '×'
+            del.title = 'delete channel'
+            del.addEventListener('click', (e) => {
+                e.stopPropagation()
+                if (confirm(`delete #${name}? all its messages will be removed.`)) {
+                    socket.emit('deleteChannel', name)
+                }
+            })
+            item.appendChild(del)
+        }
+        channelsListEl.appendChild(item)
+    })
+}
+
+function switchChannel(name) {
+    if (name === currentChannel) return
+    document.querySelector('ul').innerHTML = ''
+    renderedHistory = []
+    lastMsgMeta = null
+    socket.emit('switchChannel', name)
+}
+
+addChannelBtn.addEventListener('click', () => {
+    const name = prompt('channel name (a-z, 0-9, - ; max 24)')
+    if (name) socket.emit('createChannel', name)
+})
+
+socket.on('channels', (names) => {
+    channelList = names
+    renderChannels()
+})
+
+socket.on('switchedChannel', (name) => {
+    currentChannel = name
+    renderChannels()
+    typingUsers.clear()
+    updateTypingIndicator()
 })
 
 async function sendMessageNew(e) {
@@ -1237,6 +1297,8 @@ document.addEventListener('visibilitychange', () => {
     if (!document.hidden) activitya()
 })
 socket.on("message", (data) => {
+    // ignore stray messages from another channel (race during a switch)
+    if (data.channel && data.channel !== currentChannel) return
     if (isSystemMessage(data)) return
     renderedHistory.push(data)
     renderMessage(data)
@@ -1982,8 +2044,11 @@ socket.on('commandError', (msg) => {
 let chatMutedb = false
 
 // check owner status and mute chat status on connect
-socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted}) => {
+socket.on('init', ({isOwner: owner, chatMuted: muted, color, uMuted, currentChannel: ch}) => {
     isOwner = owner
+    if (ch) currentChannel = ch
+    addChannelBtn.style.display = isOwner ? '' : 'none'
+    renderChannels()
     updateProfileBtn()
     if (muted && !isOwner) {
         showStatus('chat has been muted', 'pink')
