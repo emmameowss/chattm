@@ -50,3 +50,4 @@ available at: https://chattm.app, currently supports images and text, please not
 - custom emojis
 - ability to suggest custom emojis
 - database stuff
+- channels
