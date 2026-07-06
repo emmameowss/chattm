@@ -397,6 +397,48 @@ const commands = {
       socket.emit("commandError", `reset strikes for ${targetUsername}`);
     },
   },
+  "/noguests": {
+    ownerOnly: true,
+    run: (socket) => {
+      guestsDisabled = true;
+      setSetting("guests_disabled", "1");
+      deleteAllGuestSessions();
+      for (const [, s] of io.sockets.sockets) {
+        if (s.userEmail?.endsWith("@guest")) {
+          s.emit("kicked", "guest logins have been disabled");
+          s.skipLeaveMessage = true;
+          s.disconnect();
+        }
+      }
+      socket.emit("commandError", "guest logins have been disabled");
+    },
+  },
+  "/allowguests": {
+    ownerOnly: true,
+    run: (socket) => {
+      guestsDisabled = false;
+      setSetting("guests_disabled", "0");
+      socket.emit("commandError", "guest logins have been reenabled");
+    },
+  },
+  "/reloademojis": {
+    ownerOnly: true,
+    run: async (socket) => {
+      await syncEmojisFromS3();
+      socket.emit("commandError", "emoji sync complete");
+    },
+  },
+  "/whois": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      const found = findSocketByUsername(rest);
+      if (found) {
+        socket.emit("commandError", `${rest}: ${found.userEmail}`);
+      } else {
+        socket.emit("commandError", `no user found with username "${rest}"`);
+      }
+    },
+  },
 };
 
 let chatMuted = false;
@@ -1039,77 +1081,6 @@ io.on("connection", (socket) => {
       return;
     }
     if (
-      data.text?.startsWith("/noguests") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      guestsDisabled = true;
-      setSetting("guests_disabled", "1");
-      deleteAllGuestSessions();
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.userEmail?.endsWith("@guest")) {
-          s.emit("kicked", "guest logins have been disabled");
-          s.skipLeaveMessage = true;
-          s.disconnect();
-        }
-      }
-      socket.emit("commandError", "guest logins disabled, all guests kicked");
-      return;
-    }
-    if (
-      data.text?.startsWith("/allowguests") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      guestsDisabled = false;
-      setSetting("guests_disabled", "0");
-      socket.emit("commandError", "guest logins re-enabled");
-      return;
-    }
-    // also pretty useless because of the emoji suggestion functionality but i'll leave it in just in case it breaks something
-    if (
-      data.text?.startsWith("/addemoji ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const args = data.text.slice(10).trim().split(" ");
-      const shortcode = args[0];
-      const url = args.slice(1).join(" ");
-      if (!/^:[a-z0-9_-]+:$/.test(shortcode) || !url) {
-        socket.emit("commandError", "usage: /addemoji :shortcode: <url>");
-        return;
-      }
-      let parsedUrl;
-      try {
-        parsedUrl = new URL(url);
-      } catch {
-        socket.emit("commandError", "invalid url");
-        return;
-      }
-      if (
-        parsedUrl.protocol !== "https:" ||
-        parsedUrl.hostname !== "cdn.chattm.app"
-      ) {
-        socket.emit(
-          "commandError",
-          "emoji url must be a https://cdn.chattm.app link",
-        );
-        return;
-      }
-      addCustomEmoji(shortcode, url);
-      io.emit("emojiUpdate", getCustomEmoji());
-      socket.emit("commandError", `added emoji ${shortcode}`);
-      return;
-    }
-    // same thing as above
-    if (
-      data.text?.startsWith("/removeemoji ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const shortcode = data.text.slice(13).trim();
-      removeCustomEmoji(shortcode);
-      io.emit("emojiUpdate", getCustomEmoji());
-      socket.emit("commandError", `removed emoji ${shortcode}`);
-      return;
-    }
-    if (
       data.text?.startsWith("/reloademojis") &&
       socket.userEmail === process.env.OWNER_EMAIL
     ) {
@@ -1170,29 +1141,6 @@ io.on("connection", (socket) => {
         "commandError",
         `removed red verification from ${targetEmail}`,
       );
-      return;
-    }
-    // also somewhat useless due to admin panel and especially because you can't even copy its output
-    if (
-      data.text?.startsWith("/whois ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const targetUsername = data.text.slice(7).trim();
-      let found = null;
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.username === targetUsername) {
-          found = s;
-          break;
-        }
-      }
-      if (found) {
-        socket.emit("commandError", `${targetUsername}: ${found.userEmail}`);
-      } else {
-        socket.emit(
-          "commandError",
-          `no user found with username "${targetUsername}"`,
-        );
-      }
       return;
     }
     if (data.text?.startsWith("/nick ")) {
