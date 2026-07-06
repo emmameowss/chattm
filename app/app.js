@@ -370,10 +370,8 @@ if (session) {
       transports: ["websocket"],
     },
   );
-  const resetId = document.querySelector("#resetid");
   const maxmessages = 100;
-  let announce = false;
-  const MAX_SIZE = 50 * 1024 * 1024; // 10mb limit to images
+  const MAX_SIZE = 50 * 1024 * 1024; // 50mb limit
 
   // profile button (replaces old username form)
   let myBio = "";
@@ -426,15 +424,6 @@ if (session) {
     openProfile(username);
   });
 
-  // move socket joined/left stuff after intialiing socket
-  /* unneeded
-socket.on('userJoined', (name) => {
-    systemMessage(`${name} joined`)
-})
-socket.on('userLeft', (name) =>  {
-    systemMessage(`${name} left`)
-})
-*/
   // mute button
   let notifymuted = localStorage.getItem("notifymuted") === "true";
   const mutebtn = document.querySelector("#mute-btn");
@@ -1825,17 +1814,6 @@ socket.on('userLeft', (name) =>  {
     }
   });
 
-  /*
-// user renamed system message
-socket.on('userRenamedSys', ({from, to}, guest) => {
-    if (guest) {
-        return
-    } else {
-        systemMessage(`${from} changed their username to ${to}`)
-    }
-})
-    */
-
   // cdn/image stuff
   async function uploadFile(file) {
     const formData = new FormData();
@@ -2107,7 +2085,6 @@ socket.on('userRenamedSys', ({from, to}, guest) => {
     return div;
   }
 
-  let cachedAdminUsers = [];
   let cachedAdminUsersWithEmails = [];
 
   socket.on("adminUserlist", (users) => {
@@ -2115,7 +2092,6 @@ socket.on('userRenamedSys', ({from, to}, guest) => {
   });
 
   socket.on("userlist", (users) => {
-    cachedAdminUsers = users;
     onlineUsernames = users
       .filter((u) => u.online)
       .map((u) => u.username)
@@ -2819,26 +2795,4 @@ socket.on('userRenamedSys', ({from, to}, guest) => {
       if (withInput) inputEl.addEventListener("keydown", onKey);
     });
   }
-
-  /* useless
-
-// color picker stuff
-const colorBtn = document.querySelector('#color-btn')
-const colorInput = document.querySelector('#color-input')
-
-// i am aware this implementation sucks and the position probably doesn't work but i am not making a custom color picker
-
-colorBtn.addEventListener('click', () => {
-    const rect = colorBtn.getBoundingClientRect()
-    colorInput.style.position = 'fixed'
-    colorInput.style.top = `${rect.bottom + 4}px`
-    colorInput.style.left = `${rect.left}px`
-    colorInput.click()
-})
-
-colorInput.addEventListener('change', (e) => {
-    socket.emit('message', { text: `/color ${e.target.value}` })
-})
-
-*/
 }

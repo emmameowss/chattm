@@ -220,7 +220,6 @@ const stmts = {
     `INSERT OR REPLACE INTO colors (email, color) VALUES (?, ?)`,
   ),
   deleteColor: db.prepare(`DELETE FROM colors WHERE email = ?`),
-  getAllColors: db.prepare(`SELECT email, color FROM colors`),
 
   // Mutes
   getMute: db.prepare(`SELECT * FROM mutes WHERE email = ?`),
@@ -233,7 +232,6 @@ const stmts = {
   ),
 
   // Strikes
-  getStrikes: db.prepare(`SELECT count FROM strikes WHERE email = ?`),
   setStrikes: db.prepare(
     `INSERT OR REPLACE INTO strikes (email, count) VALUES (?, ?)`,
   ),
@@ -311,7 +309,6 @@ const stmts = {
   updatePendingEmoji: db.prepare(
     `UPDATE pending_emojis SET status = @status, s3_key = @s3_key, url = @url, review_reason = @review_reason WHERE id = @id`,
   ),
-  deletePendingEmoji: db.prepare(`DELETE FROM pending_emojis WHERE id = ?`),
 
   // Verified users
   isVerified: db.prepare(`SELECT 1 FROM verified_users WHERE email = ?`),
@@ -527,13 +524,6 @@ export function deleteColor(email) {
   stmts.deleteColor.run(email);
 }
 
-export function getAllColors() {
-  const result = {};
-  for (const { email, color } of stmts.getAllColors.all())
-    result[email] = color;
-  return result;
-}
-
 // ─── Mute API ────────────────────────────────────────────────────────────────
 
 export function getMute(email) {
@@ -555,14 +545,6 @@ export function getExpiredMutes(now) {
 }
 
 // ─── Strike API ──────────────────────────────────────────────────────────────
-
-export function getStrikes(email) {
-  return stmts.getStrikes.get(email)?.count ?? 0;
-}
-
-export function setStrikes(email, count) {
-  stmts.setStrikes.run(email, count);
-}
 
 export function deleteStrikes(email) {
   stmts.deleteStrikes.run(email);
@@ -711,10 +693,6 @@ export function updatePendingEmoji(id, status, s3Key, url, reviewReason) {
     url,
     review_reason: reviewReason ?? null,
   });
-}
-
-export function deletePendingEmoji(id) {
-  stmts.deletePendingEmoji.run(id);
 }
 
 // ─── Verified Users API ──────────────────────────────────────────────────────

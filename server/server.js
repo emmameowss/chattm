@@ -1,4 +1,3 @@
-// THIS CODE WORKS DONT TOUCH IT IF YOU DONT NEED TO PLEASE
 import "dotenv/config";
 import { Server } from "socket.io";
 import { createServer } from "http";
@@ -36,8 +35,6 @@ import {
   setMute,
   deleteMute,
   getExpiredMutes,
-  getStrikes,
-  setStrikes,
   deleteStrikes,
   isBanned,
   getBanReason,
@@ -49,7 +46,6 @@ import {
   getFilterWords,
   addFilterWord,
   removeFilterWord,
-  replaceFilterWords,
   getSetting,
   setSetting,
   migrateFromFiles,
@@ -83,7 +79,6 @@ import {
   getPendingEmojiById,
   getPendingEmojiByShortcode,
   updatePendingEmoji,
-  deletePendingEmoji,
 } from "./db.js";
 
 const httpServer = createServer();
@@ -366,30 +361,6 @@ function isMuted(email) {
   }
   return true;
 }
-/*
-function systemMessage(text, options = {}) {
-    const { excludeUserEmail = null, saveToHistory = true } = options
-
-    const message = {
-        username: 'SYSTEM',
-        text,
-        time: Date.now(),
-        system: true
-    }
-    if (saveToHistory) {
-        addMessage({ ...message, id: randomUUID() })
-    }
-    if (!excludeUserEmail) {
-        io.emit('message', message)
-        return
-    }
-
-    for (const [id, s] of io.sockets.sockets) {
-        if (s.userEmail === excludeUserEmail) continue
-        s.emit('message', message)
-    }
-}
-*/
 
 function parseDuration(str) {
   const match = str.match(/^(\d+)(s|m|h|d)$/);
@@ -514,7 +485,6 @@ io.on("connection", (socket) => {
   socket.userIP =
     socket.handshake.headers["x-forwarded-for"]?.split(",")[0].trim() ||
     socket.handshake.address;
-  let lastMessage = 0;
   console.log(`${socket.userEmail} connected`);
   if (!socket.userEmail.endsWith("@guest")) setLastSeen(socket.userEmail);
   io.emit("usercount", io.engine.clientsCount);
@@ -543,9 +513,6 @@ io.on("connection", (socket) => {
   const currentColor = getColor(socket.userEmail);
   if (currentColor && isBlockedColor(currentColor)) {
     deleteColor(socket.userEmail);
-  }
-  if (chatMuted) {
-    const ann = "chat is currently muted";
   }
 
   if (socket.userEmail.endsWith("@guest")) {
@@ -698,8 +665,6 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     io.emit("usercount", io.engine.clientsCount);
-    if (socket.username && !socket.skipLeaveMessage) {
-    }
     emitUserList(socket.currentChannel);
   });
 
@@ -798,8 +763,6 @@ io.on("connection", (socket) => {
       );
       return;
     }
-
-    // filter disabled
 
     const now = Date.now();
     // verified users (and the owner) bypass the message cooldown
@@ -1086,14 +1049,14 @@ io.on("connection", (socket) => {
       io.to(roomOf(socket.currentChannel)).emit("clear");
       return;
     }
-
+    /* no longer functional because of the removal of system messages
     if (
       data.text?.startsWith("/announce ") &&
       socket.userEmail === process.env.OWNER_EMAIL
     ) {
-      const ann = data.text.slice(10).trim();
       return;
     }
+    */
     if (
       data.text?.startsWith("/mutechat") &&
       socket.userEmail === process.env.OWNER_EMAIL
@@ -1138,6 +1101,7 @@ io.on("connection", (socket) => {
       socket.emit("commandError", "guest logins re-enabled");
       return;
     }
+    // also pretty useless because of the emoji suggestion functionality but i'll leave it in just in case it breaks something
     if (
       data.text?.startsWith("/addemoji ") &&
       socket.userEmail === process.env.OWNER_EMAIL
@@ -1171,6 +1135,7 @@ io.on("connection", (socket) => {
       socket.emit("commandError", `added emoji ${shortcode}`);
       return;
     }
+    // same thing as above
     if (
       data.text?.startsWith("/removeemoji ") &&
       socket.userEmail === process.env.OWNER_EMAIL
@@ -1244,6 +1209,7 @@ io.on("connection", (socket) => {
       );
       return;
     }
+    // also somewhat useless due to admin panel and especially because you can't even copy its output
     if (
       data.text?.startsWith("/whois ") &&
       socket.userEmail === process.env.OWNER_EMAIL
@@ -1385,6 +1351,7 @@ io.on("connection", (socket) => {
       socket.emit("commandError", `removed ${word} from the filter`);
       return;
     }
+    // partially broken with pride flag colors
     if (
       data.text?.startsWith("/setcolor ") &&
       socket.userEmail === process.env.OWNER_EMAIL
