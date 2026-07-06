@@ -124,6 +124,13 @@ db.exec(`
     created_at INTEGER,
     created_by TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS credentials (
+    email TEXT PRIMARY KEY,
+    username TEXT,
+    password_hash TEXT NOT NULL,
+    created_at INTEGER
+  );
 `);
 
 // seed the default channel (idempotent)
@@ -212,6 +219,12 @@ const stmts = {
     `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip) VALUES (@id, @email, @guest, @expires, @ip)`,
   ),
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
+
+  // Credentials (email/password accounts)
+  getCredential: db.prepare(`SELECT * FROM credentials WHERE email = ?`),
+  insertCredential: db.prepare(
+    `INSERT INTO credentials (email, username, password_hash, created_at) VALUES (@email, @username, @password_hash, @created_at)`,
+  ),
   deleteAllGuestSessions: db.prepare(`DELETE FROM sessions WHERE guest = 1`),
 
   // Colors
@@ -508,6 +521,21 @@ export function deleteSession(id) {
 
 export function deleteAllGuestSessions() {
   stmts.deleteAllGuestSessions.run();
+}
+
+// ─── Credential API (email/password accounts) ────────────────────────────────
+
+export function getCredential(email) {
+  return stmts.getCredential.get(email) ?? null;
+}
+
+export function createCredential(email, username, passwordHash) {
+  stmts.insertCredential.run({
+    email,
+    username,
+    password_hash: passwordHash,
+    created_at: Date.now(),
+  });
 }
 
 // ─── Color API ───────────────────────────────────────────────────────────────

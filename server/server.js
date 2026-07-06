@@ -3,7 +3,7 @@ import { Server } from "socket.io";
 import { createServer } from "http";
 import formidable from "formidable";
 import fetch from "node-fetch";
-import { randomBytes } from "crypto";
+import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { readFile, appendFile } from "fs/promises";
 import { extname, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
@@ -28,6 +28,8 @@ import {
   getSession,
   saveSession,
   deleteSession,
+  getCredential,
+  createCredential,
   getColor,
   setColor,
   deleteColor,
@@ -829,6 +831,31 @@ function isValidUsername(name) {
   return /^[a-zA-Z0-9-]{1,20}$/.test(name);
 }
 
+// email/password accounts. identities are namespaced "pw:<email>" so they can
+// never collide with an OAuth email or a guest (*@guest) identity.
+function normalizeEmail(email) {
+  return String(email ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function isValidEmail(email) {
+  return email.length <= 100 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function hashPassword(pw) {
+  const salt = randomBytes(16).toString("hex");
+  return `scrypt$${salt}$${scryptSync(pw, salt, 64).toString("hex")}`;
+}
+
+function verifyPassword(pw, stored) {
+  const [scheme, salt, hash] = String(stored).split("$");
+  if (scheme !== "scrypt" || !salt || !hash) return false;
+  const a = Buffer.from(hash, "hex");
+  const b = scryptSync(pw, salt, 64);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 setInterval(() => {
   const expired = getExpiredMutes(Date.now());
   for (const email of expired) {
@@ -1581,6 +1608,104 @@ httpServer.on("request", async (req, res) => {
       "Set-Cookie": sessionCookie(sessionid, req),
     });
     res.end();
+    return;
+  }
+
+  // email/password signup → creates a "pw:<email>" account + session
+  if (url.pathname === "/signup" && req.method === "POST") {
+    const signupIp =
+      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.socket.remoteAddress;
+    if (!checkRateLimit(signupIp, "signup", 5, 60 * 60 * 1000)) {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "too many signups, try again later" }));
+      return;
+    }
+    let body = "";
+    req.on("data", (d) => {
+      body += d;
+    });
+    req.on("end", () => {
+      try {
+        const parsed = JSON.parse(body);
+        const email = normalizeEmail(parsed.email);
+        const username = String(parsed.username ?? "").trim();
+        const password = String(parsed.password ?? "");
+        const fail = (code, error) => {
+          res.writeHead(code, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error }));
+        };
+        if (!isValidEmail(email))
+          return fail(400, "enter a valid email address");
+        if (password.length < 8 || password.length > 200)
+          return fail(400, "password must be 8-200 characters");
+        if (!isValidUsername(username))
+          return fail(
+            400,
+            "username can only contain letters, numbers, and hyphens (max 20 chars)",
+          );
+        if (getCredential(email))
+          return fail(409, "an account with that email already exists");
+        if (getEmailByUsername(username))
+          return fail(409, "that username is taken");
+
+        const identity = "pw:" + email;
+        createCredential(email, username, hashPassword(password));
+        saveUsername(identity, username);
+        const sessionid = randomBytes(32).toString("hex");
+        saveSession(sessionid, { email: identity, ip: signupIp });
+        res.writeHead(200, {
+          "content-type": "application/json",
+          "Set-Cookie": sessionCookie(sessionid, req),
+        });
+        res.end(JSON.stringify({ session: sessionid }));
+      } catch (e) {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "bad request" }));
+      }
+    });
+    return;
+  }
+
+  // email/password login
+  if (url.pathname === "/pwlogin" && req.method === "POST") {
+    const loginIp =
+      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.socket.remoteAddress;
+    if (!checkRateLimit(loginIp, "pwlogin", 10, 15 * 60 * 1000)) {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "too many attempts, try again later" }));
+      return;
+    }
+    let body = "";
+    req.on("data", (d) => {
+      body += d;
+    });
+    req.on("end", () => {
+      try {
+        const parsed = JSON.parse(body);
+        const email = normalizeEmail(parsed.email);
+        const password = String(parsed.password ?? "");
+        const cred = getCredential(email);
+        // same message whether the email or the password is wrong
+        if (!cred || !verifyPassword(password, cred.password_hash)) {
+          res.writeHead(401, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "invalid email or password" }));
+          return;
+        }
+        const identity = "pw:" + email;
+        const sessionid = randomBytes(32).toString("hex");
+        saveSession(sessionid, { email: identity, ip: loginIp });
+        res.writeHead(200, {
+          "content-type": "application/json",
+          "Set-Cookie": sessionCookie(sessionid, req),
+        });
+        res.end(JSON.stringify({ session: sessionid }));
+      } catch (e) {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "bad request" }));
+      }
+    });
     return;
   }
 

@@ -17,11 +17,96 @@
     <body class="login-page">
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
+
+        <div
+            id="pw-auth"
+            style="
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                width: 240px;
+                max-width: 80vw;
+            "
+        >
+            <form
+                id="pw-login-form"
+                style="display: flex; flex-direction: column; gap: 8px"
+            >
+                <input
+                    id="pw-login-email"
+                    type="email"
+                    placeholder="email"
+                    autocomplete="email"
+                />
+                <input
+                    id="pw-login-password"
+                    type="password"
+                    placeholder="password"
+                    autocomplete="current-password"
+                />
+                <button type="submit">
+                    <i class="ti ti-mail"></i> log in with email
+                </button>
+            </form>
+            <form
+                id="pw-signup-form"
+                style="display: none; flex-direction: column; gap: 8px"
+            >
+                <input
+                    id="pw-signup-email"
+                    type="email"
+                    placeholder="email"
+                    autocomplete="email"
+                />
+                <input
+                    id="pw-signup-username"
+                    type="text"
+                    placeholder="username"
+                    maxlength="20"
+                    autocomplete="username"
+                />
+                <input
+                    id="pw-signup-password"
+                    type="password"
+                    placeholder="password (min 8 chars)"
+                    autocomplete="new-password"
+                />
+                <button type="submit">
+                    <i class="ti ti-user-plus"></i> create account
+                </button>
+            </form>
+            <p
+                id="pw-error"
+                style="
+                    display: none;
+                    color: var(--pink);
+                    margin: 0;
+                    font-size: 0.85em;
+                "
+            ></p>
+            <button
+                type="button"
+                id="pw-toggle"
+                style="
+                    align-self: center;
+                    border: none;
+                    color: var(--muted);
+                    font-size: 0.85em;
+                "
+            >
+                sign up
+            </button>
+            <div
+                style="height: 1px; background: var(--border); margin: 4px 0"
+            ></div>
+        </div>
+
         <a id="hca-login-link" href="/login"
             ><button><i class="ti ti-login-2"></i> login with Hack Club</button></a
         >
         <!--GUEST_SECTION-->
         <!--MESSAGES-->
+
         <script>
             (function () {
                 const h = location.hostname;
@@ -38,49 +123,116 @@
                 }
 
                 const hcaLink = document.getElementById("hca-login-link");
-                const guestBtn = document.getElementById("guest-btn");
-                if (!guestBtn) return;
-                const guestForm = document.getElementById("guest-name-form");
-                const guestInput = document.getElementById("guest-name-input");
-                const guestError = document.getElementById("guest-name-error");
-                function openGuestForm() {
-                    hcaLink.style.display = "none";
-                    guestBtn.style.display = "none";
-                    guestForm.style.display = "flex";
-                    guestInput.focus();
+
+                // ── email/password login + signup ──
+                const pwError = document.getElementById("pw-error");
+                const loginForm = document.getElementById("pw-login-form");
+                const signupForm = document.getElementById("pw-signup-form");
+                const pwToggle = document.getElementById("pw-toggle");
+                function showPwError(msg) {
+                    pwError.textContent = msg;
+                    pwError.style.display = "block";
                 }
-                function closeGuestForm() {
-                    guestForm.style.display = "none";
-                    guestInput.value = "";
-                    guestError.style.display = "none";
-                    guestBtn.style.display = "";
-                    hcaLink.style.display = "";
-                }
-                guestBtn.addEventListener("click", openGuestForm);
-                function submitGuestName() {
-                    const name = guestInput.value.trim();
-                    if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
-                        guestError.textContent = name
-                            ? "username can only contain letters, numbers, and hyphens (max 20 chars)"
-                            : "please enter a username";
-                        guestError.style.display = "block";
-                        guestInput.focus();
-                        return;
-                    }
-                    guestError.style.display = "none";
-                    window.location.href =
-                        "/guest?username=" + encodeURIComponent(name);
-                }
-                document
-                    .getElementById("guest-name-submit")
-                    .addEventListener("click", submitGuestName);
-                document
-                    .getElementById("guest-name-cancel")
-                    .addEventListener("click", closeGuestForm);
-                guestInput.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") submitGuestName();
-                    if (e.key === "Escape") closeGuestForm();
+                pwToggle.addEventListener("click", () => {
+                    const signingUp = signupForm.style.display !== "none";
+                    signupForm.style.display = signingUp ? "none" : "flex";
+                    loginForm.style.display = signingUp ? "flex" : "none";
+                    pwToggle.textContent = signingUp
+                        ? "need an account? sign up"
+                        : "have an account? log in";
+                    pwError.style.display = "none";
                 });
+                async function submitAuth(url, payload) {
+                    pwError.style.display = "none";
+                    try {
+                        const res = await fetch(url, {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify(payload),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            showPwError(data.error || "something went wrong");
+                            return;
+                        }
+                        localStorage.setItem("session", data.session);
+                        window.location.href = "/";
+                    } catch (e) {
+                        showPwError("network error, try again");
+                    }
+                }
+                loginForm.addEventListener("submit", (e) => {
+                    e.preventDefault();
+                    submitAuth("/pwlogin", {
+                        email: document
+                            .getElementById("pw-login-email")
+                            .value.trim(),
+                        password:
+                            document.getElementById("pw-login-password").value,
+                    });
+                });
+                signupForm.addEventListener("submit", (e) => {
+                    e.preventDefault();
+                    submitAuth("/signup", {
+                        email: document
+                            .getElementById("pw-signup-email")
+                            .value.trim(),
+                        username: document
+                            .getElementById("pw-signup-username")
+                            .value.trim(),
+                        password:
+                            document.getElementById("pw-signup-password").value,
+                    });
+                });
+
+                // ── guest form (absent when guests are disabled) ──
+                const guestBtn = document.getElementById("guest-btn");
+                if (guestBtn) {
+                    const guestForm =
+                        document.getElementById("guest-name-form");
+                    const guestInput =
+                        document.getElementById("guest-name-input");
+                    const guestError =
+                        document.getElementById("guest-name-error");
+                    function openGuestForm() {
+                        hcaLink.style.display = "none";
+                        guestBtn.style.display = "none";
+                        guestForm.style.display = "flex";
+                        guestInput.focus();
+                    }
+                    function closeGuestForm() {
+                        guestForm.style.display = "none";
+                        guestInput.value = "";
+                        guestError.style.display = "none";
+                        guestBtn.style.display = "";
+                        hcaLink.style.display = "";
+                    }
+                    guestBtn.addEventListener("click", openGuestForm);
+                    function submitGuestName() {
+                        const name = guestInput.value.trim();
+                        if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
+                            guestError.textContent = name
+                                ? "username can only contain letters, numbers, and hyphens (max 20 chars)"
+                                : "please enter a username";
+                            guestError.style.display = "block";
+                            guestInput.focus();
+                            return;
+                        }
+                        guestError.style.display = "none";
+                        window.location.href =
+                            "/guest?username=" + encodeURIComponent(name);
+                    }
+                    document
+                        .getElementById("guest-name-submit")
+                        .addEventListener("click", submitGuestName);
+                    document
+                        .getElementById("guest-name-cancel")
+                        .addEventListener("click", closeGuestForm);
+                    guestInput.addEventListener("keydown", (e) => {
+                        if (e.key === "Enter") submitGuestName();
+                        if (e.key === "Escape") closeGuestForm();
+                    });
+                }
             })();
         </script>
     </body>
