@@ -84,17 +84,9 @@
                     font-size: 0.85em;
                 "
             ></p>
-            <button
-                type="button"
-                id="pw-toggle"
-                style="
-                    align-self: center;
-                    border: none;
-                    color: var(--muted);
-                    font-size: 0.85em;
-                "
-            >
-                sign up
+            <button type="button" id="pw-toggle">
+                <i id="pw-toggle-icon" class="ti ti-user-plus"></i>
+                <span id="pw-toggle-text">sign up</span>
             </button>
             <div
                 style="height: 1px; background: var(--border); margin: 4px 0"
@@ -133,13 +125,19 @@
                     pwError.textContent = msg;
                     pwError.style.display = "block";
                 }
+                const pwToggleText =
+                    document.getElementById("pw-toggle-text");
+                const pwToggleIcon =
+                    document.getElementById("pw-toggle-icon");
                 pwToggle.addEventListener("click", () => {
                     const signingUp = signupForm.style.display !== "none";
                     signupForm.style.display = signingUp ? "none" : "flex";
                     loginForm.style.display = signingUp ? "flex" : "none";
-                    pwToggle.textContent = signingUp
-                        ? "need an account? sign up"
-                        : "have an account? log in";
+                    // now showing login → offer "sign up"; showing signup → offer "log in"
+                    pwToggleText.textContent = signingUp ? "sign up" : "log in";
+                    pwToggleIcon.className = signingUp
+                        ? "ti ti-user-plus"
+                        : "ti ti-login-2";
                     pwError.style.display = "none";
                 });
                 async function submitAuth(url, payload) {

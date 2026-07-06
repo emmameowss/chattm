@@ -2291,7 +2291,7 @@ if (session) {
         adminUsersList.appendChild(row);
       }
     }
-    makeSection("hack club", hca);
+    makeSection("accounts", hca);
     makeSection("guests", guests);
   }
 

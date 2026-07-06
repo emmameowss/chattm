@@ -1548,6 +1548,7 @@ body.login-page a button:hover {
 /* uniform, full-width primary buttons on the login page */
 body.login-page #hca-login-link button,
 body.login-page #guest-btn,
+body.login-page #pw-toggle,
 body.login-page #pw-login-form button[type="submit"],
 body.login-page #pw-signup-form button[type="submit"] {
     width: 240px;
