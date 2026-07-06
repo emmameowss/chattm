@@ -156,6 +156,31 @@ try {
   db.exec("ALTER TABLE pending_emojis ADD COLUMN review_reason TEXT");
 } catch {}
 
+// one-time migration: email/password accounts used to be namespaced as
+// "pw:<email>"; they now use the raw email as identity (like OAuth). strip the
+// prefix from every identity-keyed row, preferring an existing raw-email row on
+// conflict (UPDATE OR IGNORE skips clashes, then the leftover pw: row is dropped).
+for (const [table, col] of [
+  ["usernames", "email"],
+  ["avatars", "email"],
+  ["profiles", "email"],
+  ["colors", "email"],
+  ["mutes", "email"],
+  ["strikes", "email"],
+  ["bans", "email"],
+  ["verified_users", "email"],
+  ["red_verified_users", "email"],
+  ["sessions", "email"],
+  ["messages", "owner_email"],
+]) {
+  try {
+    db.exec(
+      `UPDATE OR IGNORE ${table} SET ${col} = substr(${col}, 4) WHERE ${col} LIKE 'pw:%';
+       DELETE FROM ${table} WHERE ${col} LIKE 'pw:%';`,
+    );
+  } catch {}
+}
+
 // ─── Messages ────────────────────────────────────────────────────────────────
 
 const stmts = {

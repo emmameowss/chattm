@@ -831,8 +831,10 @@ function isValidUsername(name) {
   return /^[a-zA-Z0-9-]{1,20}$/.test(name);
 }
 
-// email/password accounts. identities are namespaced "pw:<email>" so they can
-// never collide with an OAuth email or a guest (*@guest) identity.
+// email/password accounts use the raw email as their identity, exactly like an
+// OAuth account, so every command / lookup treats them identically (a password
+// account for OWNER_EMAIL is the owner). guest emails (*@guest) can't be
+// registered because isValidEmail requires a dot after the @.
 function normalizeEmail(email) {
   return String(email ?? "")
     .trim()
@@ -1611,7 +1613,7 @@ httpServer.on("request", async (req, res) => {
     return;
   }
 
-  // email/password signup → creates a "pw:<email>" account + session
+  // email/password signup → creates an account keyed by the raw email + session
   if (url.pathname === "/signup" && req.method === "POST") {
     const signupIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
@@ -1649,7 +1651,7 @@ httpServer.on("request", async (req, res) => {
         if (getEmailByUsername(username))
           return fail(409, "that username is taken");
 
-        const identity = "pw:" + email;
+        const identity = email;
         createCredential(email, username, hashPassword(password));
         saveUsername(identity, username);
         const sessionid = randomBytes(32).toString("hex");
@@ -1693,7 +1695,7 @@ httpServer.on("request", async (req, res) => {
           res.end(JSON.stringify({ error: "invalid email or password" }));
           return;
         }
-        const identity = "pw:" + email;
+        const identity = email;
         const sessionid = randomBytes(32).toString("hex");
         saveSession(sessionid, { email: identity, ip: loginIp });
         res.writeHead(200, {
