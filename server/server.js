@@ -1063,14 +1063,6 @@ io.on("connection", (socket) => {
       io.to(roomOf(socket.currentChannel)).emit("clear");
       return;
     }
-    /* no longer functional because of the removal of system messages
-    if (
-      data.text?.startsWith("/announce ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      return;
-    }
-    */
     if (
       data.text?.startsWith("/mutechat") &&
       socket.userEmail === process.env.OWNER_EMAIL
