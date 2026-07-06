@@ -1397,6 +1397,13 @@ httpServer.on("request", async (req, res) => {
       return;
     }
     const { primary_email } = user.identity;
+    // if an email/password account already owns this email, block OAuth login so
+    // the two can't both claim the same identity
+    if (getCredential(normalizeEmail(primary_email))) {
+      res.writeHead(302, { Location: "/?error=pw_account" });
+      res.end();
+      return;
+    }
     const ip =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.socket.remoteAddress;
@@ -2186,6 +2193,10 @@ httpServer.on("request", async (req, res) => {
       if (err === "rate_limited" || err === "guests_disabled")
         messages.push(
           '<p style="color: var(--muted)">you\'re doing that too much, try again later</p>',
+        );
+      if (err === "pw_account")
+        messages.push(
+          '<p style="color: var(--pink)">an email/password account already uses that email — log in with your password instead</p>',
         );
       const guestSection = guestsDisabled
         ? '<button disabled style="opacity:0.6;cursor:not-allowed"><i class="ti ti-user"></i> continue as guest</button>'
