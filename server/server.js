@@ -80,6 +80,7 @@ import {
   getPendingEmojiByShortcode,
   updatePendingEmoji,
 } from "./db.js";
+import { resolveHttpAuthRuntimeConfig } from "@aws-sdk/client-s3/dist-types/auth/httpAuthExtensionConfiguration.js";
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -215,6 +216,136 @@ const ownercmds = [
   "/unredverify",
 ];
 */
+
+const commands = {
+  "/ban": {
+    ownerOnly: true,
+    run: async (socket, rest, data) => {
+      const args = rest.split(" ");
+      let target = args[0];
+      const banReason = args.slice(1).join(" ") || "no reason given";
+      if (!target.includes("@")) {
+        target =
+          findSocketByUsername(target)?.userEmail ?? getEmailByUsername(target);
+        if (!target) {
+          socket.emit("commandError", `no user found with username ${args[0]}`);
+          return;
+        }
+      }
+      const targetEmail = target;
+      addBan(targetEmail, banReason);
+      await appendFile(
+        "bans.log",
+        `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${banReason}\n`,
+      );
+      for (const [, s] of io.sockets.sockets) {
+        if (s.userEmail === targetEmail) {
+          addIpBan(s.userIP);
+          s.emit("banned", banReason);
+          s.skipLeaveMessage = true;
+          s.disconnect();
+        }
+      }
+      socket.emit("commandError", `banned ${targetEmail}`);
+    },
+  },
+  "/unban": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      removeBan(rest);
+      socket.emit("commandError", `unbanned ${rest}`);
+    },
+  },
+  "/unbanip": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      removeIpBan(rest);
+      socket.emit("commandError", `unbanned ${rest}`);
+    },
+  },
+  "/kick": {
+    ownerOnly: true,
+    run: async (socket, rest, data) => {
+      const [targetUsername, ...reasonParts] = rest.split(" ");
+      const kickReason = reasonParts.join(" ") || "kicked by server";
+      if (!targetUsername) {
+        socket.emit("commandError", "usage: /kick <username> [reason]");
+        return;
+      }
+      const target = findSocketByUsername(targetUsername);
+      if (!target) {
+        socket.emit(
+          "commandError",
+          `no user found with username ${targetUsername}`,
+        );
+        return;
+      }
+      target.emit("kicked", kickReason);
+      target.skipLeaveMessage = true;
+      target.disconnect();
+      socket.emit("commandError", `kicked ${targetUsername}`);
+      await appendFile(
+        "kicks.log",
+        `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${kickReason}\n`,
+      );
+    },
+  },
+  "/mute": {
+    ownerOnly: true,
+    run: async (socket, rest) => {
+      const args = rest.split(" ");
+      const targetUsername = args[0];
+      const durationStr = args[1];
+      const muteReason = args.slice(2).join(" ") || "no reason given";
+      const targetEmail =
+        findSocketByUsername(targetUsername)?.userEmail ?? null;
+      if (!targetEmail) {
+        socket.emit(
+          "commandError",
+          `no user found with username ${targetUsername}`,
+        );
+        return;
+      }
+      const durationMs = durationStr ? parseDuration(durationStr) : null;
+      if (durationStr && !durationMs) {
+        socket.emit("commandError", "invalid duration format");
+        return;
+      }
+      setMute(
+        targetEmail,
+        muteReason,
+        durationMs ? Date.now() + durationMs : null,
+      );
+      const m = getMute(targetEmail);
+      await appendFile(
+        "mutes.log",
+        `${new Date().toISOString()}: ${socket.userEmail}`,
+      );
+      forEachUserSocket(targetEmail, (s) =>
+        s.emit("muted", { reason: muteReason, until: m.until }),
+      );
+      socket.emit(
+        "commandError",
+        `muted ${targetUsername}${durationStr ? " for " + durationStr : ""}`,
+      );
+    },
+  },
+  "/unmute": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      const targetUsername = rest;
+      const targetEmail =
+        findSocketByUsername(targetUsername)?.userEmail ?? null;
+      if (!targetEmail || !getMute(targetEmail)) {
+        socket.emit("commandError", `${targetUsername} is not muted`);
+        return;
+      }
+      deleteMute(targetEmail);
+      forEachUserSocket(targetEmail, (s) => s.emit("unmuted"));
+      socket.emit("commandError", `unmuted ${targetUsername}`);
+    },
+  },
+};
 
 let chatMuted = false;
 let guestsDisabled = getSetting("guests_disabled") === "1";
@@ -799,15 +930,21 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (
-      data.text?.startsWith("/") &&
-      socket.userEmail !== process.env.OWNER_EMAIL
-    ) {
-      if (ownercmds.some((cmd) => data.text.startsWith(cmd))) {
-        socket.emit(
-          "commandError",
-          "you do not have permission to use commands",
-        );
+    const raw = data.text ?? "";
+    if (raw.startsWith("/")) {
+      const sp = raw.indexOf(" ");
+      const name = sp === -1 ? raw : raw.slice(0, sp);
+      const rest = sp === -1 ? "" : raw.slice(sp + 1).trim();
+      const cmd = commands[name];
+      if (cmd) {
+        if (cmd.ownerOnly && socket.userEmail !== process.env.OWNER_EMAIL) {
+          socket.emit(
+            "commandError",
+            "you don't have permission to use this command",
+          );
+          return;
+        }
+        await cmd.run(socket, rest, data);
         return;
       }
     }
