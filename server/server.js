@@ -188,32 +188,31 @@ setInterval(
 );
 /*
 const ownercmds = [
-  "/ban",
-  "/removefilter",
-  "/addfilter",
-  "/reloadfilter",
-  "/unban",
-  "/mute",
-  "/setcolor",
-  "/unmute",
-  "/resetstrikes",
-  "/clear",
-  "/announce",
-  "/mutechat",
-  "/unmutechat",
-  "/maintenance",
-  "/unbanip",
-  "/whois",
-  "/kick",
-  "/noguests",
-  "/allowguests",
-  "/addemoji",
-  "/removeemoji",
-  "/reloademojis",
-  "/verify",
-  "/unverify",
-  "/redverify",
-  "/unredverify",
+  "/ban", +
+  "/removefilter", +
+  "/addfilter", +
+  "/reloadfilter", +
+  "/unban", +
+  "/mute", +
+  "/setcolor", +
+  "/unmute", +
+  "/resetstrikes", +
+  "/clear", +
+  "/mutechat", +
+  "/unmutechat", +
+  "/maintenance", +
+  "/unbanip", +
+  "/whois", +
+  "/kick", +
+  "/noguests", +
+  "/allowguests", +
+  "/addemoji", (removed/replaced)
+  "/removeemoji", (removed/replaced)
+  "/reloademojis", +
+  "/verify", +
+  "/unverify", +
+  "/redverify", +
+  "/unredverify", +
 ];
 */
 
@@ -439,7 +438,181 @@ const commands = {
       }
     },
   },
+  "/removefilter": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      const word = rest.toLowerCase();
+      if (!filteredwords.includes(word)) {
+        socket.emit("commandError", `${word} is not in the filter`);
+        return;
+      }
+      removeFilterWord(word);
+      loadFilterWordsIntoMemory();
+      socket.emit("commandError", `removed ${word} from the filter`);
+    },
+  },
+  "/addfilter": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      const word = rest.toLowerCase();
+      if (!word) {
+        socket.emit("commandError", "you need to specify a word");
+        return;
+      }
+      addFilterWord(word);
+      loadFilterWordsIntoMemory();
+      socket.emit("commandError", `added ${word} into the filter`);
+    },
+  },
+  "/setcolor": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      const args = rest.split(" ");
+      const targetUsername = args[0];
+      const colorInput = args.slice(1).join(" ").toLowerCase();
+      const targetEmail =
+        findSocketByUsername(targetUsername)?.userEmail ?? null;
+      if (!targetEmail) {
+        socket.emit(
+          "commandError",
+          `no user found with username ${targetUsername}`,
+        );
+        return;
+      }
+      const flagColors = {
+        pride: "flag:pride",
+        trans: "flag:trans",
+        bi: "flag:bi",
+        nb: "flag:nb",
+        lesbian: "flag:lesbian",
+        gay: "flag:gay",
+      };
+      const color = flagColors[colorInput] ?? colorInput;
+      if (isBlockedColor(color)) {
+        socket.emit("commandError", "please choose another color");
+        return;
+      }
+      setColor(targetEmail, color);
+      forEachUserSocket(targetEmail, (s) => s.emit("colorChanged", color));
+      emitAllUserLists();
+      socket.emit("commandError", `set ${targetUsername}'s color to ${color}`);
+    },
+  },
+  "/maintenance": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      maintenance = !maintenance;
+      reason = maintenance ? rest : "";
+      setSetting("maintenance", maintenance ? "1" : "0");
+      setSetting("maintenance_reason", reason);
+      for (const [, s] of io.sockets.sockets) {
+        if (s.userEmail !== process.env.OWNER_EMAIL) {
+          s.emit("maintenance", maintenance, reason);
+          if (maintenance) s.disconnect();
+        }
+      }
+      socket.emit(
+        "commandError",
+        maintenance ? "maintenance enabled" : "maintenance disabled",
+      );
+    },
+  },
+  "/verify": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      setVerified(rest);
+      forEachUserSocket(rest, (s) => {
+        s.cachedVerified = true;
+      });
+      emitAllUserLists();
+      socket.emit("commandError", `verified ${rest}`);
+    },
+  },
+  "/unverify": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      removeVerified(rest);
+      forEachUserSocket(rest, (s) => {
+        s.cachedVerified = false;
+      });
+      emitAllUserLists();
+      socket.emit("commandError", `unverified ${rest}`);
+    },
+  },
+  "/redverify": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      setRedVerified(rest);
+      forEachUserSocket(rest, (s) => {
+        s.cachedRedVerified = true;
+      });
+      emitAllUserLists();
+      socket.emit("commandError", `red verified ${rest}`);
+    },
+  },
+  "/unredverify": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      removeRedVerified(rest);
+      forEachUserSocket(rest, (s) => {
+        s.cachedRedVerified = false;
+      });
+      emitAllUserLists();
+      socket.emit("commandError", `removed red verification from ${rest}`);
+    },
+  },
+  "/nick": {
+    ownerOnly: false,
+    run: (socket, rest) => {
+      const nick = rest;
+      if (!isValidUsername(nick)) {
+        socket.emit("commandError", "invalid username");
+        return;
+      }
+      if (socket.userEmail.endsWith("@guest")) {
+        socket.emit("commandError", "guests cannot change their username");
+        return;
+      }
+      const prevUser = socket.username;
+      socket.username = nick;
+      saveUsername(socket.userEmail, nick);
+      if (prevUser && prevUser !== nick) {
+        socket.emit("userRenamed", { from: prevUser, to: nick });
+      }
+      emitAllUserLists();
+    },
+  },
+  "/color": {
+    ownerOnly: false,
+    run: (socket, rest) => {
+      const colorinput = rest.toLowerCase();
+      const prideFlags = {
+        pride: "flag:pride",
+        rainbow: "flag:pride",
+        gay: "flag:gay",
+        trans: "flag:trans",
+        transgender: "flag:trans",
+        bi: "flag:bi",
+        bisexual: "flag:bi",
+        lesbian: "flag:lesbian",
+        nb: "flag:nb",
+        nonbinary: "flag:nb",
+        enby: "flag:nb",
+      };
+      const color = prideFlags[colorinput] ?? colorinput;
+      if (isBlockedColor(color)) {
+        socket.emit("commandError", "please choose a different color");
+        return;
+      }
+      setColor(socket.userEmail, color);
+      socket.cachedColor = color;
+      socket.emit("colorChanged", color);
+      emitAllUserLists();
+    },
+  },
 };
+
+commands["/colour"] = commands["/color"];
 
 let chatMuted = false;
 let guestsDisabled = getSetting("guests_disabled") === "1";
