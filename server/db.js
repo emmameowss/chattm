@@ -314,6 +314,14 @@ const stmts = {
     `INSERT OR REPLACE INTO usernames (email, username) VALUES (?, ?)`,
   ),
 
+  // "has this email ever been used as an account?" (any persistent identity row)
+  emailInUsernames: db.prepare(`SELECT 1 FROM usernames WHERE email = ? LIMIT 1`),
+  emailInProfiles: db.prepare(`SELECT 1 FROM profiles WHERE email = ? LIMIT 1`),
+  emailInSessions: db.prepare(`SELECT 1 FROM sessions WHERE email = ? LIMIT 1`),
+  emailInMessages: db.prepare(
+    `SELECT 1 FROM messages WHERE owner_email = ? LIMIT 1`,
+  ),
+
   // Avatars
   getAvatar: db.prepare(`SELECT url FROM avatars WHERE email = ?`),
   setAvatar: db.prepare(
@@ -675,6 +683,18 @@ export function getStoredUsername(email) {
 
 export function getEmailByUsername(username) {
   return stmts.getEmailByUsername.get(username)?.email ?? null;
+}
+
+// true if this email already exists as an account (e.g. an OAuth user), so a
+// password account can't be created to hijack it. guests are @guest and never
+// pass email validation, so they aren't a concern here.
+export function emailHasAccount(email) {
+  return !!(
+    stmts.emailInUsernames.get(email) ||
+    stmts.emailInProfiles.get(email) ||
+    stmts.emailInSessions.get(email) ||
+    stmts.emailInMessages.get(email)
+  );
 }
 
 export function saveUsername(email, username) {

@@ -30,6 +30,7 @@ import {
   deleteSession,
   getCredential,
   createCredential,
+  emailHasAccount,
   getColor,
   setColor,
   deleteColor,
@@ -1646,7 +1647,7 @@ httpServer.on("request", async (req, res) => {
             400,
             "username can only contain letters, numbers, and hyphens (max 20 chars)",
           );
-        if (getCredential(email))
+        if (getCredential(email) || emailHasAccount(email))
           return fail(409, "an account with that email already exists");
         if (getEmailByUsername(username))
           return fail(409, "that username is taken");
