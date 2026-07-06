@@ -185,7 +185,7 @@ setInterval(
   },
   10 * 60 * 1000,
 );
-
+/*
 const ownercmds = [
   "/ban",
   "/removefilter",
@@ -214,6 +214,7 @@ const ownercmds = [
   "/redverify",
   "/unredverify",
 ];
+*/
 
 let chatMuted = false;
 let guestsDisabled = getSetting("guests_disabled") === "1";
@@ -480,6 +481,19 @@ io.use((socket, next) => {
   }
   next();
 });
+
+function findSocketByUsername(name) {
+  for (const [, s] of io.sockets.sockets) {
+    if (s.username === name) return s;
+  }
+  return null;
+}
+
+function emitToUser(email, event, ...args) {
+  for (const [, s] of io.sockets.sockets) {
+    if (s.userEmail === email) s.emit(event, ...args);
+  }
+}
 
 io.on("connection", (socket) => {
   socket.userIP =
