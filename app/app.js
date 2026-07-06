@@ -10,22 +10,6 @@ let activity = false;
 let username = localStorage.getItem("username") || userId.slice(0, 5);
 let audioctx = null;
 let isOwner = false;
-// fetch port
-const config = await fetch("/config")
-  .then((r) => r.json())
-  .catch(() => ({ port: 3000 }));
-
-if (localStorage.getItem("banned")) {
-  document.body.className = "login-page";
-  document.body.innerHTML = `
-        <h1>chat™</h1>
-        <p style="color: var(--pink)">you have been banned</p>
-        <p>reason: ${localStorage.getItem("banned")}</p>
-        <p style="color: var(--muted)">to appeal, email <a href="mailto:emma@chattm.app">emma@chattm.app</a></p>
-    `;
-  devInstanceBanner();
-  throw new Error("banned");
-}
 
 // colors
 function nameHash(name) {
@@ -162,19 +146,6 @@ function lightbox(src) {
   document.body.appendChild(overlay);
 }
 
-// clientside maintenance stuff
-function showMaintenance(reason) {
-  document.body.className = "login-page";
-  document.body.innerHTML = `
-        <h1>chat™</h1>
-        <p style="color: #F5A9B8;">chat™ is under maintenance</p>
-        ${reason ? `<p>${reason}</p>` : ""}
-    `;
-  devInstanceBanner();
-  // setTimeout(() => location.reload(), 15000)
-  throw new Error("maintenance");
-}
-
 devInstanceBanner();
 
 let customEmoji = {};
@@ -212,16 +183,6 @@ function applyFlagColor(el, color) {
   }
 }
 
-// clientside maintrnance stuf paet 2
-const maintenanceCheck = await fetch(
-  (window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
-    ? `http://localhost:${config.port}`
-    : window.location.origin) + "/maintenance",
-)
-  .then((r) => r.json())
-  .catch(() => ({ maintenance: false }));
-
 // hca stuff part 9 (live server really hates me)
 const session = (() => {
   const hash = new URLSearchParams(window.location.hash.slice(1));
@@ -235,83 +196,12 @@ const session = (() => {
   return localStorage.getItem("session");
 })();
 
-// fix auth denied crashing
-const urlError = new URLSearchParams(window.location.search).get("error");
-if (urlError === "auth_denied") {
-  window.history.replaceState({}, "", "/");
-  sessionStorage.setItem("authDenied", "1");
-}
-if (urlError === "rate_limited") {
-  window.history.replaceState({}, "", "/");
-  sessionStorage.setItem("rateLimited", "1");
-}
+// the login / ban / maintenance screens are now standalone pages served
+// server-side at GET / (see server.js). if we reach the chat bundle without a
+// local session (e.g. localStorage was cleared but the cookie lingers), clear
+// the stale cookie and let the server route us back to the login page.
 if (!session) {
-  const kickedReason = sessionStorage.getItem("kickedReason");
-  if (maintenanceCheck.maintenance) showMaintenance(maintenanceCheck.reason);
-  const guestsOff = maintenanceCheck.guestsDisabled;
-  document.body.className = "login-page";
-  document.body.innerHTML = `
-        <h1>chat™</h1>
-        <p>you need to sign in to chat</p>
-        <a id="hca-login-link" href="/login"><button><i class="ti ti-login-2"></i> login with Hack Club</button></a>
-        ${
-          guestsOff
-            ? '<button disabled style="opacity:0.6;cursor:not-allowed"><i class="ti ti-user"></i> continue as guest</button>'
-            : '<button id="guest-btn"><i class="ti ti-user"></i> continue as guest</button><div id="guest-name-form" style="display:none;flex-direction:column;gap:8px;margin-top:4px"><input id="guest-name-input" type="text" placeholder="choose a username" maxlength="20" autocomplete="new-password"><p id="guest-name-error" style="display:none;color:var(--pink);margin:0;font-size:0.85em"></p><div style="display:flex;gap:8px"><button id="guest-name-cancel" type="button" style="flex:1">cancel</button><button id="guest-name-submit" style="flex:2">enter chat</button></div></div>'
-        }
-        ${kickedReason ? `<p style="color: var(--pink)">you've been kicked: ${kickedReason}</p>` : ""}
-        ${sessionStorage.getItem("authDenied") ? '<p style="color: var(--pink)">login was cancelled or denied</p>' : ""}
-        ${guestsOff ? '<p style="color: var(--muted)">guest logins are currently disabled</p>' : ""}
-        ${sessionStorage.getItem("rateLimited") ? '<p style="color: var(--muted)">you\'re doing that too much, try again later</p>' : ""}
-    `;
-  devInstanceBanner();
-  sessionStorage.removeItem("kickedReason");
-  sessionStorage.removeItem("authDenied");
-  sessionStorage.removeItem("rateLimited");
-  if (!guestsOff) {
-    const hcaLink = document.getElementById("hca-login-link");
-    const guestBtn = document.getElementById("guest-btn");
-    const guestForm = document.getElementById("guest-name-form");
-    const guestInput = document.getElementById("guest-name-input");
-    const guestError = document.getElementById("guest-name-error");
-    function openGuestForm() {
-      hcaLink.style.display = "none";
-      guestBtn.style.display = "none";
-      guestForm.style.display = "flex";
-      guestInput.focus();
-    }
-    function closeGuestForm() {
-      guestForm.style.display = "none";
-      guestInput.value = "";
-      guestError.style.display = "none";
-      guestBtn.style.display = "";
-      hcaLink.style.display = "";
-    }
-    guestBtn.addEventListener("click", openGuestForm);
-    function submitGuestName() {
-      const name = guestInput.value.trim();
-      if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
-        guestError.textContent = name
-          ? "username can only contain letters, numbers, and hyphens (max 20 chars)"
-          : "please enter a username";
-        guestError.style.display = "block";
-        guestInput.focus();
-        return;
-      }
-      guestError.style.display = "none";
-      window.location.href = "/guest?username=" + encodeURIComponent(name);
-    }
-    document
-      .getElementById("guest-name-submit")
-      .addEventListener("click", submitGuestName);
-    document
-      .getElementById("guest-name-cancel")
-      .addEventListener("click", closeGuestForm);
-    guestInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submitGuestName();
-      if (e.key === "Escape") closeGuestForm();
-    });
-  }
+  window.location.href = "/signout";
   throw new Error("not authenticated");
 }
 
@@ -1983,44 +1873,34 @@ if (session) {
 
   socket.on("kicked", (reason) => {
     localStorage.removeItem("session");
-    sessionStorage.setItem("kickedReason", reason || "no reason given");
-    window.location.href = "/";
+    // /kicked clears the session cookie server-side and shows the reason page
+    window.location.href =
+      "/kicked?reason=" + encodeURIComponent(reason || "no reason given");
   });
 
   // an iq too high?
   // join/leave messages/system messages
 
-  // nuke session and reload if unauthenticated, updated for maintenance
+  // the ban / maintenance / login screens are served server-side at GET /, so
+  // for these connect errors we just reload and let the server route us
   socket.on("connect_error", (err) => {
-    if (err.message === "maintenance") {
-      showMaintenance(maintenanceCheck.reason);
-      return;
-    }
-    if (err.message === "banned") {
-      document.body.className = "login-page";
-      document.body.innerHTML = `
-            <h1>chat™</h1>
-            <p style="color: var(--pink)">you have been banned</p>
-            <p>reason: ${err.data?.reason || "no reason given"}</p>
-            <p style="color: var(--muted)">to appeal, email <a href="mailto:emma@chattm.app">emma@chattm.app</a></p>
-        `;
-      devInstanceBanner();
-      return;
-    }
-    if (err.message === "not authenticated") {
-      localStorage.removeItem("session");
+    if (
+      err.message === "maintenance" ||
+      err.message === "banned" ||
+      err.message === "not authenticated"
+    ) {
+      if (err.message === "not authenticated")
+        localStorage.removeItem("session");
       location.reload();
+      return;
     }
     if (err.message === "rate limited") return; // socket.io will retry automatically
     // for transient errors, let socket.io reconnect automatically
   });
 
-  socket.on("maintenance", (enabled, reason) => {
-    if (enabled) {
-      try {
-        showMaintenance(reason);
-      } catch (e) {}
-    }
+  socket.on("maintenance", (enabled) => {
+    // server flips maintenance on and disconnects us; reload → maintenance page
+    if (enabled) location.reload();
   });
 
   // user list client side stuff

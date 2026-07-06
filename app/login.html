@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>chat™</title>
+        <link href="style.css" rel="stylesheet" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
+        />
+        <meta name="theme-color" content="#F5A9B8" />
+    </head>
+    <body class="login-page">
+        <h1>chat™</h1>
+        <p>you need to sign in to chat</p>
+        <a id="hca-login-link" href="/login"
+            ><button><i class="ti ti-login-2"></i> login with Hack Club</button></a
+        >
+        <!--GUEST_SECTION-->
+        <!--MESSAGES-->
+        <script>
+            (function () {
+                const h = location.hostname;
+                if (
+                    ["beta.chattm.app", "localhost", "127.0.0.1"].includes(h)
+                ) {
+                    const b = document.createElement("div");
+                    b.id = "dev-banner";
+                    b.textContent =
+                        h === "beta.chattm.app"
+                            ? "this is a beta instance of chat™ - things may not be very stable"
+                            : "this is a dev instance of chat™ - things may not be stable and may break often";
+                    document.body.appendChild(b);
+                }
+
+                const hcaLink = document.getElementById("hca-login-link");
+                const guestBtn = document.getElementById("guest-btn");
+                if (!guestBtn) return;
+                const guestForm = document.getElementById("guest-name-form");
+                const guestInput = document.getElementById("guest-name-input");
+                const guestError = document.getElementById("guest-name-error");
+                function openGuestForm() {
+                    hcaLink.style.display = "none";
+                    guestBtn.style.display = "none";
+                    guestForm.style.display = "flex";
+                    guestInput.focus();
+                }
+                function closeGuestForm() {
+                    guestForm.style.display = "none";
+                    guestInput.value = "";
+                    guestError.style.display = "none";
+                    guestBtn.style.display = "";
+                    hcaLink.style.display = "";
+                }
+                guestBtn.addEventListener("click", openGuestForm);
+                function submitGuestName() {
+                    const name = guestInput.value.trim();
+                    if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
+                        guestError.textContent = name
+                            ? "username can only contain letters, numbers, and hyphens (max 20 chars)"
+                            : "please enter a username";
+                        guestError.style.display = "block";
+                        guestInput.focus();
+                        return;
+                    }
+                    guestError.style.display = "none";
+                    window.location.href =
+                        "/guest?username=" + encodeURIComponent(name);
+                }
+                document
+                    .getElementById("guest-name-submit")
+                    .addEventListener("click", submitGuestName);
+                document
+                    .getElementById("guest-name-cancel")
+                    .addEventListener("click", closeGuestForm);
+                guestInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") submitGuestName();
+                    if (e.key === "Escape") closeGuestForm();
+                });
+            })();
+        </script>
+    </body>
+</html>

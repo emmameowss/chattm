@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>chat™ — maintenance</title>
+        <link href="style.css" rel="stylesheet" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
+        />
+        <meta name="theme-color" content="#F5A9B8" />
+    </head>
+    <body class="login-page">
+        <h1>chat™</h1>
+        <p style="color: #f5a9b8">chat™ is under maintenance</p>
+        <!--REASON-->
+        <script>
+            (function () {
+                const h = location.hostname;
+                if (
+                    ["beta.chattm.app", "localhost", "127.0.0.1"].includes(h)
+                ) {
+                    const b = document.createElement("div");
+                    b.id = "dev-banner";
+                    b.textContent =
+                        h === "beta.chattm.app"
+                            ? "this is a beta instance of chat™ - things may not be very stable"
+                            : "this is a dev instance of chat™ - things may not be stable and may break often";
+                    document.body.appendChild(b);
+                }
+            })();
+        </script>
+    </body>
+</html>

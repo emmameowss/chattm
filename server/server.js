@@ -635,6 +635,63 @@ const types = {
   ".ico": "image/x-icon",
 };
 
+function parseCookies(req) {
+  const out = {};
+  const header = req.headers.cookie;
+  if (!header) return out;
+  for (const part of header.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const k = part.slice(0, idx).trim();
+    const v = part.slice(idx + 1).trim();
+    if (k) out[k] = decodeURIComponent(v);
+  }
+  return out;
+}
+
+function sessionCookie(id, req) {
+  const secure =
+    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
+  return `session=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${
+    secure ? "; Secure" : ""
+  }`;
+}
+
+function clearSessionCookie() {
+  return "session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// read a standalone page from ../app and substitute <!--TOKEN--> placeholders
+async function renderPage(file, replacements = {}) {
+  let html = await readFile(resolve(process.cwd(), "../app", file), "utf8");
+  for (const [token, value] of Object.entries(replacements)) {
+    html = html.split(`<!--${token}-->`).join(value);
+  }
+  return html;
+}
+
+// resolve the cookie session, mirroring the socket middleware's guest-expiry check
+function getRequestUser(req) {
+  const sessionId = parseCookies(req).session;
+  if (!sessionId) return null;
+  const user = getSession(sessionId);
+  if (!user) return null;
+  if (user.guest) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (user.expires !== today) return null;
+  }
+  return user;
+}
+
 function isBlockedColor(color) {
   const lower = color.toLowerCase();
   // block near-white (unreadable on light surfaces)
@@ -1320,7 +1377,10 @@ httpServer.on("request", async (req, res) => {
     const sessionid = randomBytes(32).toString("hex");
     saveSession(sessionid, { email: primary_email, ip });
     const redirectUrl = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}/#session=${sessionid}`;
-    res.writeHead(302, { Location: redirectUrl });
+    res.writeHead(302, {
+      Location: redirectUrl,
+      "Set-Cookie": sessionCookie(sessionid, req),
+    });
     res.end();
     return;
   }
@@ -1344,11 +1404,12 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/signout") {
-    const sessionId = url.searchParams.get("session");
+    const sessionId =
+      url.searchParams.get("session") || parseCookies(req).session;
     if (sessionId) {
       deleteSession(sessionId);
     }
-    res.writeHead(302, { Location: "/" });
+    res.writeHead(302, { Location: "/", "Set-Cookie": clearSessionCookie() });
     res.end();
     return;
   }
@@ -1515,7 +1576,10 @@ httpServer.on("request", async (req, res) => {
     if (rawUsername && isValidUsername(rawUsername))
       saveUsername(guestEmail, rawUsername);
     const redirectUrl = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}/#session=${sessionid}`;
-    res.writeHead(302, { Location: redirectUrl });
+    res.writeHead(302, {
+      Location: redirectUrl,
+      "Set-Cookie": sessionCookie(sessionid, req),
+    });
     res.end();
     return;
   }
@@ -1938,6 +2002,78 @@ httpServer.on("request", async (req, res) => {
     res.writeHead(200, { "content-type": "text/html" });
     res.end(content);
     return;
+  }
+
+  // kicked landing page: clears the session (and cookie) and shows the reason
+  if (url.pathname === "/kicked") {
+    const sessionId = parseCookies(req).session;
+    if (sessionId) deleteSession(sessionId);
+    const kickReason = url.searchParams.get("reason") || "no reason given";
+    const html = await renderPage("kicked.html", {
+      REASON: escapeHtml(kickReason),
+    });
+    res.writeHead(200, {
+      "content-type": "text/html",
+      "Set-Cookie": clearSessionCookie(),
+    });
+    res.end(html);
+    return;
+  }
+
+  // server-side routing for the root page: pick login / ban / maintenance / chat
+  // based on the cookie session, mirroring the socket auth middleware
+  if (req.method === "GET" && url.pathname === "/") {
+    const user = getRequestUser(req);
+    const isOwner = user && user.email === process.env.OWNER_EMAIL;
+
+    if (maintenance && !isOwner) {
+      const html = await renderPage("maintenance.html", {
+        REASON: reason ? `<p>${escapeHtml(reason)}</p>` : "",
+      });
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(html);
+      return;
+    }
+
+    if (user && isBanned(user.email)) {
+      const html = await renderPage("ban.html", {
+        REASON: escapeHtml(getBanReason(user.email) || "no reason given"),
+      });
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(html);
+      return;
+    }
+
+    if (!user) {
+      const err = url.searchParams.get("error");
+      const messages = [];
+      if (guestsDisabled)
+        messages.push(
+          '<p style="color: var(--muted)">guest logins are currently disabled</p>',
+        );
+      if (err === "auth_denied")
+        messages.push(
+          '<p style="color: var(--pink)">login was cancelled or denied</p>',
+        );
+      if (err === "rate_limited" || err === "guests_disabled")
+        messages.push(
+          '<p style="color: var(--muted)">you\'re doing that too much, try again later</p>',
+        );
+      const guestSection = guestsDisabled
+        ? '<button disabled style="opacity:0.6;cursor:not-allowed"><i class="ti ti-user"></i> continue as guest</button>'
+        : '<button id="guest-btn"><i class="ti ti-user"></i> continue as guest</button><div id="guest-name-form" style="display:none;flex-direction:column;gap:8px;margin-top:4px"><input id="guest-name-input" type="text" placeholder="choose a username" maxlength="20" autocomplete="new-password"><p id="guest-name-error" style="display:none;color:var(--pink);margin:0;font-size:0.85em"></p><div style="display:flex;gap:8px"><button id="guest-name-cancel" type="button" style="flex:1">cancel</button><button id="guest-name-submit" style="flex:2">enter chat</button></div></div>';
+      const html = await renderPage("login.html", {
+        GUEST_SECTION: guestSection,
+        MESSAGES: messages.join("\n        "),
+      });
+      const headers = { "content-type": "text/html" };
+      // drop a stale cookie whose session no longer resolves
+      if (parseCookies(req).session) headers["Set-Cookie"] = clearSessionCookie();
+      res.writeHead(200, headers);
+      res.end(html);
+      return;
+    }
+    // authenticated, not banned, not in maintenance → fall through to index.html
   }
 
   if (req.method === "GET") {
