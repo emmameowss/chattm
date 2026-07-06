@@ -345,6 +345,58 @@ const commands = {
       socket.emit("commandError", `unmuted ${targetUsername}`);
     },
   },
+  "/clear": {
+    ownerOnly: true,
+    run: (socket) => {
+      clearMessages(socket.currentChannel);
+      io.to(roomOf(socket.currentChannel).emit("clear"));
+    },
+  },
+  "/mutechat": {
+    ownerOnly: true,
+    run: () => {
+      chatMuted = true;
+      io.emit("mutechat", "chat has been muted");
+    },
+  },
+  "/unmutechat": {
+    ownerOnly: true,
+    run: () => {
+      chatMuted = false;
+      io.emit("unmutechat", "chat has been unmuted");
+    },
+  },
+  "/status": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      status = rest;
+      socket.emit("status", status);
+    },
+  },
+  "/reloadfilter": {
+    ownerOnly: true,
+    run: (socket) => {
+      loadFilterWordsIntoMemory();
+      socket.emit("commandError", `${filteredwords.length} loaded`);
+    },
+  },
+  "/resetstrikes": {
+    ownerOnly: true,
+    run: (socket, rest) => {
+      const targetUsername = rest;
+      const targetEmail =
+        findSocketByUsername(targetUsername)?.userEmail ?? null;
+      if (!targetEmail) {
+        socket.emit(
+          "commandError",
+          `no user found with username ${targetUsername}`,
+        );
+        return;
+      }
+      deleteStrikes(targetEmail);
+      socket.emit("commandError", `reset strikes for ${targetUsername}`);
+    },
+  },
 };
 
 let chatMuted = false;
@@ -948,105 +1000,6 @@ io.on("connection", (socket) => {
         return;
       }
     }
-
-    // /ban command
-    if (
-      data.text?.startsWith("/ban ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const args = data.text.slice(5).trim().split(" ");
-      let target = args[0];
-      const banReason = args.slice(1).join(" ") || "no reason given";
-
-      if (!target.includes("@")) {
-        let found = null;
-        for (const [id, s] of io.sockets.sockets) {
-          if (s.username === target) {
-            found = s.userEmail;
-            break;
-          }
-        }
-        target = found ?? getEmailByUsername(target);
-        if (!target) {
-          socket.emit("commandError", `no user found with username ${args[0]}`);
-          return;
-        }
-      }
-
-      const targetEmail = target;
-      addBan(targetEmail, banReason);
-      await appendFile(
-        "bans.log",
-        `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${banReason}\n`,
-      );
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.userEmail === targetEmail) {
-          addIpBan(s.userIP);
-          await appendFile(
-            "bans.log",
-            `${new Date().toISOString()}: also banned IP ${s.userIP}\n`,
-          );
-          s.emit("banned", banReason);
-          s.skipLeaveMessage = true;
-          s.disconnect();
-        }
-      }
-      socket.emit("commandError", `banned ${targetEmail}`);
-      return;
-    }
-
-    if (
-      data.text?.startsWith("/kick ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const args = data.text.slice(6).trim();
-      const [targetUsername, ...reasonParts] = args.split(" ");
-      const kickReason = reasonParts.join(" ") || "kicked by server";
-
-      if (!targetUsername) {
-        socket.emit("commandError", "usage: /kick <username> [reason]");
-        return;
-      }
-
-      let kicked = false;
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.username === targetUsername) {
-          s.emit("kicked", kickReason);
-          s.skipLeaveMessage = true;
-          s.disconnect();
-          kicked = true;
-          break;
-        }
-      }
-
-      if (!kicked) {
-        socket.emit(
-          "commandError",
-          `no user found with username ${targetUsername}`,
-        );
-        return;
-      }
-
-      socket.emit("commandError", `kicked ${targetUsername}`);
-      await appendFile(
-        "kicks.log",
-        `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${kickReason}\n`,
-      );
-      return;
-    }
-
-    if (
-      data.text?.startsWith("/unban ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const targetEmail = data.text.slice(7).trim();
-      removeBan(targetEmail);
-      socket.emit(
-        "commandError",
-        `unbanned ${targetEmail}, use /unbanip for IP`,
-      );
-      return;
-    }
     if (
       data.text?.startsWith("/setnick ") &&
       socket.userEmail === process.env.OWNER_EMAIL
@@ -1083,139 +1036,6 @@ io.on("connection", (socket) => {
       targetSocket.emit("savedUsername", newName);
       emitAllUserLists();
       socket.emit("commandError", `changed ${prevName}'s name to ${newName}`);
-      return;
-    }
-    if (
-      data.text?.startsWith("/unbanip ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const targetIP = data.text.slice(9).trim();
-      removeIpBan(targetIP);
-      socket.emit("commandError", `unbanned ${targetIP}`);
-      return;
-    }
-    if (
-      data.text?.startsWith("/mute ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const args = data.text.slice(6).trim().split(" ");
-      const targetUsername = args[0];
-      const durationStr = args[1];
-      const muteReason = args.slice(2).join(" ") || "no reason given";
-
-      let targetEmail = null;
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.username === targetUsername) {
-          targetEmail = s.userEmail;
-          break;
-        }
-      }
-      if (!targetEmail) {
-        socket.emit(
-          "commandError",
-          `no user found with username ${targetUsername}`,
-        );
-        return;
-      }
-      const durationMs = durationStr ? parseDuration(durationStr) : null;
-      if (durationStr && !durationMs) {
-        socket.emit("commandError", "invalid duration format");
-        return;
-      }
-      setMute(
-        targetEmail,
-        muteReason,
-        durationMs ? Date.now() + durationMs : null,
-      );
-      const m = getMute(targetEmail);
-      await appendFile(
-        "mutes.log",
-        `${new Date().toISOString()}: ${socket.userEmail}`,
-      );
-
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.userEmail === targetEmail) {
-          s.emit("muted", { reason: muteReason, until: m.until });
-        }
-      }
-      socket.emit(
-        "commandError",
-        `muted ${targetUsername}${durationStr ? " for " + durationStr : ""}`,
-      );
-      return;
-    }
-    if (
-      data.text?.startsWith("/unmute ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const targetUsername = data.text.slice(8).trim();
-      let targetEmail = null;
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.username === targetUsername) {
-          targetEmail = s.userEmail;
-          break;
-        }
-      }
-      if (!targetEmail || !getMute(targetEmail)) {
-        socket.emit("commandError", `${targetUsername} is not muted`);
-        return;
-      }
-      deleteMute(targetEmail);
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.userEmail === targetEmail) {
-          s.emit("unmuted");
-        }
-      }
-      socket.emit("commandError", `unmuted ${targetUsername}`);
-      return;
-    }
-    if (
-      data.text?.startsWith("/resetstrikes ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const targetUsername = data.text.slice(14).trim();
-      let targetEmail = null;
-      for (const [id, s] of io.sockets.sockets) {
-        if (s.username === targetUsername) {
-          targetEmail = s.userEmail;
-          break;
-        }
-      }
-      if (!targetEmail) {
-        socket.emit(
-          "commandError",
-          `no user found with username ${targetUsername}`,
-        );
-        return;
-      }
-      deleteStrikes(targetEmail);
-      socket.emit("commandError", `reset filter strikes for ${targetUsername}`);
-      return;
-    }
-    if (
-      data.text?.startsWith("/clear") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      clearMessages(socket.currentChannel);
-      io.to(roomOf(socket.currentChannel)).emit("clear");
-      return;
-    }
-    if (
-      data.text?.startsWith("/mutechat") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const ann = "chat has been muted";
-      chatMuted = true;
-      io.emit("mutechat", ann);
-      return;
-    }
-    if (
-      data.text?.startsWith("/unmutechat") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      const ann = "chat has been unmuted";
-      chatMuted = false;
-      io.emit("unmutechat", ann);
       return;
     }
     if (
@@ -1424,14 +1244,6 @@ io.on("connection", (socket) => {
       );
       return;
     }
-    if (
-      data.text?.startsWith("/status ") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      status = data.text.slice(8).trim();
-      socket.emit("status", status);
-      return;
-    }
     if (data.text?.startsWith("/color ") || data.text?.startsWith("/colour ")) {
       const sliceAt = data.text.startsWith("/color ") ? 7 : 8;
       const colorinput = data.text.slice(sliceAt).trim().toLowerCase();
@@ -1470,14 +1282,6 @@ io.on("connection", (socket) => {
       addFilterWord(word);
       loadFilterWordsIntoMemory();
       socket.emit("commandError", `added ${word} to filter list`);
-      return;
-    }
-    if (
-      data.text?.startsWith("/reloadfilter") &&
-      socket.userEmail === process.env.OWNER_EMAIL
-    ) {
-      loadFilterWordsIntoMemory();
-      socket.emit("commandError", `${filteredwords.length} words loaded`);
       return;
     }
     if (
