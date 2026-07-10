@@ -26,7 +26,10 @@
         <p>you need to sign in to chat</p>
 
         <!-- Clerk mounts its sign-in / sign-up UI here -->
-        <div id="clerk-signin" style="width: 100%; max-width: 400px"></div>
+        <div
+            id="clerk-signin"
+            style="width: 100%; max-width: 400px; margin: 0 auto"
+        ></div>
         <p
             id="clerk-error"
             style="
@@ -107,6 +110,28 @@
                             {
                                 fallbackRedirectUrl: "/",
                                 signUpFallbackRedirectUrl: "/",
+                                // dark appearance matching the app palette
+                                appearance: {
+                                    variables: {
+                                        colorBackground: "#141414",
+                                        colorInputBackground: "#0e0e0e",
+                                        colorInputText: "#e8e8e8",
+                                        colorText: "#e8e8e8",
+                                        colorTextSecondary: "#8a8a8a",
+                                        colorPrimary: "#f5a9b8",
+                                        // light neutral so shades read on a dark bg
+                                        colorNeutral: "#ffffff",
+                                        borderRadius: "10px",
+                                    },
+                                    elements: {
+                                        rootBox: { width: "100%" },
+                                        cardBox: {
+                                            width: "100%",
+                                            boxShadow: "none",
+                                            border: "1px solid #242424",
+                                        },
+                                    },
+                                },
                             },
                         );
                     }
