@@ -13,89 +13,30 @@
             href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
         />
         <meta name="theme-color" content="#F5A9B8" />
+        <script
+            async
+            crossorigin="anonymous"
+            data-clerk-publishable-key="pk_test_dGhhbmtmdWwtZWVsLTc0LmNsZXJrLmFjY291bnRzLmRldiQ"
+            src="https://thankful-eel-74.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+            type="text/javascript"
+        ></script>
     </head>
     <body class="login-page">
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
 
-        <div
-            id="pw-auth"
+        <!-- Clerk mounts its sign-in / sign-up UI here -->
+        <div id="clerk-signin" style="width: 100%; max-width: 400px"></div>
+        <p
+            id="clerk-error"
             style="
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                width: 240px;
-                max-width: 80vw;
+                display: none;
+                color: var(--pink);
+                margin: 0;
+                font-size: 0.85em;
             "
-        >
-            <form
-                id="pw-login-form"
-                style="display: flex; flex-direction: column; gap: 8px"
-            >
-                <input
-                    id="pw-login-email"
-                    type="email"
-                    placeholder="email"
-                    autocomplete="email"
-                />
-                <input
-                    id="pw-login-password"
-                    type="password"
-                    placeholder="password"
-                    autocomplete="current-password"
-                />
-                <button type="submit">
-                    <i class="ti ti-mail"></i> log in with email
-                </button>
-            </form>
-            <form
-                id="pw-signup-form"
-                style="display: none; flex-direction: column; gap: 8px"
-            >
-                <input
-                    id="pw-signup-email"
-                    type="email"
-                    placeholder="email"
-                    autocomplete="email"
-                />
-                <input
-                    id="pw-signup-username"
-                    type="text"
-                    placeholder="username"
-                    maxlength="20"
-                    autocomplete="username"
-                />
-                <input
-                    id="pw-signup-password"
-                    type="password"
-                    placeholder="password (min 8 chars)"
-                    autocomplete="new-password"
-                />
-                <button type="submit">
-                    <i class="ti ti-user-plus"></i> create account
-                </button>
-            </form>
-            <p
-                id="pw-error"
-                style="
-                    display: none;
-                    color: var(--pink);
-                    margin: 0;
-                    font-size: 0.85em;
-                "
-            ></p>
-            <button type="button" id="pw-toggle">
-                <i id="pw-toggle-icon" class="ti ti-user-plus"></i>
-                <span id="pw-toggle-text">sign up</span>
-            </button>
-            <div
-                style="height: 1px; background: var(--border); margin: 4px 0"
-            ></div>
-        </div>
+        ></p>
 
-        <a id="hca-login-link" href="/login"
-            ><button><i class="ti ti-login-2"></i> login with Hack Club</button></a
-        >
         <!--GUEST_SECTION-->
         <!--MESSAGES-->
 
@@ -114,73 +55,61 @@
                     document.body.appendChild(b);
                 }
 
-                const hcaLink = document.getElementById("hca-login-link");
-
-                // ── email/password login + signup ──
-                const pwError = document.getElementById("pw-error");
-                const loginForm = document.getElementById("pw-login-form");
-                const signupForm = document.getElementById("pw-signup-form");
-                const pwToggle = document.getElementById("pw-toggle");
-                function showPwError(msg) {
-                    pwError.textContent = msg;
-                    pwError.style.display = "block";
+                const clerkError = document.getElementById("clerk-error");
+                function showClerkError(msg) {
+                    clerkError.textContent = msg;
+                    clerkError.style.display = "block";
                 }
-                const pwToggleText =
-                    document.getElementById("pw-toggle-text");
-                const pwToggleIcon =
-                    document.getElementById("pw-toggle-icon");
-                pwToggle.addEventListener("click", () => {
-                    const signingUp = signupForm.style.display !== "none";
-                    signupForm.style.display = signingUp ? "none" : "flex";
-                    loginForm.style.display = signingUp ? "flex" : "none";
-                    // now showing login → offer "sign up"; showing signup → offer "log in"
-                    pwToggleText.textContent = signingUp ? "sign up" : "log in";
-                    pwToggleIcon.className = signingUp
-                        ? "ti ti-user-plus"
-                        : "ti ti-login-2";
-                    pwError.style.display = "none";
-                });
-                async function submitAuth(url, payload) {
-                    pwError.style.display = "none";
+
+                // ── Clerk sign-in ──
+                // Once Clerk loads, either the user is already signed in (in
+                // which case we exchange their Clerk session for one of our own
+                // app sessions), or we mount Clerk's sign-in UI.
+                async function exchangeClerkSession() {
                     try {
-                        const res = await fetch(url, {
+                        const token = await window.Clerk.session.getToken();
+                        const res = await fetch("/clerk-login", {
                             method: "POST",
                             headers: { "content-type": "application/json" },
-                            body: JSON.stringify(payload),
+                            body: JSON.stringify({ token }),
                         });
                         const data = await res.json().catch(() => ({}));
                         if (!res.ok) {
-                            showPwError(data.error || "something went wrong");
+                            showClerkError(
+                                data.error || "could not sign you in",
+                            );
                             return;
                         }
                         localStorage.setItem("session", data.session);
                         window.location.href = "/";
                     } catch (e) {
-                        showPwError("network error, try again");
+                        showClerkError("network error, try again");
                     }
                 }
-                loginForm.addEventListener("submit", (e) => {
-                    e.preventDefault();
-                    submitAuth("/pwlogin", {
-                        email: document
-                            .getElementById("pw-login-email")
-                            .value.trim(),
-                        password:
-                            document.getElementById("pw-login-password").value,
-                    });
-                });
-                signupForm.addEventListener("submit", (e) => {
-                    e.preventDefault();
-                    submitAuth("/signup", {
-                        email: document
-                            .getElementById("pw-signup-email")
-                            .value.trim(),
-                        username: document
-                            .getElementById("pw-signup-username")
-                            .value.trim(),
-                        password:
-                            document.getElementById("pw-signup-password").value,
-                    });
+
+                window.addEventListener("load", async function () {
+                    if (!window.Clerk) {
+                        showClerkError("couldn't load sign-in, please refresh");
+                        return;
+                    }
+                    await window.Clerk.load();
+                    const params = new URLSearchParams(location.search);
+                    // came from /signout → end the Clerk session too, then reload
+                    if (params.get("signedout") && window.Clerk.user) {
+                        await window.Clerk.signOut({ redirectUrl: "/" });
+                        return;
+                    }
+                    if (window.Clerk.user && window.Clerk.session) {
+                        exchangeClerkSession();
+                    } else {
+                        window.Clerk.mountSignIn(
+                            document.getElementById("clerk-signin"),
+                            {
+                                fallbackRedirectUrl: "/",
+                                signUpFallbackRedirectUrl: "/",
+                            },
+                        );
+                    }
                 });
 
                 // ── guest form (absent when guests are disabled) ──
@@ -193,7 +122,6 @@
                     const guestError =
                         document.getElementById("guest-name-error");
                     function openGuestForm() {
-                        hcaLink.style.display = "none";
                         guestBtn.style.display = "none";
                         guestForm.style.display = "flex";
                         guestInput.focus();
@@ -203,7 +131,6 @@
                         guestInput.value = "";
                         guestError.style.display = "none";
                         guestBtn.style.display = "";
-                        hcaLink.style.display = "";
                     }
                     guestBtn.addEventListener("click", openGuestForm);
                     function submitGuestName() {

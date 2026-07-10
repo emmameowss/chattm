@@ -2,6 +2,7 @@ import "dotenv/config";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import formidable from "formidable";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { readFile, appendFile } from "fs/promises";
@@ -104,6 +105,11 @@ const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+
+// Clerk handles all real-account auth. The frontend signs users in with
+// clerk-js, then POSTs the resulting session JWT to /clerk-login where we
+// verify it here and mint one of our own SQLite sessions.
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 // migrate from legacy files on first run
 await migrateFromFiles();
@@ -846,19 +852,6 @@ function isValidEmail(email) {
   return email.length <= 100 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function hashPassword(pw) {
-  const salt = randomBytes(16).toString("hex");
-  return `scrypt$${salt}$${scryptSync(pw, salt, 64).toString("hex")}`;
-}
-
-function verifyPassword(pw, stored) {
-  const [scheme, salt, hash] = String(stored).split("$");
-  if (scheme !== "scrypt" || !salt || !hash) return false;
-  const a = Buffer.from(hash, "hex");
-  const b = scryptSync(pw, salt, 64);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 setInterval(() => {
   const expired = getExpiredMutes(Date.now());
   for (const email of expired) {
@@ -1357,68 +1350,59 @@ httpServer.on("request", async (req, res) => {
     `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`,
   );
 
-  if (url.pathname === "/login") {
-    const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=email`;
-    res.writeHead(302, { location: authUrl });
-    res.end();
-    return;
-  }
-
-  if (url.pathname === "/callback") {
-    const cbIp =
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket.remoteAddress;
-    if (!checkRateLimit(cbIp, "callback", 30, 60 * 60 * 1000)) {
-      res.writeHead(302, { Location: "/?error=rate_limited" });
-      res.end();
-      return;
-    }
-    const code = url.searchParams.get("code");
-    const tokenRes = await fetch("https://auth.hackclub.com/oauth/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: process.env.HCA_CLIENT_ID,
-        client_secret: process.env.HCA_CLIENT_SECRET,
-        redirect_uri: process.env.HCA_REDIRECT_URI,
-        code,
-        grant_type: "authorization_code",
-      }),
-    });
-    const tokenJson = await tokenRes.json();
-    const { access_token } = tokenJson;
-    const userRes = await fetch("https://auth.hackclub.com/api/v1/me", {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    const user = await userRes.json();
-    if (!user.identity?.primary_email) {
-      res.writeHead(302, { Location: "/?error=auth_denied" });
-      res.end();
-      return;
-    }
-    const { primary_email } = user.identity;
-    // if an email/password account already owns this email, block OAuth login so
-    // the two can't both claim the same identity
-    if (getCredential(normalizeEmail(primary_email))) {
-      res.writeHead(302, { Location: "/?error=pw_account" });
-      res.end();
-      return;
-    }
+  // Clerk sign-in: the client signs in with clerk-js and POSTs the resulting
+  // session JWT here. We verify it, resolve the user's primary email, and mint
+  // one of our own SQLite sessions (same shape the app already expects).
+  if (url.pathname === "/clerk-login" && req.method === "POST") {
     const ip =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.socket.remoteAddress;
-    await appendFile(
-      "login.log",
-      `${new Date().toISOString()}: ${primary_email} signed in from ${ip}\n`,
-    );
-    const sessionid = randomBytes(32).toString("hex");
-    saveSession(sessionid, { email: primary_email, ip });
-    const redirectUrl = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}/#session=${sessionid}`;
-    res.writeHead(302, {
-      Location: redirectUrl,
-      "Set-Cookie": sessionCookie(sessionid, req),
+    if (!checkRateLimit(ip, "clerk-login", 30, 60 * 60 * 1000)) {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "too many attempts, try again later" }));
+      return;
+    }
+    let body = "";
+    req.on("data", (d) => {
+      body += d;
     });
-    res.end();
+    req.on("end", async () => {
+      const fail = (code, error) => {
+        res.writeHead(code, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error }));
+      };
+      try {
+        const token = JSON.parse(body).token;
+        if (!token) return fail(400, "missing token");
+
+        // verify the session JWT against Clerk's JWKS using our secret key
+        const claims = await verifyToken(token, {
+          secretKey: process.env.CLERK_SECRET_KEY,
+        });
+
+        // session tokens don't carry the email, so look the user up
+        const user = await clerk.users.getUser(claims.sub);
+        const primaryEmail = user.emailAddresses.find(
+          (e) => e.id === user.primaryEmailAddressId,
+        )?.emailAddress;
+        if (!primaryEmail) return fail(400, "no email on Clerk account");
+
+        const email = normalizeEmail(primaryEmail);
+        await appendFile(
+          "login.log",
+          `${new Date().toISOString()}: ${email} signed in from ${ip}\n`,
+        );
+        const sessionid = randomBytes(32).toString("hex");
+        saveSession(sessionid, { email, ip });
+        res.writeHead(200, {
+          "content-type": "application/json",
+          "Set-Cookie": sessionCookie(sessionid, req),
+        });
+        res.end(JSON.stringify({ session: sessionid }));
+      } catch (e) {
+        fail(401, "invalid or expired sign-in");
+      }
+    });
     return;
   }
 
@@ -1446,7 +1430,12 @@ httpServer.on("request", async (req, res) => {
     if (sessionId) {
       deleteSession(sessionId);
     }
-    res.writeHead(302, { Location: "/", "Set-Cookie": clearSessionCookie() });
+    // ?signedout=1 tells the login page to also end the Clerk session so the
+    // user isn't silently re-signed-in on the next visit
+    res.writeHead(302, {
+      Location: "/?signedout=1",
+      "Set-Cookie": clearSessionCookie(),
+    });
     res.end();
     return;
   }
@@ -1618,104 +1607,6 @@ httpServer.on("request", async (req, res) => {
       "Set-Cookie": sessionCookie(sessionid, req),
     });
     res.end();
-    return;
-  }
-
-  // email/password signup → creates an account keyed by the raw email + session
-  if (url.pathname === "/signup" && req.method === "POST") {
-    const signupIp =
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket.remoteAddress;
-    if (!checkRateLimit(signupIp, "signup", 5, 60 * 60 * 1000)) {
-      res.writeHead(429, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "too many signups, try again later" }));
-      return;
-    }
-    let body = "";
-    req.on("data", (d) => {
-      body += d;
-    });
-    req.on("end", () => {
-      try {
-        const parsed = JSON.parse(body);
-        const email = normalizeEmail(parsed.email);
-        const username = String(parsed.username ?? "").trim();
-        const password = String(parsed.password ?? "");
-        const fail = (code, error) => {
-          res.writeHead(code, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error }));
-        };
-        if (!isValidEmail(email))
-          return fail(400, "enter a valid email address");
-        if (password.length < 8 || password.length > 200)
-          return fail(400, "password must be 8-200 characters");
-        if (!isValidUsername(username))
-          return fail(
-            400,
-            "username can only contain letters, numbers, and hyphens (max 20 chars)",
-          );
-        if (getCredential(email) || emailHasAccount(email))
-          return fail(409, "an account with that email already exists");
-        if (getEmailByUsername(username))
-          return fail(409, "that username is taken");
-
-        const identity = email;
-        createCredential(email, username, hashPassword(password));
-        saveUsername(identity, username);
-        const sessionid = randomBytes(32).toString("hex");
-        saveSession(sessionid, { email: identity, ip: signupIp });
-        res.writeHead(200, {
-          "content-type": "application/json",
-          "Set-Cookie": sessionCookie(sessionid, req),
-        });
-        res.end(JSON.stringify({ session: sessionid }));
-      } catch (e) {
-        res.writeHead(400, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: "bad request" }));
-      }
-    });
-    return;
-  }
-
-  // email/password login
-  if (url.pathname === "/pwlogin" && req.method === "POST") {
-    const loginIp =
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket.remoteAddress;
-    if (!checkRateLimit(loginIp, "pwlogin", 10, 15 * 60 * 1000)) {
-      res.writeHead(429, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "too many attempts, try again later" }));
-      return;
-    }
-    let body = "";
-    req.on("data", (d) => {
-      body += d;
-    });
-    req.on("end", () => {
-      try {
-        const parsed = JSON.parse(body);
-        const email = normalizeEmail(parsed.email);
-        const password = String(parsed.password ?? "");
-        const cred = getCredential(email);
-        // same message whether the email or the password is wrong
-        if (!cred || !verifyPassword(password, cred.password_hash)) {
-          res.writeHead(401, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "invalid email or password" }));
-          return;
-        }
-        const identity = email;
-        const sessionid = randomBytes(32).toString("hex");
-        saveSession(sessionid, { email: identity, ip: loginIp });
-        res.writeHead(200, {
-          "content-type": "application/json",
-          "Set-Cookie": sessionCookie(sessionid, req),
-        });
-        res.end(JSON.stringify({ session: sessionid }));
-      } catch (e) {
-        res.writeHead(400, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: "bad request" }));
-      }
-    });
     return;
   }
 
@@ -2186,17 +2077,9 @@ httpServer.on("request", async (req, res) => {
         messages.push(
           '<p style="color: var(--muted)">guest logins are currently disabled</p>',
         );
-      if (err === "auth_denied")
-        messages.push(
-          '<p style="color: var(--pink)">login was cancelled or denied</p>',
-        );
       if (err === "rate_limited" || err === "guests_disabled")
         messages.push(
           '<p style="color: var(--muted)">you\'re doing that too much, try again later</p>',
-        );
-      if (err === "pw_account")
-        messages.push(
-          '<p style="color: var(--pink)">an email/password account already uses that email — log in with your password instead</p>',
         );
       const guestSection = guestsDisabled
         ? '<button disabled style="opacity:0.6;cursor:not-allowed"><i class="ti ti-user"></i> continue as guest</button>'
