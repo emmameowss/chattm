@@ -1737,16 +1737,6 @@ body:has(#dev-banner) #version-status {
     transform: translateY(-50%);
 }
 
-#mute-btn::before {
-    font-family: "tabler-icons";
-    content: "\ea35";
-    margin-right: 6px;
-}
-
-#mute-btn.muted::before {
-    content: "\ece9";
-}
-
 #modal-overlay {
     position: fixed;
     inset: 0;
@@ -2547,16 +2537,6 @@ body:has(#dev-banner) #version-status {
         height: 1px;
         background: var(--border);
         transform: translateY(-50%) !important;
-    }
-
-    #mute-btn::before {
-        font-family: "tabler-icons";
-        content: "\ea35";
-        margin-right: 6px;
-    }
-
-    #mute-btn.muted::before {
-        content: "\ece9";
     }
 
     body:has(#dev-banner) h1 {

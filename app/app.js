@@ -317,12 +317,17 @@ if (session) {
   // mute button
   let notifymuted = localStorage.getItem("notifymuted") === "true";
   const mutebtn = document.querySelector("#mute-btn");
-  mutebtn.classList.toggle("muted", notifymuted);
+  function applyMute() {
+    mutebtn.innerHTML = notifymuted
+      ? '<i class="ti ti-bell-off"></i> mute sound'
+      : '<i class="ti ti-bell"></i> mute sound';
+  }
+  applyMute();
 
   mutebtn.addEventListener("click", () => {
     notifymuted = !notifymuted;
     localStorage.setItem("notifymuted", notifymuted);
-    mutebtn.classList.toggle("muted", notifymuted);
+    applyMute();
   });
 
   const themebtn = document.querySelector("#theme-btn");
