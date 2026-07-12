@@ -148,6 +148,8 @@ form {
 }
 
 input[type="text"],
+input[type="email"],
+input[type="password"],
 input[type="file"] {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -160,7 +162,9 @@ input[type="file"] {
     transition: border-color 0.15s;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
     border-color: var(--pink);
 }
 
@@ -1541,6 +1545,21 @@ body.login-page a button:hover {
     background: var(--pink-dim);
 }
 
+/* uniform, full-width primary buttons on the login page */
+body.login-page #hca-login-link button,
+body.login-page #guest-btn,
+body.login-page #pw-toggle,
+body.login-page #pw-login-form button[type="submit"],
+body.login-page #pw-signup-form button[type="submit"] {
+    width: 240px;
+    max-width: 80vw;
+}
+
+/* stretch inputs to fill their form (base form rule centers them otherwise) */
+body.login-page #pw-auth input {
+    width: 100%;
+}
+
 #guest-btn {
     border-color: var(--pink);
     color: var(--pink);
@@ -1716,16 +1735,6 @@ body:has(#dev-banner) #version-status {
     height: 1px;
     background: var(--border);
     transform: translateY(-50%);
-}
-
-#mute-btn::before {
-    font-family: "tabler-icons";
-    content: "\ea35";
-    margin-right: 6px;
-}
-
-#mute-btn.muted::before {
-    content: "\ece9";
 }
 
 #modal-overlay {
@@ -2528,16 +2537,6 @@ body:has(#dev-banner) #version-status {
         height: 1px;
         background: var(--border);
         transform: translateY(-50%) !important;
-    }
-
-    #mute-btn::before {
-        font-family: "tabler-icons";
-        content: "\ea35";
-        margin-right: 6px;
-    }
-
-    #mute-btn.muted::before {
-        content: "\ece9";
     }
 
     body:has(#dev-banner) h1 {

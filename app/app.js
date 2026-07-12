@@ -317,12 +317,17 @@ if (session) {
   // mute button
   let notifymuted = localStorage.getItem("notifymuted") === "true";
   const mutebtn = document.querySelector("#mute-btn");
-  mutebtn.classList.toggle("muted", notifymuted);
+  function applyMute() {
+    mutebtn.innerHTML = notifymuted
+      ? '<i class="ti ti-bell-off"></i> mute sound'
+      : '<i class="ti ti-bell"></i> mute sound';
+  }
+  applyMute();
 
   mutebtn.addEventListener("click", () => {
     notifymuted = !notifymuted;
     localStorage.setItem("notifymuted", notifymuted);
-    mutebtn.classList.toggle("muted", notifymuted);
+    applyMute();
   });
 
   const themebtn = document.querySelector("#theme-btn");
@@ -401,36 +406,27 @@ if (session) {
     }
   });
 
-  async function uploadAvatar(file) {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch(
-      `${window.location.origin}/upload?session=${encodeURIComponent(session || "")}&avatar=1`,
-      {
-        method: "POST",
-        body: formData,
-      },
-    );
-    const { url, error } = await res.json();
-    if (error) throw new Error(error);
-    return url;
+  // Profile pictures are stored in Clerk. Grab the clerk-js instance that
+  // index.html loads (it's ready well before anyone edits their profile).
+  async function getClerk() {
+    for (let i = 0; i < 100; i++) {
+      if (window.Clerk && window.Clerk.loaded && window.Clerk.user)
+        return window.Clerk;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error("clerk not ready");
   }
 
-  let pendingAvatar = undefined; // undefined=no change, null=remove, string=new url
+  let pendingAvatar = undefined; // undefined=no change, null=remove, File=new pic
   let suppressProfileClose = false;
 
-  avatarInput.addEventListener("change", async () => {
+  avatarInput.addEventListener("change", () => {
     const file = avatarInput.files[0];
     if (!file) return;
     avatarInput.value = "";
-    try {
-      const url = await uploadAvatar(file);
-      pendingAvatar = url;
-      // preview in the panel without saving yet
-      renderProfileAvatarWrap(url, true);
-    } catch (e) {
-      showError("avatar upload failed");
-    }
+    // stage the file; it's uploaded to Clerk when the user hits save
+    pendingAvatar = file;
+    renderProfileAvatarWrap(URL.createObjectURL(file), true);
   });
 
   // prevent panel close when file dialog opens
@@ -508,6 +504,9 @@ if (session) {
       const img = document.createElement("img");
       img.src = avatarUrl;
       img.className = "profile-avatar";
+      // free the blob: URL used for local previews once it's decoded
+      if (avatarUrl.startsWith("blob:"))
+        img.addEventListener("load", () => URL.revokeObjectURL(avatarUrl));
       inner.appendChild(img);
     } else {
       const pl = document.createElement("div");
@@ -712,25 +711,41 @@ if (session) {
     }
   });
 
-  document.querySelector("#profile-save-btn").addEventListener("click", () => {
-    const newName = document
-      .querySelector("#profile-username-input")
-      .value.trim();
-    const newPronouns = document
-      .querySelector("#profile-pronouns-input")
-      .value.trim();
-    const newBio = document.querySelector("#profile-bio-input").value.trim();
-    if (newName && newName !== username) socket.emit("setUsername", newName);
-    if (newPronouns !== myPronouns) socket.emit("setPronouns", newPronouns);
-    if (newBio !== myBio) socket.emit("setBio", newBio);
-    if (pendingAvatar === null) socket.emit("deleteAvatar");
-    else if (pendingAvatar !== undefined)
-      socket.emit("setAvatar", pendingAvatar);
-    pendingAvatar = undefined;
-    document.querySelector("#profile-edit").style.display = "none";
-    document.querySelector("#profile-edit-btn").style.display = "";
-    document.querySelector("#profile-edit-actions").style.display = "none";
-  });
+  document
+    .querySelector("#profile-save-btn")
+    .addEventListener("click", async () => {
+      const newName = document
+        .querySelector("#profile-username-input")
+        .value.trim();
+      const newPronouns = document
+        .querySelector("#profile-pronouns-input")
+        .value.trim();
+      const newBio = document.querySelector("#profile-bio-input").value.trim();
+      if (newName && newName !== username) socket.emit("setUsername", newName);
+      if (newPronouns !== myPronouns) socket.emit("setPronouns", newPronouns);
+      if (newBio !== myBio) socket.emit("setBio", newBio);
+
+      // profile picture changes go through Clerk; the server then re-syncs
+      // from the authoritative Clerk image
+      if (pendingAvatar !== undefined) {
+        const avatarChange = pendingAvatar;
+        pendingAvatar = undefined;
+        try {
+          const clerk = await getClerk();
+          await clerk.user.setProfileImage({
+            file: avatarChange === null ? null : avatarChange,
+          });
+          socket.emit("refreshAvatar");
+        } catch (e) {
+          showError("couldn't update profile picture");
+          renderProfileAvatarWrap(myAvatar, false);
+        }
+      }
+
+      document.querySelector("#profile-edit").style.display = "none";
+      document.querySelector("#profile-edit-btn").style.display = "";
+      document.querySelector("#profile-edit-actions").style.display = "none";
+    });
 
   document
     .querySelector("#profile-cancel-btn")
@@ -2291,7 +2306,7 @@ if (session) {
         adminUsersList.appendChild(row);
       }
     }
-    makeSection("hack club", hca);
+    makeSection("accounts", hca);
     makeSection("guests", guests);
   }
 

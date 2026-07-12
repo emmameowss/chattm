@@ -13,15 +13,36 @@
             href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
         />
         <meta name="theme-color" content="#F5A9B8" />
+        <script
+            async
+            crossorigin="anonymous"
+            data-clerk-publishable-key="pk_test_dGhhbmtmdWwtZWVsLTc0LmNsZXJrLmFjY291bnRzLmRldiQ"
+            src="https://thankful-eel-74.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+            type="text/javascript"
+        ></script>
     </head>
     <body class="login-page">
         <h1>chat™</h1>
         <p>you need to sign in to chat</p>
-        <a id="hca-login-link" href="/login"
-            ><button><i class="ti ti-login-2"></i> login with Hack Club</button></a
-        >
+
+        <!-- Clerk mounts its sign-in / sign-up UI here -->
+        <div
+            id="clerk-signin"
+            style="width: 100%; max-width: 400px; margin: 0 auto"
+        ></div>
+        <p
+            id="clerk-error"
+            style="
+                display: none;
+                color: var(--pink);
+                margin: 0;
+                font-size: 0.85em;
+            "
+        ></p>
+
         <!--GUEST_SECTION-->
         <!--MESSAGES-->
+
         <script>
             (function () {
                 const h = location.hostname;
@@ -37,50 +58,131 @@
                     document.body.appendChild(b);
                 }
 
-                const hcaLink = document.getElementById("hca-login-link");
-                const guestBtn = document.getElementById("guest-btn");
-                if (!guestBtn) return;
-                const guestForm = document.getElementById("guest-name-form");
-                const guestInput = document.getElementById("guest-name-input");
-                const guestError = document.getElementById("guest-name-error");
-                function openGuestForm() {
-                    hcaLink.style.display = "none";
-                    guestBtn.style.display = "none";
-                    guestForm.style.display = "flex";
-                    guestInput.focus();
+                const clerkError = document.getElementById("clerk-error");
+                function showClerkError(msg) {
+                    clerkError.textContent = msg;
+                    clerkError.style.display = "block";
                 }
-                function closeGuestForm() {
-                    guestForm.style.display = "none";
-                    guestInput.value = "";
-                    guestError.style.display = "none";
-                    guestBtn.style.display = "";
-                    hcaLink.style.display = "";
+
+                // ── Clerk sign-in ──
+                // Once Clerk loads, either the user is already signed in (in
+                // which case we exchange their Clerk session for one of our own
+                // app sessions), or we mount Clerk's sign-in UI.
+                async function exchangeClerkSession() {
+                    try {
+                        const token = await window.Clerk.session.getToken();
+                        const res = await fetch("/clerk-login", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ token }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                            showClerkError(
+                                data.error || "could not sign you in",
+                            );
+                            return;
+                        }
+                        localStorage.setItem("session", data.session);
+                        window.location.href = "/";
+                    } catch (e) {
+                        showClerkError("network error, try again");
+                    }
                 }
-                guestBtn.addEventListener("click", openGuestForm);
-                function submitGuestName() {
-                    const name = guestInput.value.trim();
-                    if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
-                        guestError.textContent = name
-                            ? "username can only contain letters, numbers, and hyphens (max 20 chars)"
-                            : "please enter a username";
-                        guestError.style.display = "block";
-                        guestInput.focus();
+
+                window.addEventListener("load", async function () {
+                    if (!window.Clerk) {
+                        showClerkError("couldn't load sign-in, please refresh");
                         return;
                     }
-                    guestError.style.display = "none";
-                    window.location.href =
-                        "/guest?username=" + encodeURIComponent(name);
-                }
-                document
-                    .getElementById("guest-name-submit")
-                    .addEventListener("click", submitGuestName);
-                document
-                    .getElementById("guest-name-cancel")
-                    .addEventListener("click", closeGuestForm);
-                guestInput.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") submitGuestName();
-                    if (e.key === "Escape") closeGuestForm();
+                    await window.Clerk.load();
+                    const params = new URLSearchParams(location.search);
+                    // came from /signout → end the Clerk session too, then reload
+                    if (params.get("signedout") && window.Clerk.user) {
+                        await window.Clerk.signOut({ redirectUrl: "/" });
+                        return;
+                    }
+                    if (window.Clerk.user && window.Clerk.session) {
+                        exchangeClerkSession();
+                    } else {
+                        window.Clerk.mountSignIn(
+                            document.getElementById("clerk-signin"),
+                            {
+                                fallbackRedirectUrl: "/",
+                                signUpFallbackRedirectUrl: "/",
+                                // dark appearance matching the app palette
+                                appearance: {
+                                    variables: {
+                                        colorBackground: "#141414",
+                                        colorInputBackground: "#0e0e0e",
+                                        colorInputText: "#e8e8e8",
+                                        colorText: "#e8e8e8",
+                                        colorTextSecondary: "#8a8a8a",
+                                        colorPrimary: "#f5a9b8",
+                                        // light neutral so shades read on a dark bg
+                                        colorNeutral: "#ffffff",
+                                        borderRadius: "10px",
+                                    },
+                                    elements: {
+                                        rootBox: { width: "100%" },
+                                        cardBox: {
+                                            width: "100%",
+                                            boxShadow: "none",
+                                            border: "1px solid #242424",
+                                        },
+                                    },
+                                },
+                            },
+                        );
+                    }
                 });
+
+                // ── guest form (absent when guests are disabled) ──
+                const guestBtn = document.getElementById("guest-btn");
+                if (guestBtn) {
+                    const guestForm =
+                        document.getElementById("guest-name-form");
+                    const guestInput =
+                        document.getElementById("guest-name-input");
+                    const guestError =
+                        document.getElementById("guest-name-error");
+                    function openGuestForm() {
+                        guestBtn.style.display = "none";
+                        guestForm.style.display = "flex";
+                        guestInput.focus();
+                    }
+                    function closeGuestForm() {
+                        guestForm.style.display = "none";
+                        guestInput.value = "";
+                        guestError.style.display = "none";
+                        guestBtn.style.display = "";
+                    }
+                    guestBtn.addEventListener("click", openGuestForm);
+                    function submitGuestName() {
+                        const name = guestInput.value.trim();
+                        if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
+                            guestError.textContent = name
+                                ? "username can only contain letters, numbers, and hyphens (max 20 chars)"
+                                : "please enter a username";
+                            guestError.style.display = "block";
+                            guestInput.focus();
+                            return;
+                        }
+                        guestError.style.display = "none";
+                        window.location.href =
+                            "/guest?username=" + encodeURIComponent(name);
+                    }
+                    document
+                        .getElementById("guest-name-submit")
+                        .addEventListener("click", submitGuestName);
+                    document
+                        .getElementById("guest-name-cancel")
+                        .addEventListener("click", closeGuestForm);
+                    guestInput.addEventListener("keydown", (e) => {
+                        if (e.key === "Enter") submitGuestName();
+                        if (e.key === "Escape") closeGuestForm();
+                    });
+                }
             })();
         </script>
     </body>

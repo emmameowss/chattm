@@ -2,6 +2,7 @@ import "dotenv/config";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import formidable from "formidable";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
 import { randomBytes } from "crypto";
 import { readFile, appendFile } from "fs/promises";
@@ -101,6 +102,20 @@ const s3 = new S3Client({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
 });
+
+// Clerk handles all real-account auth. The frontend signs users in with
+// clerk-js, then POSTs the resulting session JWT to /clerk-login where we
+// verify it here and mint one of our own SQLite sessions.
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
+// Origins allowed to present Clerk session tokens to /clerk-login. Set
+// CLERK_AUTHORIZED_PARTIES to a comma-separated list of your frontend origins
+// (e.g. "https://chat.emmameowss.gay,https://chattm.app") so a token minted for
+// another origin can't be replayed against us. Left empty → check is skipped.
+const clerkAuthorizedParties = (process.env.CLERK_AUTHORIZED_PARTIES || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 // migrate from legacy files on first run
 await migrateFromFiles();
@@ -829,6 +844,15 @@ function isValidUsername(name) {
   return /^[a-zA-Z0-9-]{1,20}$/.test(name);
 }
 
+// Clerk accounts use the raw (normalized) email as their in-app identity, so
+// every command / lookup treats them identically (a Clerk account for
+// OWNER_EMAIL is the owner).
+function normalizeEmail(email) {
+  return String(email ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 setInterval(() => {
   const expired = getExpiredMutes(Date.now());
   for (const email of expired) {
@@ -929,6 +953,7 @@ io.use((socket, next) => {
     }
   }
   socket.userEmail = user.email;
+  socket.clerkId = user.clerkId ?? null;
   socket.username = null;
   if (maintenance && socket.userEmail !== process.env.OWNER_EMAIL) {
     return next(new Error("maintenance"));
@@ -1071,26 +1096,33 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("setAvatar", (url) => {
+  // Profile pictures live in Clerk. The client uploads or removes the image
+  // via clerk-js, then asks us to re-sync. We read the authoritative image URL
+  // straight from Clerk (never trusting a client-supplied URL) so a user can't
+  // spoof someone else's picture.
+  socket.on("refreshAvatar", async () => {
     if (socket.userEmail.endsWith("@guest")) return;
-    const avatarBase = process.env.AWS_S3_PUBLIC_URL;
-    if (
-      !avatarBase ||
-      typeof url !== "string" ||
-      !url.startsWith(`${avatarBase}/avatars/`)
-    )
-      return;
-    setAvatar(socket.userEmail, url);
-    socket.cachedAvatar = url;
-    socket.emit("savedAvatar", url);
-    emitUserList(socket.currentChannel);
-  });
-
-  socket.on("deleteAvatar", () => {
-    deleteAvatar(socket.userEmail);
-    socket.cachedAvatar = null;
-    socket.emit("savedAvatar", null);
-    emitUserList(socket.currentChannel);
+    try {
+      // sessions minted before we stored the Clerk id fall back to an email
+      // lookup (then cache it so subsequent refreshes are cheap)
+      if (!socket.clerkId) {
+        const list = await clerk.users.getUserList({
+          emailAddress: [socket.userEmail],
+          limit: 1,
+        });
+        socket.clerkId = list.data?.[0]?.id ?? null;
+      }
+      if (!socket.clerkId) return;
+      const u = await clerk.users.getUser(socket.clerkId);
+      const url = u.hasImage ? u.imageUrl : null;
+      if (url) setAvatar(socket.userEmail, url);
+      else deleteAvatar(socket.userEmail);
+      socket.cachedAvatar = url;
+      socket.emit("savedAvatar", url);
+      emitUserList(socket.currentChannel);
+    } catch (e) {
+      console.error("refreshAvatar failed:", e);
+    }
   });
 
   socket.on("setUsername", (name) => {
@@ -1327,61 +1359,94 @@ httpServer.on("request", async (req, res) => {
     `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`,
   );
 
-  if (url.pathname === "/login") {
-    const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${process.env.HCA_CLIENT_ID}&redirect_uri=${process.env.HCA_REDIRECT_URI}&response_type=code&scope=email`;
-    res.writeHead(302, { location: authUrl });
-    res.end();
-    return;
-  }
-
-  if (url.pathname === "/callback") {
-    const cbIp =
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket.remoteAddress;
-    if (!checkRateLimit(cbIp, "callback", 30, 60 * 60 * 1000)) {
-      res.writeHead(302, { Location: "/?error=rate_limited" });
-      res.end();
-      return;
-    }
-    const code = url.searchParams.get("code");
-    const tokenRes = await fetch("https://auth.hackclub.com/oauth/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: process.env.HCA_CLIENT_ID,
-        client_secret: process.env.HCA_CLIENT_SECRET,
-        redirect_uri: process.env.HCA_REDIRECT_URI,
-        code,
-        grant_type: "authorization_code",
-      }),
-    });
-    const tokenJson = await tokenRes.json();
-    const { access_token } = tokenJson;
-    const userRes = await fetch("https://auth.hackclub.com/api/v1/me", {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    const user = await userRes.json();
-    if (!user.identity?.primary_email) {
-      res.writeHead(302, { Location: "/?error=auth_denied" });
-      res.end();
-      return;
-    }
-    const { primary_email } = user.identity;
+  // Clerk sign-in: the client signs in with clerk-js and POSTs the resulting
+  // session JWT here. We verify it, resolve the user's primary email, and mint
+  // one of our own SQLite sessions (same shape the app already expects).
+  if (url.pathname === "/clerk-login" && req.method === "POST") {
     const ip =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.socket.remoteAddress;
-    await appendFile(
-      "login.log",
-      `${new Date().toISOString()}: ${primary_email} signed in from ${ip}\n`,
-    );
-    const sessionid = randomBytes(32).toString("hex");
-    saveSession(sessionid, { email: primary_email, ip });
-    const redirectUrl = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}/#session=${sessionid}`;
-    res.writeHead(302, {
-      Location: redirectUrl,
-      "Set-Cookie": sessionCookie(sessionid, req),
+    if (!checkRateLimit(ip, "clerk-login", 30, 60 * 60 * 1000)) {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "too many attempts, try again later" }));
+      return;
+    }
+    let body = "";
+    req.on("data", (d) => {
+      body += d;
     });
-    res.end();
+    req.on("end", async () => {
+      const fail = (code, error) => {
+        res.writeHead(code, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error }));
+      };
+      try {
+        const token = JSON.parse(body).token;
+        if (!token) return fail(400, "missing token");
+
+        // verify the session JWT against Clerk's JWKS using our secret key
+        const claims = await verifyToken(token, {
+          secretKey: process.env.CLERK_SECRET_KEY,
+          ...(clerkAuthorizedParties.length
+            ? { authorizedParties: clerkAuthorizedParties }
+            : {}),
+        });
+
+        // session tokens don't carry the email, so look the user up
+        const user = await clerk.users.getUser(claims.sub);
+        const primaryEmail = user.emailAddresses.find(
+          (e) => e.id === user.primaryEmailAddressId,
+        )?.emailAddress;
+        if (!primaryEmail) return fail(400, "no email on Clerk account");
+
+        const email = normalizeEmail(primaryEmail);
+
+        // Clerk is the source of truth for profile pictures. Reconcile the
+        // in-app avatar with the user's Clerk image on every sign-in.
+        let clerkUser = user;
+        try {
+          const existingAvatar = getAvatar(email);
+          const s3base = process.env.AWS_S3_PUBLIC_URL;
+          // one-time migration: the user set a custom (S3) avatar before we
+          // moved to Clerk and has no Clerk image yet → push it up to Clerk
+          // once. Users with only the default avatar are never synced.
+          if (
+            !clerkUser.hasImage &&
+            existingAvatar &&
+            s3base &&
+            existingAvatar.startsWith(`${s3base}/avatars/`)
+          ) {
+            const imgRes = await fetch(existingAvatar);
+            if (imgRes.ok) {
+              const blob = await imgRes.blob();
+              await clerk.users.updateUserProfileImage(clerkUser.id, {
+                file: blob,
+              });
+              clerkUser = await clerk.users.getUser(clerkUser.id);
+            }
+          }
+          // Clerk image → in-app avatar. If migration failed we keep the
+          // existing avatar rather than dropping the user's picture.
+          if (clerkUser.hasImage) setAvatar(email, clerkUser.imageUrl);
+        } catch (e) {
+          console.error("clerk avatar sync failed:", e);
+        }
+
+        await appendFile(
+          "login.log",
+          `${new Date().toISOString()}: ${email} signed in from ${ip}\n`,
+        );
+        const sessionid = randomBytes(32).toString("hex");
+        saveSession(sessionid, { email, ip, clerkId: clerkUser.id });
+        res.writeHead(200, {
+          "content-type": "application/json",
+          "Set-Cookie": sessionCookie(sessionid, req),
+        });
+        res.end(JSON.stringify({ session: sessionid }));
+      } catch (e) {
+        fail(401, "invalid or expired sign-in");
+      }
+    });
     return;
   }
 
@@ -1409,7 +1474,12 @@ httpServer.on("request", async (req, res) => {
     if (sessionId) {
       deleteSession(sessionId);
     }
-    res.writeHead(302, { Location: "/", "Set-Cookie": clearSessionCookie() });
+    // ?signedout=1 tells the login page to also end the Clerk session so the
+    // user isn't silently re-signed-in on the next visit
+    res.writeHead(302, {
+      Location: "/?signedout=1",
+      "Set-Cookie": clearSessionCookie(),
+    });
     res.end();
     return;
   }
@@ -2050,10 +2120,6 @@ httpServer.on("request", async (req, res) => {
       if (guestsDisabled)
         messages.push(
           '<p style="color: var(--muted)">guest logins are currently disabled</p>',
-        );
-      if (err === "auth_denied")
-        messages.push(
-          '<p style="color: var(--pink)">login was cancelled or denied</p>',
         );
       if (err === "rate_limited" || err === "guests_disabled")
         messages.push(

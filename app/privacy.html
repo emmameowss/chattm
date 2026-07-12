@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>chat™ — privacy policy</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
+        />
+        <style>
+            @import url("https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap");
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --bg: #0e0e0e;
+                --surface: #161616;
+                --border: #242424;
+                --text: #e8e8e8;
+                --muted: #666;
+                --pink: #f5a9b8;
+                --pink-dim: rgba(245, 169, 184, 0.12);
+                --radius: 6px;
+                --font-mono: "DM Mono", monospace;
+                --font-sans: "DM Sans", sans-serif;
+            }
+
+            html,
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: var(--font-mono);
+                font-size: 14px;
+                line-height: 1.6;
+                min-height: 100vh;
+            }
+
+            ::-webkit-scrollbar {
+                width: 4px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 2px;
+            }
+
+            header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 48px;
+                background: var(--bg);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                padding: 0 24px;
+                gap: 16px;
+                z-index: 100;
+            }
+
+            header a {
+                color: var(--pink);
+                text-decoration: none;
+                font-size: 13px;
+                letter-spacing: 0.15em;
+                text-transform: lowercase;
+            }
+
+            header a:hover {
+                text-decoration: underline;
+            }
+
+            header span {
+                color: var(--border);
+                font-size: 12px;
+            }
+
+            header h1 {
+                color: var(--muted);
+                font-size: 11px;
+                font-weight: 400;
+                letter-spacing: 0.15em;
+                text-transform: lowercase;
+            }
+
+            main {
+                max-width: 680px;
+                margin: 0 auto;
+                padding: 80px 24px 80px;
+            }
+
+            .meta {
+                color: var(--muted);
+                font-size: 11px;
+                font-style: italic;
+                margin-bottom: 8px;
+            }
+
+            .disclaimer {
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 12px 16px;
+                color: var(--muted);
+                font-size: 12px;
+                font-style: italic;
+                margin-bottom: 40px;
+                line-height: 1.7;
+            }
+
+            .disclaimer a {
+                color: var(--pink);
+                text-decoration: none;
+            }
+            .disclaimer a:hover {
+                text-decoration: underline;
+            }
+
+            h2 {
+                font-size: 11px;
+                font-weight: 400;
+                letter-spacing: 0.15em;
+                text-transform: uppercase;
+                color: var(--pink);
+                margin: 40px 0 16px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            h3 {
+                font-size: 12px;
+                font-weight: 400;
+                color: var(--muted);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin: 24px 0 10px;
+            }
+
+            p {
+                color: var(--text);
+                font-size: 13px;
+                line-height: 1.8;
+                margin-bottom: 12px;
+            }
+
+            ul {
+                list-style: none;
+                padding: 0;
+                margin-bottom: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            ul li {
+                font-size: 13px;
+                line-height: 1.7;
+                padding-left: 16px;
+                position: relative;
+                color: var(--text);
+            }
+
+            ul li::before {
+                content: "—";
+                position: absolute;
+                left: 0;
+                color: var(--muted);
+            }
+
+            strong {
+                color: var(--text);
+                font-weight: 500;
+            }
+
+            a {
+                color: var(--pink);
+                text-decoration: none;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+
+            .warning {
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 12px 16px;
+                font-size: 12px;
+                color: var(--muted);
+                margin: 12px 0;
+            }
+
+            .warning strong {
+                color: var(--pink);
+            }
+
+            footer {
+                margin-top: 60px;
+                padding-top: 24px;
+                border-top: 1px solid var(--border);
+                font-size: 11px;
+                color: var(--muted);
+                font-style: italic;
+            }
+
+            @media (max-width: 600px) {
+                main {
+                    padding: 72px 16px 40px;
+                }
+                header {
+                    padding: 0 16px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <a href="/">chat™</a>
+            <span>/</span>
+            <h1>privacy policy</h1>
+        </header>
+        <main>
+            <p class="meta">last updated: july 12, 2026</p>
+            <div class="disclaimer">
+                this privacy policy was mostly generated by AI. i'm not a
+                lawyer, claude is not a lawyer, this policy isn't perfect (or
+                good really) but it's here purely so someone doesn't come
+                yelling at me. if you have a concern or suggestion or anything
+                really, DM me on Slack.
+            </div>
+
+            <h2>1. introduction</h2>
+            <p>
+                this privacy policy explains what data chat™ collects, how it is
+                stored, and how it is used. by using chat™, you agree to the
+                practices described here.
+            </p>
+
+            <h2>2. data we collect</h2>
+            <p>
+                when you use chat™, the following information is collected and
+                stored:
+            </p>
+            <ul>
+                <li>
+                    <strong>username</strong> — the username you set on the site
+                    is stored.
+                </li>
+                <li>
+                    <strong>first and last name</strong> — if you sign in with
+                    email and choose to provide them, or if you sign in with Hack
+                    Club, your first and last name are stored.
+                </li>
+                <li>
+                    <strong>email address</strong> — the email address you sign
+                    in with (handled via Clerk) is stored.
+                </li>
+                <li>
+                    <strong>IP address</strong> — your IP address is logged when
+                    you use the service.
+                </li>
+                <li>
+                    <strong>messages</strong> — all messages you send are
+                    permanently stored.
+                </li>
+                <li>
+                    <strong>images and files</strong> — any images or files you
+                    upload are stored in Amazon S3.
+                </li>
+            </ul>
+
+            <h3>guest accounts</h3>
+            <p>
+                if you use chat™ without logging in, you are assigned a
+                temporary guest session. guest sessions may generate data such
+                as messages and IP addresses, however this data is not linked to
+                any account, email address, or persistent identifier. as a
+                result, it cannot be traced back to you specifically.
+            </p>
+
+            <h3>local storage</h3>
+            <p>
+                chat™ uses your browser's local storage to save certain
+                information on your device. this includes your user ID, which is
+                stored locally to keep you logged in and maintain your session.
+            </p>
+
+            <h2>2.5. eligibility</h2>
+            <h3>age requirement</h3>
+            <p>
+                chat™ does not have a strict minimum age requirement, however it
+                is not directed at children. if you are under 13, please be
+                aware that this service was not designed with you in mind and
+                parental guidance is advised. chat™ does not knowingly collect
+                data from children under 13.
+            </p>
+
+            <h2>3. how your data is stored</h2>
+            <div class="warning">
+                all stored data — including usernames, email addresses,
+                messages, and IP addresses — is kept in an SQLite database
+                <strong>and is not encrypted</strong>. you should be
+                aware of this when deciding what information to share on the
+                platform. images and all other files uploaded while using the
+                website are publicly accessible by anyone, at any time.
+            </div>
+
+            <h2>4. how your data is used</h2>
+            <p>
+                stored data (logged messages, emails, and IP addresses) is
+                <strong>not actively accessed or reviewed</strong> except when
+                necessary — for example, to investigate abuse or resolve
+                technical issues.
+            </p>
+            <p>
+                we do not sell, share, or otherwise distribute your personal
+                data to third parties.
+            </p>
+
+            <h3>transparency</h3>
+            <p>
+                chat™ is an open source project. the source code is publicly
+                available and can be inspected to verify how data is collected,
+                stored, and handled. we encourage technically inclined users to
+                review the codebase if they have concerns about data practices.
+            </p>
+
+            <h2>5. third-party services</h2>
+            <h3>amazon S3</h3>
+            <p>
+                images and files uploaded to chat™ are served and stored via
+                Amazon S3. their handling of that data is governed by the
+                <a href="https://aws.amazon.com/privacy/" target="_blank"
+                    >AWS Privacy Notice</a
+                >.
+            </p>
+
+            <h3>amazon EC2</h3>
+            <p>
+                chat™ is hosted on
+                <a href="https://aws.amazon.com/ec2/" target="_blank"
+                    >Amazon EC2</a
+                >, a hosting platform provided by Amazon Web Services. as a
+                result, all data and activity on chat™ is also subject to the
+                <a href="https://aws.amazon.com/privacy/" target="_blank"
+                    >AWS Privacy Notice</a
+                >.
+            </p>
+
+            <h3>clerk</h3>
+            <p>
+                chat™ uses
+                <a href="https://clerk.com" target="_blank">Clerk</a> for sign-in
+                and account management. when you sign in or manage your account,
+                that process is handled by Clerk and is subject to Clerk's own
+                <a href="https://clerk.com/legal/privacy" target="_blank"
+                    >Privacy Policy</a
+                >
+                and Terms of Service.
+            </p>
+
+            <h2>6. data retention</h2>
+            <p>
+                messages and account data (email, username, IP) are retained
+                <strong>indefinitely</strong>. there is currently no automated
+                deletion process.
+            </p>
+
+            <h2>7. breaches</h2>
+            <p>
+                in the event of a data breach or unauthorized access to stored
+                data, affected users will be notified on a best-effort basis via
+                a notice posted on the site. given that data is stored
+                unencrypted, you are encouraged to avoid sharing sensitive
+                personal information on the platform.
+            </p>
+
+            <h2>8. contact</h2>
+            <p>
+                if you have questions or concerns about this Privacy Policy or
+                your data, please contact me (Emma) over email, at
+                <a href="mailto:emma@chattm.app">emma@chattm.app</a>.
+            </p>
+
+            <h3>data deletion requests</h3>
+            <p>
+                to request deletion of your data (messages, email, username, IP
+                address), please contact me (Emma) at
+                <a href="mailto:emma@chattm.app">emma@chattm.app</a>.
+                deletion requests will be handled on a best-effort basis, and
+                may take some time to fully review and take action. for the
+                quickest reply, please use the same email you used to log into
+                the site.
+            </p>
+            <div class="warning">
+                <strong>note:</strong> if you have only ever used chat™ as a
+                guest, you cannot submit a deletion request — guest session data
+                is not tied to any identifiable account and cannot be traced
+                back to you specifically, unless you directly reveal what your
+                guest username was. in that case, that's on you.
+            </div>
+
+            <footer>
+                this policy may be updated at any time. continued use of chat™
+                after changes are posted constitutes your acceptance of the
+                revised policy.
+            </footer>
+        </main>
+    </body>
+</html>

@@ -14,6 +14,13 @@
         />
         <script defer src="app.js" type="module"></script>
         <script
+            async
+            crossorigin="anonymous"
+            data-clerk-publishable-key="pk_test_dGhhbmtmdWwtZWVsLTc0LmNsZXJrLmFjY291bnRzLmRldiQ"
+            src="https://thankful-eel-74.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+            type="text/javascript"
+        ></script>
+        <script
             src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"
             integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw=="
             crossorigin="anonymous"
@@ -46,18 +53,21 @@
                     </button></a
                 >
                 <!-- <a href="https://status.emmameowss.gay" target="_blank"><button type="button"><i class="ti ti-progress-check"></i> status</button></a> -->
-                <button type="button" id="signout">
-                    <i class="ti ti-logout"></i> sign out
-                </button>
-                <div id="version-status"></div>
                 <div
                     class="menu-divider"
                     id="owner-divider"
                     style="display: none"
                 ></div>
+                <button type="button" id="account-btn">
+                    <i class="ti ti-user-cog"></i> account
+                </button>
+                <button type="button" id="signout">
+                    <i class="ti ti-logout"></i> sign out
+                </button>
                 <button type="button" id="admin-btn" style="display: none">
                     <i class="ti ti-shield-lock"></i> admin
                 </button>
+                <div id="version-status"></div>
             </div>
         </form>
         <div id="stats-backdrop" style="display: none"></div>
@@ -89,7 +99,7 @@
                             title="mute notification sound"
                             id="mute-btn"
                         >
-                            <span class="mute-label">mute sound</span>
+                            <i class="ti ti-bell"></i> mute sound
                         </button>
                     </div>
                 </div>
@@ -333,5 +343,54 @@
             </button>
         </nav>
         <ul></ul>
+        <script>
+            // Embed the Clerk Account Portal (manage account) inside the app.
+            // The Clerk session set up on login.html persists same-origin, so
+            // clerk-js picks it up here. Guests have no Clerk user, so the
+            // "manage account" button stays hidden for them.
+            (function () {
+                const accountBtn = document.getElementById("account-btn");
+                if (!accountBtn) return;
+                // hidden until we confirm a signed-in Clerk user (not a guest)
+                accountBtn.style.display = "none";
+
+                const appearance = {
+                    variables: {
+                        colorBackground: "#141414",
+                        colorInputBackground: "#0e0e0e",
+                        colorInputText: "#e8e8e8",
+                        colorText: "#e8e8e8",
+                        colorTextSecondary: "#8a8a8a",
+                        colorPrimary: "#f5a9b8",
+                        colorNeutral: "#ffffff",
+                        borderRadius: "10px",
+                    },
+                };
+
+                window.addEventListener("load", async function () {
+                    if (!window.Clerk) return;
+                    try {
+                        await window.Clerk.load({ appearance });
+                    } catch (e) {
+                        return;
+                    }
+                    // only signed-in Clerk users (not guests) get an account
+                    if (!window.Clerk.user) return;
+                    accountBtn.style.display = "";
+                    accountBtn.addEventListener("click", function () {
+                        // close the more-menu (account-btn lives inside it, so
+                        // app.js's outside-click handler won't close it) before
+                        // opening the Clerk portal
+                        const moreMenu =
+                            document.getElementById("more-menu");
+                        if (moreMenu) moreMenu.classList.remove("open");
+                        const userlist =
+                            document.getElementById("userlist");
+                        if (userlist) userlist.style.top = "";
+                        window.Clerk.openUserProfile({ appearance });
+                    });
+                });
+            })();
+        </script>
     </body>
 </html>
