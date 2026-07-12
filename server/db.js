@@ -127,13 +127,6 @@ db.exec(`
     created_at INTEGER,
     created_by TEXT
   );
-
-  CREATE TABLE IF NOT EXISTS credentials (
-    email TEXT PRIMARY KEY,
-    username TEXT,
-    password_hash TEXT NOT NULL,
-    created_at INTEGER
-  );
 `);
 
 // seed the default channel (idempotent)
@@ -158,31 +151,6 @@ try {
 try {
   db.exec("ALTER TABLE pending_emojis ADD COLUMN review_reason TEXT");
 } catch {}
-
-// one-time migration: email/password accounts used to be namespaced as
-// "pw:<email>"; they now use the raw email as identity (like OAuth). strip the
-// prefix from every identity-keyed row, preferring an existing raw-email row on
-// conflict (UPDATE OR IGNORE skips clashes, then the leftover pw: row is dropped).
-for (const [table, col] of [
-  ["usernames", "email"],
-  ["avatars", "email"],
-  ["profiles", "email"],
-  ["colors", "email"],
-  ["mutes", "email"],
-  ["strikes", "email"],
-  ["bans", "email"],
-  ["verified_users", "email"],
-  ["red_verified_users", "email"],
-  ["sessions", "email"],
-  ["messages", "owner_email"],
-]) {
-  try {
-    db.exec(
-      `UPDATE OR IGNORE ${table} SET ${col} = substr(${col}, 4) WHERE ${col} LIKE 'pw:%';
-       DELETE FROM ${table} WHERE ${col} LIKE 'pw:%';`,
-    );
-  } catch {}
-}
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 
@@ -247,12 +215,6 @@ const stmts = {
     `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip, clerk_id) VALUES (@id, @email, @guest, @expires, @ip, @clerk_id)`,
   ),
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
-
-  // Credentials (email/password accounts)
-  getCredential: db.prepare(`SELECT * FROM credentials WHERE email = ?`),
-  insertCredential: db.prepare(
-    `INSERT INTO credentials (email, username, password_hash, created_at) VALUES (@email, @username, @password_hash, @created_at)`,
-  ),
   deleteAllGuestSessions: db.prepare(`DELETE FROM sessions WHERE guest = 1`),
 
   // Colors
@@ -315,14 +277,6 @@ const stmts = {
   ),
   saveUsername: db.prepare(
     `INSERT OR REPLACE INTO usernames (email, username) VALUES (?, ?)`,
-  ),
-
-  // "has this email ever been used as an account?" (any persistent identity row)
-  emailInUsernames: db.prepare(`SELECT 1 FROM usernames WHERE email = ? LIMIT 1`),
-  emailInProfiles: db.prepare(`SELECT 1 FROM profiles WHERE email = ? LIMIT 1`),
-  emailInSessions: db.prepare(`SELECT 1 FROM sessions WHERE email = ? LIMIT 1`),
-  emailInMessages: db.prepare(
-    `SELECT 1 FROM messages WHERE owner_email = ? LIMIT 1`,
   ),
 
   // Avatars
@@ -561,21 +515,6 @@ export function deleteAllGuestSessions() {
   stmts.deleteAllGuestSessions.run();
 }
 
-// ─── Credential API (email/password accounts) ────────────────────────────────
-
-export function getCredential(email) {
-  return stmts.getCredential.get(email) ?? null;
-}
-
-export function createCredential(email, username, passwordHash) {
-  stmts.insertCredential.run({
-    email,
-    username,
-    password_hash: passwordHash,
-    created_at: Date.now(),
-  });
-}
-
 // ─── Color API ───────────────────────────────────────────────────────────────
 
 export function getColor(email) {
@@ -688,18 +627,6 @@ export function getStoredUsername(email) {
 
 export function getEmailByUsername(username) {
   return stmts.getEmailByUsername.get(username)?.email ?? null;
-}
-
-// true if this email already exists as an account (e.g. an OAuth user), so a
-// password account can't be created to hijack it. guests are @guest and never
-// pass email validation, so they aren't a concern here.
-export function emailHasAccount(email) {
-  return !!(
-    stmts.emailInUsernames.get(email) ||
-    stmts.emailInProfiles.get(email) ||
-    stmts.emailInSessions.get(email) ||
-    stmts.emailInMessages.get(email)
-  );
 }
 
 export function saveUsername(email, username) {

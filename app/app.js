@@ -504,6 +504,9 @@ if (session) {
       const img = document.createElement("img");
       img.src = avatarUrl;
       img.className = "profile-avatar";
+      // free the blob: URL used for local previews once it's decoded
+      if (avatarUrl.startsWith("blob:"))
+        img.addEventListener("load", () => URL.revokeObjectURL(avatarUrl));
       inner.appendChild(img);
     } else {
       const pl = document.createElement("div");

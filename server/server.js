@@ -4,7 +4,7 @@ import { createServer } from "http";
 import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
-import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { randomBytes } from "crypto";
 import { readFile, appendFile } from "fs/promises";
 import { extname, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
@@ -29,9 +29,6 @@ import {
   getSession,
   saveSession,
   deleteSession,
-  getCredential,
-  createCredential,
-  emailHasAccount,
   getColor,
   setColor,
   deleteColor,
@@ -110,6 +107,15 @@ const s3 = new S3Client({
 // clerk-js, then POSTs the resulting session JWT to /clerk-login where we
 // verify it here and mint one of our own SQLite sessions.
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
+// Origins allowed to present Clerk session tokens to /clerk-login. Set
+// CLERK_AUTHORIZED_PARTIES to a comma-separated list of your frontend origins
+// (e.g. "https://chat.emmameowss.gay,https://chattm.app") so a token minted for
+// another origin can't be replayed against us. Left empty → check is skipped.
+const clerkAuthorizedParties = (process.env.CLERK_AUTHORIZED_PARTIES || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 // migrate from legacy files on first run
 await migrateFromFiles();
@@ -838,18 +844,13 @@ function isValidUsername(name) {
   return /^[a-zA-Z0-9-]{1,20}$/.test(name);
 }
 
-// email/password accounts use the raw email as their identity, exactly like an
-// OAuth account, so every command / lookup treats them identically (a password
-// account for OWNER_EMAIL is the owner). guest emails (*@guest) can't be
-// registered because isValidEmail requires a dot after the @.
+// Clerk accounts use the raw (normalized) email as their in-app identity, so
+// every command / lookup treats them identically (a Clerk account for
+// OWNER_EMAIL is the owner).
 function normalizeEmail(email) {
   return String(email ?? "")
     .trim()
     .toLowerCase();
-}
-
-function isValidEmail(email) {
-  return email.length <= 100 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 setInterval(() => {
@@ -1100,8 +1101,18 @@ io.on("connection", (socket) => {
   // straight from Clerk (never trusting a client-supplied URL) so a user can't
   // spoof someone else's picture.
   socket.on("refreshAvatar", async () => {
-    if (socket.userEmail.endsWith("@guest") || !socket.clerkId) return;
+    if (socket.userEmail.endsWith("@guest")) return;
     try {
+      // sessions minted before we stored the Clerk id fall back to an email
+      // lookup (then cache it so subsequent refreshes are cheap)
+      if (!socket.clerkId) {
+        const list = await clerk.users.getUserList({
+          emailAddress: [socket.userEmail],
+          limit: 1,
+        });
+        socket.clerkId = list.data?.[0]?.id ?? null;
+      }
+      if (!socket.clerkId) return;
       const u = await clerk.users.getUser(socket.clerkId);
       const url = u.hasImage ? u.imageUrl : null;
       if (url) setAvatar(socket.userEmail, url);
@@ -1376,6 +1387,9 @@ httpServer.on("request", async (req, res) => {
         // verify the session JWT against Clerk's JWKS using our secret key
         const claims = await verifyToken(token, {
           secretKey: process.env.CLERK_SECRET_KEY,
+          ...(clerkAuthorizedParties.length
+            ? { authorizedParties: clerkAuthorizedParties }
+            : {}),
         });
 
         // session tokens don't carry the email, so look the user up
