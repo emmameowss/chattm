@@ -378,6 +378,15 @@
                     if (!window.Clerk.user) return;
                     accountBtn.style.display = "";
                     accountBtn.addEventListener("click", function () {
+                        // close the more-menu (account-btn lives inside it, so
+                        // app.js's outside-click handler won't close it) before
+                        // opening the Clerk portal
+                        const moreMenu =
+                            document.getElementById("more-menu");
+                        if (moreMenu) moreMenu.classList.remove("open");
+                        const userlist =
+                            document.getElementById("userlist");
+                        if (userlist) userlist.style.top = "";
                         window.Clerk.openUserProfile({ appearance });
                     });
                 });
