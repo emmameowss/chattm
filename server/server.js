@@ -2074,6 +2074,13 @@ httpServer.on("request", async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/terms") {
+    const content = await readFile("../app/terms.html");
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(content);
+    return;
+  }
+
   // kicked landing page: clears the session (and cookie) and shows the reason
   if (url.pathname === "/kicked") {
     const sessionId = parseCookies(req).session;

@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>chat™ — terms of service</title>
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
+        />
+        <style>
+            @import url("https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap");
+
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --bg: #0e0e0e;
+                --surface: #161616;
+                --border: #242424;
+                --text: #e8e8e8;
+                --muted: #666;
+                --pink: #f5a9b8;
+                --pink-dim: rgba(245, 169, 184, 0.12);
+                --radius: 6px;
+                --font-mono: "DM Mono", monospace;
+                --font-sans: "DM Sans", sans-serif;
+            }
+
+            html,
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: var(--font-mono);
+                font-size: 14px;
+                line-height: 1.6;
+                min-height: 100vh;
+            }
+
+            ::-webkit-scrollbar {
+                width: 4px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 2px;
+            }
+
+            header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 48px;
+                background: var(--bg);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                padding: 0 24px;
+                gap: 16px;
+                z-index: 100;
+            }
+
+            header a {
+                color: var(--pink);
+                text-decoration: none;
+                font-size: 13px;
+                letter-spacing: 0.15em;
+                text-transform: lowercase;
+            }
+
+            header a:hover {
+                text-decoration: underline;
+            }
+
+            header span {
+                color: var(--border);
+                font-size: 12px;
+            }
+
+            header h1 {
+                color: var(--muted);
+                font-size: 11px;
+                font-weight: 400;
+                letter-spacing: 0.15em;
+                text-transform: lowercase;
+            }
+
+            main {
+                max-width: 680px;
+                margin: 0 auto;
+                padding: 80px 24px 80px;
+            }
+
+            .meta {
+                color: var(--muted);
+                font-size: 11px;
+                font-style: italic;
+                margin-bottom: 8px;
+            }
+
+            .disclaimer {
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 12px 16px;
+                color: var(--muted);
+                font-size: 12px;
+                font-style: italic;
+                margin-bottom: 40px;
+                line-height: 1.7;
+            }
+
+            .disclaimer a {
+                color: var(--pink);
+                text-decoration: none;
+            }
+            .disclaimer a:hover {
+                text-decoration: underline;
+            }
+
+            h2 {
+                font-size: 11px;
+                font-weight: 400;
+                letter-spacing: 0.15em;
+                text-transform: uppercase;
+                color: var(--pink);
+                margin: 40px 0 16px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            h3 {
+                font-size: 12px;
+                font-weight: 400;
+                color: var(--muted);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin: 24px 0 10px;
+            }
+
+            p {
+                color: var(--text);
+                font-size: 13px;
+                line-height: 1.8;
+                margin-bottom: 12px;
+            }
+
+            ul {
+                list-style: none;
+                padding: 0;
+                margin-bottom: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            ul li {
+                font-size: 13px;
+                line-height: 1.7;
+                padding-left: 16px;
+                position: relative;
+                color: var(--text);
+            }
+
+            ul li::before {
+                content: "—";
+                position: absolute;
+                left: 0;
+                color: var(--muted);
+            }
+
+            strong {
+                color: var(--text);
+                font-weight: 500;
+            }
+
+            a {
+                color: var(--pink);
+                text-decoration: none;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+
+            .warning {
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                padding: 12px 16px;
+                font-size: 12px;
+                color: var(--muted);
+                margin: 12px 0;
+            }
+
+            .warning strong {
+                color: var(--pink);
+            }
+
+            footer {
+                margin-top: 60px;
+                padding-top: 24px;
+                border-top: 1px solid var(--border);
+                font-size: 11px;
+                color: var(--muted);
+                font-style: italic;
+            }
+
+            @media (max-width: 600px) {
+                main {
+                    padding: 72px 16px 40px;
+                }
+                header {
+                    padding: 0 16px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <a href="/">chat™</a>
+            <span>/</span>
+            <h1>terms of service</h1>
+        </header>
+        <main>
+            <p class="meta">last updated: july 12, 2026</p>
+            <div class="disclaimer">
+                these terms were mostly generated by AI. i'm not a lawyer,
+                claude is not a lawyer, this document isn't perfect (or good
+                really) but it's here purely so someone doesn't come yelling at
+                me. if you have a concern or suggestion or anything really, DM
+                me on Slack.
+            </div>
+
+            <h2>1. acceptance of terms</h2>
+            <p>
+                by accessing or using chat™, you agree to be bound by these
+                Terms of Service. if you do not agree with any part of these
+                terms, please do not use the service. these terms apply whether
+                you use chat™ with an account or as a guest.
+            </p>
+            <p>
+                your use of chat™ is also governed by the
+                <a href="/privacy">Privacy Policy</a>, which explains what data
+                is collected and how it is handled.
+            </p>
+
+            <h2>2. eligibility</h2>
+            <p>
+                chat™ does not have a strict minimum age requirement, however it
+                is not directed at children. if you are under 13, please be
+                aware that this service was not designed with you in mind and
+                parental guidance is advised. by using chat™ you confirm that
+                you are legally able to agree to these terms.
+            </p>
+
+            <h2>3. accounts &amp; guest sessions</h2>
+            <p>
+                sign-in and account management are handled by
+                <a href="https://clerk.com" target="_blank">Clerk</a> and are
+                subject to Clerk's own
+                <a href="https://clerk.com/legal/privacy" target="_blank"
+                    >Privacy Policy</a
+                >
+                and Terms of Service. you are responsible for any activity that
+                happens under your account or session.
+            </p>
+            <p>
+                you may also use chat™ without logging in via a temporary guest
+                session. guest access is a privilege, not a right, and may be
+                limited or removed at any time.
+            </p>
+
+            <h2>4. acceptable use</h2>
+            <p>
+                you agree not to use chat™ to do, post, upload, or share any of
+                the following:
+            </p>
+            <ul>
+                <li>
+                    <strong>harassment &amp; hate</strong> — harassment,
+                    bullying, threats, or hate speech directed at any person or
+                    group.
+                </li>
+                <li>
+                    <strong>illegal &amp; harmful content</strong> — anything
+                    illegal, including CSAM, as well as doxxing or sharing
+                    other people's private information without consent.
+                </li>
+                <li>
+                    <strong>spam &amp; abuse</strong> — spam, flooding,
+                    evading bans or mutes, exploiting bugs, or uploading
+                    malicious files.
+                </li>
+                <li>
+                    <strong>impersonation &amp; NSFW</strong> — impersonating
+                    other people, and posting explicit or NSFW content.
+                </li>
+            </ul>
+            <p>
+                this list is not exhaustive. if it's obviously going to make the
+                experience worse for everyone else, don't do it.
+            </p>
+
+            <h2>5. enforcement</h2>
+            <p>
+                chat™ may mute, kick, rename, or ban any user, and remove any
+                content, at any time, with or without notice or reason, at the
+                sole discretion of the site owner. this is a small, informally
+                run community and moderation decisions are final.
+            </p>
+
+            <h2>6. your content</h2>
+            <p>
+                you retain ownership of the messages, images, and files you
+                post to chat™. chat™ does not claim any ownership over your
+                content — it is simply stored and displayed so the service can
+                function.
+            </p>
+            <div class="warning">
+                <strong>note:</strong> messages are permanently stored, and any
+                images or files you upload are publicly accessible by anyone, at
+                any time. do not post anything you are not comfortable being
+                stored and publicly visible. see the
+                <a href="/privacy">Privacy Policy</a> for details on storage and
+                retention.
+            </div>
+            <p>
+                you are solely responsible for the content you post, and you
+                confirm you have the right to post it.
+            </p>
+
+            <h2>7. availability</h2>
+            <p>
+                chat™ is provided on a best-effort basis. the service may be
+                slow, broken, taken offline for maintenance, or discontinued
+                entirely at any time, without notice. there is no guarantee of
+                uptime, and no guarantee that your data or messages will be
+                preserved.
+            </p>
+
+            <h2>8. disclaimer of warranties</h2>
+            <p>
+                chat™ is provided "as is" and "as available", without warranties
+                of any kind, whether express or implied. you use the service at
+                your own risk. chat™ does not warrant that the service will be
+                uninterrupted, secure, error-free, or that any content posted by
+                other users is accurate or appropriate.
+            </p>
+
+            <h2>9. limitation of liability</h2>
+            <p>
+                to the fullest extent permitted by law, the operator of chat™
+                shall not be liable for any damages arising out of or related to
+                your use of, or inability to use, the service — including loss of
+                data, loss of messages, or the actions or content of other
+                users. this is a hobby project run by one person.
+            </p>
+
+            <h2>10. governing law</h2>
+            <p>
+                these terms are governed by the laws of the Republic of Croatia,
+                without regard to conflict-of-law principles. any disputes
+                relating to chat™ or these terms shall be subject to the
+                jurisdiction of the Croatian courts.
+            </p>
+
+            <h2>11. changes to these terms</h2>
+            <p>
+                these terms may be updated at any time. when they are, the "last
+                updated" date at the top will change. it's on you to check back
+                every now and then.
+            </p>
+
+            <h2>12. contact</h2>
+            <p>
+                if you have questions, concerns, or suggestions about these
+                Terms of Service, please contact me (Emma) over email, at
+                <a href="mailto:emma@chattm.app">emma@chattm.app</a>.
+            </p>
+
+            <footer>
+                these terms may be updated at any time. continued use of chat™
+                after changes are posted constitutes your acceptance of the
+                revised terms.
+            </footer>
+        </main>
+    </body>
+</html>
