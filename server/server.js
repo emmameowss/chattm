@@ -952,6 +952,7 @@ io.use((socket, next) => {
     }
   }
   socket.userEmail = user.email;
+  socket.clerkId = user.clerkId ?? null;
   socket.username = null;
   if (maintenance && socket.userEmail !== process.env.OWNER_EMAIL) {
     return next(new Error("maintenance"));
@@ -1094,26 +1095,23 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("setAvatar", (url) => {
-    if (socket.userEmail.endsWith("@guest")) return;
-    const avatarBase = process.env.AWS_S3_PUBLIC_URL;
-    if (
-      !avatarBase ||
-      typeof url !== "string" ||
-      !url.startsWith(`${avatarBase}/avatars/`)
-    )
-      return;
-    setAvatar(socket.userEmail, url);
-    socket.cachedAvatar = url;
-    socket.emit("savedAvatar", url);
-    emitUserList(socket.currentChannel);
-  });
-
-  socket.on("deleteAvatar", () => {
-    deleteAvatar(socket.userEmail);
-    socket.cachedAvatar = null;
-    socket.emit("savedAvatar", null);
-    emitUserList(socket.currentChannel);
+  // Profile pictures live in Clerk. The client uploads or removes the image
+  // via clerk-js, then asks us to re-sync. We read the authoritative image URL
+  // straight from Clerk (never trusting a client-supplied URL) so a user can't
+  // spoof someone else's picture.
+  socket.on("refreshAvatar", async () => {
+    if (socket.userEmail.endsWith("@guest") || !socket.clerkId) return;
+    try {
+      const u = await clerk.users.getUser(socket.clerkId);
+      const url = u.hasImage ? u.imageUrl : null;
+      if (url) setAvatar(socket.userEmail, url);
+      else deleteAvatar(socket.userEmail);
+      socket.cachedAvatar = url;
+      socket.emit("savedAvatar", url);
+      emitUserList(socket.currentChannel);
+    } catch (e) {
+      console.error("refreshAvatar failed:", e);
+    }
   });
 
   socket.on("setUsername", (name) => {
@@ -1388,12 +1386,44 @@ httpServer.on("request", async (req, res) => {
         if (!primaryEmail) return fail(400, "no email on Clerk account");
 
         const email = normalizeEmail(primaryEmail);
+
+        // Clerk is the source of truth for profile pictures. Reconcile the
+        // in-app avatar with the user's Clerk image on every sign-in.
+        let clerkUser = user;
+        try {
+          const existingAvatar = getAvatar(email);
+          const s3base = process.env.AWS_S3_PUBLIC_URL;
+          // one-time migration: the user set a custom (S3) avatar before we
+          // moved to Clerk and has no Clerk image yet → push it up to Clerk
+          // once. Users with only the default avatar are never synced.
+          if (
+            !clerkUser.hasImage &&
+            existingAvatar &&
+            s3base &&
+            existingAvatar.startsWith(`${s3base}/avatars/`)
+          ) {
+            const imgRes = await fetch(existingAvatar);
+            if (imgRes.ok) {
+              const blob = await imgRes.blob();
+              await clerk.users.updateUserProfileImage(clerkUser.id, {
+                file: blob,
+              });
+              clerkUser = await clerk.users.getUser(clerkUser.id);
+            }
+          }
+          // Clerk image → in-app avatar. If migration failed we keep the
+          // existing avatar rather than dropping the user's picture.
+          if (clerkUser.hasImage) setAvatar(email, clerkUser.imageUrl);
+        } catch (e) {
+          console.error("clerk avatar sync failed:", e);
+        }
+
         await appendFile(
           "login.log",
           `${new Date().toISOString()}: ${email} signed in from ${ip}\n`,
         );
         const sessionid = randomBytes(32).toString("hex");
-        saveSession(sessionid, { email, ip });
+        saveSession(sessionid, { email, ip, clerkId: clerkUser.id });
         res.writeHead(200, {
           "content-type": "application/json",
           "Set-Cookie": sessionCookie(sessionid, req),
