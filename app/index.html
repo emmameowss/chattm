@@ -349,10 +349,10 @@
             // clerk-js picks it up here. Guests have no Clerk user, so the
             // "manage account" button stays hidden for them.
             (function () {
-                const accountGroup =
-                    document.getElementById("account-group");
                 const accountBtn = document.getElementById("account-btn");
-                if (!accountGroup || !accountBtn) return;
+                if (!accountBtn) return;
+                // hidden until we confirm a signed-in Clerk user (not a guest)
+                accountBtn.style.display = "none";
 
                 const appearance = {
                     variables: {
@@ -376,7 +376,7 @@
                     }
                     // only signed-in Clerk users (not guests) get an account
                     if (!window.Clerk.user) return;
-                    accountGroup.style.display = "";
+                    accountBtn.style.display = "";
                     accountBtn.addEventListener("click", function () {
                         window.Clerk.openUserProfile({ appearance });
                     });
