@@ -1418,7 +1418,23 @@ httpServer.on("request", async (req, res) => {
           ) {
             const imgRes = await fetch(existingAvatar);
             if (imgRes.ok) {
-              const blob = await imgRes.blob();
+              // Clerk uses the blob's content-type as the upload image type and
+              // rejects anything non-image (S3 can hand back text/plain or an
+              // empty type). Force a real image type from the file extension.
+              const ext = new URL(existingAvatar).pathname
+                .split(".")
+                .pop()
+                .toLowerCase();
+              const mime =
+                {
+                  jpg: "image/jpeg",
+                  jpeg: "image/jpeg",
+                  png: "image/png",
+                  gif: "image/gif",
+                  webp: "image/webp",
+                }[ext] || "image/jpeg";
+              const bytes = await imgRes.arrayBuffer();
+              const blob = new Blob([bytes], { type: mime });
               await clerk.users.updateUserProfileImage(clerkUser.id, {
                 file: blob,
               });
