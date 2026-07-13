@@ -22,6 +22,9 @@ try {
 try {
   db.exec("ALTER TABLE sessions ADD COLUMN clerk_id TEXT");
 } catch {}
+try {
+  db.exec("ALTER TABLE sessions ADD COLUMN clerk_session_id TEXT");
+} catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -212,7 +215,7 @@ const stmts = {
   // Sessions
   getSession: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
   upsertSession: db.prepare(
-    `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip, clerk_id) VALUES (@id, @email, @guest, @expires, @ip, @clerk_id)`,
+    `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip, clerk_id, clerk_session_id) VALUES (@id, @email, @guest, @expires, @ip, @clerk_id, @clerk_session_id)`,
   ),
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
   deleteAllGuestSessions: db.prepare(`DELETE FROM sessions WHERE guest = 1`),
@@ -493,6 +496,7 @@ export function getSession(id) {
     expires: row.expires,
     ip: row.ip,
     clerkId: row.clerk_id ?? null,
+    clerkSessionId: row.clerk_session_id ?? null,
   };
 }
 
@@ -504,6 +508,7 @@ export function saveSession(id, data) {
     expires: data.expires ?? null,
     ip: data.ip ?? null,
     clerk_id: data.clerkId ?? null,
+    clerk_session_id: data.clerkSessionId ?? null,
   });
 }
 

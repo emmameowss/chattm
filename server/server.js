@@ -928,7 +928,36 @@ function emitUserList(channel = "main") {
   }
 }
 
-io.use((socket, next) => {
+// Clerk is the source of truth for session lifetime. Our SQLite session lives
+// independently, so a Clerk session that expires (or is revoked) would leave
+// the chat session valid forever. Reconcile by checking the Clerk session's
+// status; cache results briefly so reconnect storms don't hammer the API.
+const clerkSessionCache = new Map(); // sid -> { active, checkedAt }
+const CLERK_SESSION_TTL = 60 * 1000;
+async function isClerkSessionActive(sid) {
+  const cached = clerkSessionCache.get(sid);
+  if (cached && Date.now() - cached.checkedAt < CLERK_SESSION_TTL)
+    return cached.active;
+  let active;
+  try {
+    const s = await clerk.sessions.getSession(sid);
+    active = s.status === "active";
+  } catch (e) {
+    // 404 → session no longer exists (expired/removed). Treat any hard 4xx as
+    // inactive; on transient/unknown errors fail open so we don't lock users
+    // out during a Clerk outage.
+    if (e?.status === 404) active = false;
+    else if (e?.status >= 400 && e?.status < 500) active = false;
+    else {
+      console.error("clerk session check failed:", e);
+      active = true;
+    }
+  }
+  clerkSessionCache.set(sid, { active, checkedAt: Date.now() });
+  return active;
+}
+
+io.use(async (socket, next) => {
   const ip =
     socket.handshake.headers["x-forwarded-for"]?.split(",")[0].trim() ||
     socket.handshake.address;
@@ -937,6 +966,14 @@ io.use((socket, next) => {
   const sessionId = socket.handshake.auth.session;
   const user = getSession(sessionId);
   if (!user) return next(new Error("not authenticated"));
+  // a signed-in (non-guest) user whose Clerk session has expired/been revoked
+  // loses the chat session too
+  if (!user.guest && user.clerkSessionId) {
+    if (!(await isClerkSessionActive(user.clerkSessionId))) {
+      deleteSession(sessionId);
+      return next(new Error("session expired"));
+    }
+  }
   if (isBanned(user.email)) {
     const err = new Error("banned");
     err.data = { reason: getBanReason(user.email) || "no reason given" };
@@ -1462,7 +1499,12 @@ httpServer.on("request", async (req, res) => {
           `${new Date().toISOString()}: ${email} signed in from ${ip}\n`,
         );
         const sessionid = randomBytes(32).toString("hex");
-        saveSession(sessionid, { email, ip, clerkId: clerkUser.id });
+        saveSession(sessionid, {
+          email,
+          ip,
+          clerkId: clerkUser.id,
+          clerkSessionId: claims.sid ?? null,
+        });
         res.writeHead(200, {
           "content-type": "application/json",
           "Set-Cookie": sessionCookie(sessionid, req),

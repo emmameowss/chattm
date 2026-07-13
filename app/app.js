@@ -1902,9 +1902,13 @@ if (session) {
     if (
       err.message === "maintenance" ||
       err.message === "banned" ||
-      err.message === "not authenticated"
+      err.message === "not authenticated" ||
+      err.message === "session expired"
     ) {
-      if (err.message === "not authenticated")
+      if (
+        err.message === "not authenticated" ||
+        err.message === "session expired"
+      )
         localStorage.removeItem("session");
       location.reload();
       return;
