@@ -1384,13 +1384,22 @@ httpServer.on("request", async (req, res) => {
         const token = JSON.parse(body).token;
         if (!token) return fail(400, "missing token");
 
-        // verify the session JWT against Clerk's JWKS using our secret key
+        // Verify the session JWT against Clerk's JWKS using our secret key.
+        // We intentionally do NOT pass authorizedParties here: native (mobile)
+        // session tokens have no `azp` claim, and @clerk/backend rejects a
+        // missing azp when authorizedParties is set. We re-apply the CSRF
+        // check ourselves below, but only for tokens that actually carry an
+        // azp (i.e. browser origins) so native clients can still sign in.
         const claims = await verifyToken(token, {
           secretKey: process.env.CLERK_SECRET_KEY,
-          ...(clerkAuthorizedParties.length
-            ? { authorizedParties: clerkAuthorizedParties }
-            : {}),
         });
+        if (
+          claims.azp &&
+          clerkAuthorizedParties.length &&
+          !clerkAuthorizedParties.includes(claims.azp)
+        ) {
+          return fail(401, "unauthorized origin");
+        }
 
         // session tokens don't carry the email, so look the user up
         const user = await clerk.users.getUser(claims.sub);
@@ -1460,6 +1469,7 @@ httpServer.on("request", async (req, res) => {
         });
         res.end(JSON.stringify({ session: sessionid }));
       } catch (e) {
+        console.error("clerk-login failed:", e);
         fail(401, "invalid or expired sign-in");
       }
     });
