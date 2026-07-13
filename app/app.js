@@ -2230,8 +2230,8 @@ if (session) {
           "pink",
         );
       }
+      document.querySelector("#owner-divider").style.display = "block";
       if (isOwner) {
-        document.querySelector("#owner-divider").style.display = "block";
         document.querySelector("#admin-btn").style.display = "";
       }
 
