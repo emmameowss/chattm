@@ -1,7 +1,15 @@
 # chat™
-prounounced however you want to pronounce it
+an incredibly simple chat app
 
-### an incredibly simple chat app
+![meow](https://pride-badges.pony.workers.dev/static/v1?label=meow&labelColor=%23555&stripeWidth=8&stripeColors=5BCEFA%2CF5A9B8%2CFFFFFF%2CF5A9B8%2C5BCEFA)
+![women](https://pride-badges.pony.workers.dev/static/v1?label=women&labelColor=%23555&stripeWidth=8&stripeColors=D52D00%2CEF7627%2CFF9A56%2CFFFFFF%2CD162A4%2CB55690%2CA30262)
+![Top language](https://img.shields.io/github/languages/top/emmameowss/chattm)
+![License](https://img.shields.io/github/license/emmameowss/chattm)
+![Last commit](https://img.shields.io/github/last-commit/emmameowss/chattm)
+![Hack Club Badge](https://img.shields.io/badge/Hack%20Club-EC3750?logo=hackclub&logoColor=fff&style=flat)
+
+
+
 
 ![interface of the site](https://cdn.hackclub.com/019e93b3-806e-702a-b857-b302d5e2b877/cleanshot_2026-06-04_at_19.34.14_2x.png)
 
