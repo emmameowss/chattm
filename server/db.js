@@ -4,27 +4,6 @@ import { existsSync } from "fs";
 
 const db = new Database("chat.db");
 db.pragma("journal_mode = WAL");
-try {
-  db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'");
-} catch {}
-try {
-  db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT");
-} catch {}
-try {
-  db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0");
-} catch {}
-try {
-  db.exec("ALTER TABLE messages ADD COLUMN reply_to TEXT");
-} catch {}
-try {
-  db.exec("ALTER TABLE messages ADD COLUMN channel TEXT DEFAULT 'main'");
-} catch {}
-try {
-  db.exec("ALTER TABLE sessions ADD COLUMN clerk_id TEXT");
-} catch {}
-try {
-  db.exec("ALTER TABLE sessions ADD COLUMN clerk_session_id TEXT");
-} catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -137,7 +116,30 @@ db.prepare(
   `INSERT OR IGNORE INTO channels (name, created_at, created_by) VALUES ('main', ?, 'system')`,
 ).run(Date.now());
 
-// profiles column migrations (run after CREATE TABLE so the table exists)
+// column migrations (run after CREATE TABLE so the tables exist)
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN mentions TEXT DEFAULT '[]'");
+} catch {}
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN avatar_url TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN is_verified INTEGER DEFAULT 0");
+} catch {}
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN reply_to TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE messages ADD COLUMN channel TEXT DEFAULT 'main'");
+} catch {}
+try {
+  db.exec("ALTER TABLE sessions ADD COLUMN clerk_id TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE sessions ADD COLUMN clerk_session_id TEXT");
+} catch {}
+
+// profiles column migrations
 try {
   db.exec("ALTER TABLE profiles ADD COLUMN pronouns TEXT");
 } catch {}
