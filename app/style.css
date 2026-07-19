@@ -1501,14 +1501,16 @@ html.replying #bottom-hints {
     flex-wrap: nowrap;
 }
 
-.ul-info .badge-wrap {
+.ul-info .badge-wrap,
+#profile-name-row .badge-wrap {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     margin-left: 3px;
 }
 
-.ul-info .badge-wrap img {
+.ul-info .badge-wrap img,
+#profile-name-row .badge-wrap img {
     top: 0 !important;
     margin-left: 0 !important;
 }
