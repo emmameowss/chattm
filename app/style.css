@@ -1501,6 +1501,18 @@ html.replying #bottom-hints {
     flex-wrap: nowrap;
 }
 
+.ul-info .badge-wrap {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    margin-left: -1px;
+}
+
+.ul-info .badge-wrap img {
+    top: 0 !important;
+    margin-left: 0 !important;
+}
+
 .ul-name {
     font-size: 12px;
     white-space: nowrap;
