@@ -271,6 +271,7 @@ if (session) {
   let myVerified = false;
   let myRedVerified = false;
   let myColor = null;
+  let role = "user";
 
   function updateProfileBtn() {
     const btn = document.querySelector("#profile-btn");
@@ -643,6 +644,7 @@ if (session) {
     if (isOwnProfile) {
       myVerified = data.verified;
       myRedVerified = data.redVerified ?? false;
+      role = data.role ?? 'user';
       updateProfileBtn();
     }
 
