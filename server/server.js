@@ -1329,7 +1329,7 @@ io.on("connection", (socket) => {
       username: socket.username,
       time: Date.now(),
       channel: socket.currentChannel,
-      isToken: socket.userEmail === process.env.OWNER_EMAIL,
+      isToken: ["owner"].includes(socket.userRole),
       isGuest: socket.userEmail.endsWith("@guest"),
       color: getColor(socket.userEmail) ?? null,
       avatar: getAvatar(socket.userEmail) ?? null,
