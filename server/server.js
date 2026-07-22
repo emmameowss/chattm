@@ -1184,7 +1184,7 @@ io.on("connection", (socket) => {
     if (!msg) return;
 
     const isOwnerOfMsg = msg.ownerEmail === socket.userEmail;
-    const isAdmin = socket.userEmail === process.env.OWNER_EMAIL;
+    const isAdmin = ['admin', 'owner'].includes(socket.userRole);
 
     if (!isOwnerOfMsg && !isAdmin) {
       socket.emit("commandError", "you can only delete your own messages");
