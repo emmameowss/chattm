@@ -2210,12 +2210,14 @@ if (session) {
     "init",
     ({
       isOwner: owner,
+      role: r,
       chatMuted: muted,
       color,
       uMuted,
       currentChannel: ch,
     }) => {
       isOwner = owner;
+      role = r ?? 'user';
       if (ch) currentChannel = ch;
       addChannelBtn.style.display = isOwner ? "" : "none";
       renderChannels();

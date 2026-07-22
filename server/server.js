@@ -1010,6 +1010,7 @@ io.on("connection", (socket) => {
   );
   socket.emit("init", {
     isOwner: ["owner"].includes(socket.userRole),
+    role: socket.userRole ?? 'user',
     chatMuted,
     currentChannel: socket.currentChannel,
     uMuted: isMuted(socket.userEmail) ? getMute(socket.userEmail) : null,
