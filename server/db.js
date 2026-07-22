@@ -137,6 +137,9 @@ try {
 } catch {}
 try {
   db.exec("ALTER TABLE sessions ADD COLUMN clerk_session_id TEXT");
+} catch { }
+try {
+  db.exec("ALTER TABLE sessions ADD COLUMN role TEXT DEFAULT 'user'");
 } catch {}
 
 // profiles column migrations
@@ -217,7 +220,7 @@ const stmts = {
   // Sessions
   getSession: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
   upsertSession: db.prepare(
-    `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip, clerk_id, clerk_session_id) VALUES (@id, @email, @guest, @expires, @ip, @clerk_id, @clerk_session_id)`,
+    `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip, clerk_id, clerk_session_id, role) VALUES (@id, @email, @guest, @expires, @ip, @clerk_id, @clerk_session_id)`,
   ),
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
   deleteAllGuestSessions: db.prepare(`DELETE FROM sessions WHERE guest = 1`),
@@ -499,6 +502,7 @@ export function getSession(id) {
     ip: row.ip,
     clerkId: row.clerk_id ?? null,
     clerkSessionId: row.clerk_session_id ?? null,
+    role: row.role ?? "user",
   };
 }
 
@@ -511,6 +515,7 @@ export function saveSession(id, data) {
     ip: data.ip ?? null,
     clerk_id: data.clerkId ?? null,
     clerk_session_id: data.clerkSessionId ?? null,
+    role: row.role ?? "user",
   });
 }
 
