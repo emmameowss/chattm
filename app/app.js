@@ -1844,7 +1844,7 @@ if (session) {
       .then((r) => r.json())
       .then((data) => {
         const rows = [
-          ["users (hca)", data.users.toLocaleString()],
+          ["accounts", data.users.toLocaleString()],
           ["total messages", data.messages.toLocaleString()],
           ["images uploaded", data.uploads.toLocaleString()],
           ["custom emojis", data.emoji.toLocaleString()],
