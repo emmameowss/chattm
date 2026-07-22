@@ -205,7 +205,7 @@ setInterval(
 
 const commands = {
   "/ban": {
-    ownerOnly: true,
+    minRole: "admin",
     run: async (socket, rest, data) => {
       const args = rest.split(" ");
       let target = args[0];
@@ -236,21 +236,21 @@ const commands = {
     },
   },
   "/unban": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       removeBan(rest);
       socket.emit("commandError", `unbanned ${rest}`);
     },
   },
   "/unbanip": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       removeIpBan(rest);
       socket.emit("commandError", `unbanned ${rest}`);
     },
   },
   "/kick": {
-    ownerOnly: true,
+    minRole: "admin",
     run: async (socket, rest, data) => {
       const [targetUsername, ...reasonParts] = rest.split(" ");
       const kickReason = reasonParts.join(" ") || "kicked by server";
@@ -277,7 +277,7 @@ const commands = {
     },
   },
   "/mute": {
-    ownerOnly: true,
+    minRole: "admin",
     run: async (socket, rest) => {
       const args = rest.split(" ");
       const targetUsername = args[0];
@@ -317,7 +317,7 @@ const commands = {
     },
   },
   "/unmute": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       const targetUsername = rest;
       const targetEmail =
@@ -332,42 +332,42 @@ const commands = {
     },
   },
   "/clear": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket) => {
       clearMessages(socket.currentChannel);
       io.to(roomOf(socket.currentChannel).emit("clear"));
     },
   },
   "/mutechat": {
-    ownerOnly: true,
+    minRole: "admin",
     run: () => {
       chatMuted = true;
       io.emit("mutechat", "chat has been muted");
     },
   },
   "/unmutechat": {
-    ownerOnly: true,
+    minRole: "admin",
     run: () => {
       chatMuted = false;
       io.emit("unmutechat", "chat has been unmuted");
     },
   },
   "/status": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       status = rest;
       socket.emit("status", status);
     },
   },
   "/reloadfilter": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket) => {
       loadFilterWordsIntoMemory();
       socket.emit("commandError", `${filteredwords.length} loaded`);
     },
   },
   "/resetstrikes": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       const targetUsername = rest;
       const targetEmail =
@@ -384,7 +384,7 @@ const commands = {
     },
   },
   "/noguests": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket) => {
       guestsDisabled = true;
       setSetting("guests_disabled", "1");
@@ -400,7 +400,7 @@ const commands = {
     },
   },
   "/allowguests": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket) => {
       guestsDisabled = false;
       setSetting("guests_disabled", "0");
@@ -408,14 +408,14 @@ const commands = {
     },
   },
   "/reloademojis": {
-    ownerOnly: true,
+    minRole: "admin",
     run: async (socket) => {
       await syncEmojisFromS3();
       socket.emit("commandError", "emoji sync complete");
     },
   },
   "/whois": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       const found = findSocketByUsername(rest);
       if (found) {
@@ -426,7 +426,7 @@ const commands = {
     },
   },
   "/removefilter": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       const word = rest.toLowerCase();
       if (!filteredwords.includes(word)) {
@@ -439,7 +439,7 @@ const commands = {
     },
   },
   "/addfilter": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       const word = rest.toLowerCase();
       if (!word) {
@@ -452,7 +452,7 @@ const commands = {
     },
   },
   "/setcolor": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       const args = rest.split(" ");
       const targetUsername = args[0];
@@ -486,7 +486,7 @@ const commands = {
     },
   },
   "/maintenance": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       maintenance = !maintenance;
       reason = maintenance ? rest : "";
@@ -505,7 +505,7 @@ const commands = {
     },
   },
   "/verify": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       setVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -516,7 +516,7 @@ const commands = {
     },
   },
   "/unverify": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       removeVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -527,7 +527,7 @@ const commands = {
     },
   },
   "/redverify": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       setRedVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -538,7 +538,7 @@ const commands = {
     },
   },
   "/unredverify": {
-    ownerOnly: true,
+    minRole: "admin",
     run: (socket, rest) => {
       removeRedVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -549,7 +549,7 @@ const commands = {
     },
   },
   "/nick": {
-    ownerOnly: false,
+    minRole: "user",
     run: (socket, rest) => {
       const nick = rest;
       if (!isValidUsername(nick)) {
@@ -570,7 +570,7 @@ const commands = {
     },
   },
   "/color": {
-    ownerOnly: false,
+    minRole: "user",
     run: (socket, rest) => {
       const colorinput = rest.toLowerCase();
       const prideFlags = {
