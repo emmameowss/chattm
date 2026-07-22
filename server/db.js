@@ -220,7 +220,7 @@ const stmts = {
   // Sessions
   getSession: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
   upsertSession: db.prepare(
-    `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip, clerk_id, clerk_session_id, role) VALUES (@id, @email, @guest, @expires, @ip, @clerk_id, @clerk_session_id)`,
+    `INSERT OR REPLACE INTO sessions (id, email, guest, expires, ip, clerk_id, clerk_session_id, role) VALUES (@id, @email, @guest, @expires, @ip, @clerk_id, @clerk_session_id, @role)`,
   ),
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
   deleteAllGuestSessions: db.prepare(`DELETE FROM sessions WHERE guest = 1`),
