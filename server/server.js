@@ -1014,6 +1014,7 @@ io.on("connection", (socket) => {
     chatMuted,
     currentChannel: socket.currentChannel,
     uMuted: isMuted(socket.userEmail) ? getMute(socket.userEmail) : null,
+    color: getColor(socket.userEmail),
   });
   if (status) socket.emit("status", status);
   // check blocked colors on connect
