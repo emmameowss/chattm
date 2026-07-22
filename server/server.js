@@ -877,7 +877,7 @@ function emitUserList(channel = "main") {
       color: row.color ?? null,
       avatar: row.avatar ?? null,
       guest: false,
-      isOwner: s.userEmail === process.env.OWNER_EMAIL,
+      isOwner: row.userEmail === process.env.OWNER_EMAIL,
       role: row.role ?? 'user',
       verified: !!row.verified,
       redVerified: !!row.red_verified,
