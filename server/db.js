@@ -515,7 +515,7 @@ export function saveSession(id, data) {
     ip: data.ip ?? null,
     clerk_id: data.clerkId ?? null,
     clerk_session_id: data.clerkSessionId ?? null,
-    role: row.role ?? "user",
+    role: data.role ?? "user",
   });
 }
 
