@@ -109,6 +109,11 @@ db.exec(`
     created_at INTEGER,
     created_by TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS roles (
+    email TEXT PRIMARY KEY,
+    role TEXT NOT NULL DEFAULT 'user'
+  );
 `);
 
 // seed the default channel (idempotent)
@@ -375,15 +380,21 @@ const stmts = {
            a.url AS avatar,
            CASE WHEN v.email IS NOT NULL THEN 1 ELSE 0 END AS verified,
            CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified
+           COALESCE(r.role, 'user') AS role
     FROM profiles p
     JOIN usernames u ON u.email = p.email
     LEFT JOIN colors c ON c.email = p.email
     LEFT JOIN avatars a ON a.email = p.email
     LEFT JOIN verified_users v ON v.email = p.email
     LEFT JOIN red_verified_users rv ON rv.email = p.email
+    LEFT JOIN roles r on r.email = p.email
     WHERE p.last_seen > ? AND u.email NOT LIKE '%@guest'
     ORDER BY p.last_seen DESC LIMIT 100
   `),
+
+  // roles
+  getRole: db.prepare(`SELECT role FROM roles WHERE email = ?`),
+  setRole: db.prepare(`INSERT OR REPLACE INTO roles (email, role) VALUES (?, ?)`),
 };
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -779,6 +790,14 @@ export function getDbStats() {
 
 export function getRecentUsers(cutoffMs) {
   return stmts.getRecentUsers.all(cutoffMs);
+}
+
+export function getRole(email) {
+  return stmts.getRole.get(email)?.role ?? 'user';
+}
+
+export function setRole(email, role) {
+  stmts.setRole.run(email, role);
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

@@ -80,6 +80,7 @@ import {
   getPendingEmojiById,
   getPendingEmojiByShortcode,
   updatePendingEmoji,
+  setRole,
 } from "./db.js";
 
 const httpServer = createServer();
@@ -857,7 +858,8 @@ function emitUserList(channel = "main") {
       color: s.cachedColor ?? null,
       avatar: s.cachedAvatar ?? null,
       guest: s.userEmail.endsWith("@guest"),
-      isOwner: ["owner"].includes(s.userRole) ?? 'user',
+      isOwner: s.userEmail === process.env.OWNER_EMAIL,
+      role: s.userRole ?? 'user',
       verified: s.cachedVerified ?? false,
       redVerified: s.cachedRedVerified ?? false,
       status: s.cachedStatus ?? "online",
@@ -875,7 +877,8 @@ function emitUserList(channel = "main") {
       color: row.color ?? null,
       avatar: row.avatar ?? null,
       guest: false,
-      isOwner: ["owner"].includes(row.role) ?? 'user',
+      isOwner: s.userEmail === process.env.OWNER_EMAIL,
+      role: row.role ?? 'user',
       verified: !!row.verified,
       redVerified: !!row.red_verified,
       status: row.status ?? "online",
@@ -1418,6 +1421,7 @@ httpServer.on("request", async (req, res) => {
 
         const email = normalizeEmail(primaryEmail);
         const role = user.publicMetadata?.role ?? "user"
+        setRole(email, role)
 
         // Clerk is the source of truth for profile pictures. Reconcile the
         // in-app avatar with the user's Clerk image on every sign-in.
