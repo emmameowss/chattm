@@ -1084,6 +1084,7 @@ io.on("connection", (socket) => {
         return;
       }
       const profile = getProfileData(email);
+      const role = getRole(email)
       const isOnline = [...io.sockets.sockets.values()].some(
         (s) => s.userEmail === email && s.username,
       );
@@ -1098,7 +1099,7 @@ io.on("connection", (socket) => {
         avatar: getAvatar(email),
         verified: isVerified(email),
         redVerified: isRedVerified(email),
-        role: getRole(email),
+        role,
         isOwner: role === "owner",
         isGuest: email.endsWith("@guest"),
         online: isOnline,
