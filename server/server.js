@@ -878,7 +878,7 @@ function emitUserList(channel = "main") {
       color: row.color ?? null,
       avatar: row.avatar ?? null,
       guest: false,
-      isOwner: ["owner"].includes(s.userRole),
+      isOwner: row.role === "owner",
       role: row.role ?? 'user',
       verified: !!row.verified,
       redVerified: !!row.red_verified,
