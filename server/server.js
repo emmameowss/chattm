@@ -963,6 +963,7 @@ io.use(async (socket, next) => {
   }
   socket.userEmail = user.email;
   socket.clerkId = user.clerkId ?? null;
+  socket.userRole = user.role ?? 'user';
   socket.username = null;
   if (maintenance && socket.userEmail !== process.env.OWNER_EMAIL) {
     return next(new Error("maintenance"));
@@ -1302,11 +1303,9 @@ io.on("connection", (socket) => {
       const cmd = commands[name];
       // todo: improve this, preferrably make it fetch some kind of admin flag/metadata from clerk account
       if (cmd) {
-        if (cmd.ownerOnly && socket.userEmail !== process.env.OWNER_EMAIL) {
-          socket.emit(
-            "commandError",
-            "you don't have permission to use this command",
-          );
+        const roleValues = { user: 0, admin: 1, owner: 2 };
+        if (cmd.minRole && (roleValues[socket.userRole] ?? 0) < roleValues[cmd.minRole]) {
+          socket.emit('commandError', "you don't have permission to use this command");
           return;
         }
         await cmd.run(socket, rest, data);
