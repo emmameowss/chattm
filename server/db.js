@@ -379,7 +379,7 @@ const stmts = {
            c.color,
            a.url AS avatar,
            CASE WHEN v.email IS NOT NULL THEN 1 ELSE 0 END AS verified,
-           CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified
+           CASE WHEN rv.email IS NOT NULL THEN 1 ELSE 0 END AS red_verified,
            COALESCE(r.role, 'user') AS role
     FROM profiles p
     JOIN usernames u ON u.email = p.email
