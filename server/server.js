@@ -1300,6 +1300,7 @@ io.on("connection", (socket) => {
       const name = sp === -1 ? raw : raw.slice(0, sp);
       const rest = sp === -1 ? "" : raw.slice(sp + 1).trim();
       const cmd = commands[name];
+      // todo: improve this, preferrably make it fetch some kind of admin flag/metadata from clerk account
       if (cmd) {
         if (cmd.ownerOnly && socket.userEmail !== process.env.OWNER_EMAIL) {
           socket.emit(
