@@ -81,6 +81,7 @@ import {
   getPendingEmojiByShortcode,
   updatePendingEmoji,
   setRole,
+  getRole,
 } from "./db.js";
 
 const httpServer = createServer();
@@ -858,7 +859,7 @@ function emitUserList(channel = "main") {
       color: s.cachedColor ?? null,
       avatar: s.cachedAvatar ?? null,
       guest: s.userEmail.endsWith("@guest"),
-      isOwner: s.userEmail === process.env.OWNER_EMAIL,
+      isOwner: ["owner"].includes(s.userRole),
       role: s.userRole ?? 'user',
       verified: s.cachedVerified ?? false,
       redVerified: s.cachedRedVerified ?? false,
@@ -877,7 +878,7 @@ function emitUserList(channel = "main") {
       color: row.color ?? null,
       avatar: row.avatar ?? null,
       guest: false,
-      isOwner: row.userEmail === process.env.OWNER_EMAIL,
+      isOwner: ["owner"].includes(s.userRole),
       role: row.role ?? 'user',
       verified: !!row.verified,
       redVerified: !!row.red_verified,
@@ -893,7 +894,7 @@ function emitUserList(channel = "main") {
   // send full data (with emails) only to owners viewing this channel
   for (const [, s] of io.sockets.sockets) {
     if (
-      s.userEmail === process.env.OWNER_EMAIL &&
+      ["admin", "owner"].includes(s.userRole) &&
       s.username &&
       s.currentChannel === channel
     ) {
@@ -1008,7 +1009,7 @@ io.on("connection", (socket) => {
     getHistory(socket.currentChannel).map(({ ownerEmail, ...m }) => m),
   );
   socket.emit("init", {
-    isOwner: socket.userEmail === process.env.OWNER_EMAIL,
+    isOwner: ["owner"].includes(socket.userRole),
     chatMuted,
     currentChannel: socket.currentChannel,
     uMuted: isMuted(socket.userEmail) ? getMute(socket.userEmail) : null,
@@ -1097,7 +1098,8 @@ io.on("connection", (socket) => {
         avatar: getAvatar(email),
         verified: isVerified(email),
         redVerified: isRedVerified(email),
-        isOwner: email === process.env.OWNER_EMAIL,
+        role: getRole(email),
+        isOwner: role === "owner",
         isGuest: email.endsWith("@guest"),
         online: isOnline,
         lastSeen: isOnline ? null : (profile.lastSeen ?? null),
@@ -2146,7 +2148,7 @@ httpServer.on("request", async (req, res) => {
   // based on the cookie session, mirroring the socket auth middleware
   if (req.method === "GET" && url.pathname === "/") {
     const user = getRequestUser(req);
-    const isOwner = user && user.email === process.env.OWNER_EMAIL;
+    const isOwner = user && user.role === "owner";
 
     if (maintenance && !isOwner) {
       const html = await renderPage("maintenance.html", {

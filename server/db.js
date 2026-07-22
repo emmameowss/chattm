@@ -758,6 +758,7 @@ export function getProfileData(email) {
     status: row?.status ?? null,
     pronouns: row?.pronouns ?? null,
     lastSeen: row?.last_seen ?? null,
+    role: row?.role ?? 'user',
   };
 }
 
