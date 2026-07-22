@@ -813,9 +813,8 @@ function parseDuration(str) {
 }
 
 function isValidUsername(name) {
-  return /^[a-zA-Z0-9-]{1,20}$/.test(name);
+  return /^[a-zA-Z0-9- ]{1,20}$/.test(name) && name.trim() === name && !name.includes("  ");
 }
-
 // Clerk accounts use the raw (normalized) email as their in-app identity, so
 // every command / lookup treats them identically (a Clerk account for
 // OWNER_EMAIL is the owner).
