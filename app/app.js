@@ -291,7 +291,7 @@ if (session) {
     if (myRedVerified) applyRedVerifiedColor(nameSpan);
     else applyFlagColor(nameSpan, myColor || getNameColor(username));
     btn.appendChild(nameSpan);
-    if (isOwner) {
+    if (role === "owner") {
       const badge = document.createElement("img");
       badge.src = "https://cdn.chattm.app/verified_owner.png";
       badge.style.cssText =
