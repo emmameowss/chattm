@@ -201,35 +201,6 @@ setInterval(
   },
   10 * 60 * 1000,
 );
-/*
-const ownercmds = [
-  "/ban", +
-  "/removefilter", +
-  "/addfilter", +
-  "/reloadfilter", +
-  "/unban", +
-  "/mute", +
-  "/setcolor", +
-  "/unmute", +
-  "/resetstrikes", +
-  "/clear", +
-  "/mutechat", +
-  "/unmutechat", +
-  "/maintenance", +
-  "/unbanip", +
-  "/whois", +
-  "/kick", +
-  "/noguests", +
-  "/allowguests", +
-  "/addemoji", (removed/replaced)
-  "/removeemoji", (removed/replaced)
-  "/reloademojis", +
-  "/verify", +
-  "/unverify", +
-  "/redverify", +
-  "/unredverify", +
-];
-*/
 
 const commands = {
   "/ban": {
