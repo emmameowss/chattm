@@ -1419,6 +1419,7 @@ httpServer.on("request", async (req, res) => {
         if (!primaryEmail) return fail(400, "no email on Clerk account");
 
         const email = normalizeEmail(primaryEmail);
+        const role = user.publicMetadata?.role ?? "user"
 
         // Clerk is the source of truth for profile pictures. Reconcile the
         // in-app avatar with the user's Clerk image on every sign-in.
@@ -1477,6 +1478,7 @@ httpServer.on("request", async (req, res) => {
           ip,
           clerkId: clerkUser.id,
           clerkSessionId: claims.sid ?? null,
+          role,
         });
         res.writeHead(200, {
           "content-type": "application/json",
