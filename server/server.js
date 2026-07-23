@@ -537,13 +537,31 @@ const commands = {
   },
   "/unverify": {
     minRole: "admin",
-    run: (socket, rest) => {
+    run: async (socket, rest) => {
       removeVerified(rest);
       forEachUserSocket(rest, (s) => {
         s.cachedVerified = false;
       });
-      emitAllUserLists();
-      socket.emit("commandError", `unverified ${rest}`);
+      const currentRole = getRole(rest)
+      if (currentRole === "mod") {
+        try {
+          const list = await clerk.users.getUserList({ emailAddress: [rest] })
+          const clerkUser = list.data?.[0]
+          if (clerkUser) {
+            await clerk.users.updateUserMetadata(clerkUser.id, {
+              publicMetadata: { role: "user" }
+            })
+            setRole(rest, 'user')
+            forEachUserSocket(rest, (s) => {
+              s.userRole = 'user'
+            })
+          }
+        } catch (e) {
+          console.error('failed to demote user from mod: ', e)
+        }
+      }
+      emitAllUserLists()
+      socket.emit('commandError', `unverified ${rest}`)
     },
   },
   "/redverify": {
