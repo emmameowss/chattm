@@ -1979,7 +1979,7 @@ httpServer.on("request", async (req, res) => {
   if (url.pathname === "/pending-emojis") {
     const peSessionId = url.searchParams.get("session");
     const peSession = peSessionId ? getSession(peSessionId) : null;
-    if (!peSession || peSession.email !== process.env.OWNER_EMAIL) {
+    if (!peSession || peSession.role !== "owner" || peSession.role !== "admin") {
       res.writeHead(403, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "forbidden" }));
       return;
@@ -2013,7 +2013,7 @@ httpServer.on("request", async (req, res) => {
         } = JSON.parse(body);
         const sessionId = bodySession || url.searchParams.get("session");
         const sess = sessionId ? getSession(sessionId) : null;
-        if (!sess || sess.email !== process.env.OWNER_EMAIL) {
+        if (!sess || sess.role !== "owner" || sess.role !== "admin") {
           res.writeHead(403, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "forbidden" }));
           return;
@@ -2080,7 +2080,7 @@ httpServer.on("request", async (req, res) => {
         } = JSON.parse(body);
         const sessionId = bodySession || url.searchParams.get("session");
         const sess = sessionId ? getSession(sessionId) : null;
-        if (!sess || sess.email !== process.env.OWNER_EMAIL) {
+        if (!sess || sess.role !== "owner" || sess.role !== "admin") {
           res.writeHead(403, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "forbidden" }));
           return;
