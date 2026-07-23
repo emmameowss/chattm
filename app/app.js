@@ -632,7 +632,7 @@ if (session) {
         makeBadge(
           "https://cdn.chattm.app/verified.png",
           14,
-          "this user has been verified",
+          "this user is a moderator",
         ),
       );
 
