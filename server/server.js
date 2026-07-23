@@ -251,7 +251,7 @@ const commands = {
     },
   },
   "/kick": {
-    minRole: "admin",
+    minRole: "mod",
     run: async (socket, rest, data) => {
       const [targetUsername, ...reasonParts] = rest.split(" ");
       const kickReason = reasonParts.join(" ") || "kicked by server";
@@ -278,7 +278,7 @@ const commands = {
     },
   },
   "/mute": {
-    minRole: "admin",
+    minRole: "mod",
     run: async (socket, rest) => {
       const args = rest.split(" ");
       const targetUsername = args[0];
@@ -318,7 +318,7 @@ const commands = {
     },
   },
   "/unmute": {
-    minRole: "admin",
+    minRole: "mod",
     run: (socket, rest) => {
       const targetUsername = rest;
       const targetEmail =
@@ -340,21 +340,21 @@ const commands = {
     },
   },
   "/mutechat": {
-    minRole: "admin",
+    minRole: "owner",
     run: () => {
       chatMuted = true;
       io.emit("mutechat", "chat has been muted");
     },
   },
   "/unmutechat": {
-    minRole: "admin",
+    minRole: "owner",
     run: () => {
       chatMuted = false;
       io.emit("unmutechat", "chat has been unmuted");
     },
   },
   "/status": {
-    minRole: "admin",
+    minRole: "owner",
     run: (socket, rest) => {
       status = rest;
       socket.emit("status", status);
@@ -368,7 +368,7 @@ const commands = {
     },
   },
   "/resetstrikes": {
-    minRole: "admin",
+    minRole: "mod",
     run: (socket, rest) => {
       const targetUsername = rest;
       const targetEmail =
@@ -385,7 +385,7 @@ const commands = {
     },
   },
   "/noguests": {
-    minRole: "admin",
+    minRole: "owner",
     run: (socket) => {
       guestsDisabled = true;
       setSetting("guests_disabled", "1");
@@ -401,7 +401,7 @@ const commands = {
     },
   },
   "/allowguests": {
-    minRole: "admin",
+    minRole: "owner",
     run: (socket) => {
       guestsDisabled = false;
       setSetting("guests_disabled", "0");
@@ -416,7 +416,7 @@ const commands = {
     },
   },
   "/whois": {
-    minRole: "admin",
+    minRole: "owner",
     run: (socket, rest) => {
       const found = findSocketByUsername(rest);
       if (found) {
@@ -506,7 +506,7 @@ const commands = {
     },
   },
   "/verify": {
-    minRole: "admin",
+    minRole: "owner",
     run: async (socket, rest) => {
       setVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -536,7 +536,7 @@ const commands = {
     },
   },
   "/unverify": {
-    minRole: "admin",
+    minRole: "owner",
     run: async (socket, rest) => {
       removeVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -565,7 +565,7 @@ const commands = {
     },
   },
   "/redverify": {
-    minRole: "admin",
+    minRole: "owner",
     run: (socket, rest) => {
       setRedVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -576,7 +576,7 @@ const commands = {
     },
   },
   "/unredverify": {
-    minRole: "admin",
+    minRole: "owner",
     run: (socket, rest) => {
       removeRedVerified(rest);
       forEachUserSocket(rest, (s) => {
@@ -1228,7 +1228,7 @@ io.on("connection", (socket) => {
     if (!msg) return;
 
     const isOwnerOfMsg = msg.ownerEmail === socket.userEmail;
-    const isAdmin = ['admin', 'owner'].includes(socket.userRole);
+    const isAdmin = ['mod', 'admin', 'owner'].includes(socket.userRole);
 
     if (!isOwnerOfMsg && !isAdmin) {
       socket.emit("commandError", "you can only delete your own messages");
