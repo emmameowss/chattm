@@ -627,7 +627,7 @@ if (session) {
         ),
       );
     else if (data.redVerified) nameRow.appendChild(makeRedCheckBadge(14));
-    else if (data.verified)
+    else if (data.role === "mod")
       nameRow.appendChild(
         makeBadge(
           "https://cdn.chattm.app/verified.png",
