@@ -507,13 +507,32 @@ const commands = {
   },
   "/verify": {
     minRole: "admin",
-    run: (socket, rest) => {
+    run: async (socket, rest) => {
       setVerified(rest);
       forEachUserSocket(rest, (s) => {
         s.cachedVerified = true;
       });
-      emitAllUserLists();
-      socket.emit("commandError", `verified ${rest}`);
+
+      const currentRole = getRole(rest)
+      if (currentRole === "user") {
+        try {
+          const list = await clerk.users.getUserList({ emailAddress: [rest] })
+          const clerkUser = list.data?.[0]
+          if (clerkUser) {
+            await clerk.users.updateUserMetadata(clerkUser.id, {
+              publicMetadata: { role: "mod" }
+            })
+            setRole(rest, "mod")
+            forEachUserSocket(rest, (s) => {
+              s.userRole = "mod";
+            })
+          }
+        } catch (e) {
+          console.error('failed to promote user to mod: ', e)
+        }
+      }
+      emitAllUserLists()
+      socket.emit('commandError', `verified ${rest}`)
     },
   },
   "/unverify": {
@@ -1310,7 +1329,7 @@ io.on("connection", (socket) => {
       const cmd = commands[name];
       // todo: improve this, preferrably make it fetch some kind of admin flag/metadata from clerk account
       if (cmd) {
-        const roleValues = { user: 0, admin: 1, owner: 2 };
+        const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
         if (cmd.minRole && (roleValues[socket.userRole] ?? 0) < roleValues[cmd.minRole]) {
           socket.emit('commandError', "you don't have permission to use this command");
           return;
