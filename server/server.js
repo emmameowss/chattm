@@ -1910,7 +1910,7 @@ httpServer.on("request", async (req, res) => {
         }
         const fileBuffer = await readFile(file.filepath);
         const ext = extname(file.originalFilename || "") || ".png";
-        const isOwnerSubmit = suggestSession.email === process.env.OWNER_EMAIL;
+        const isOwnerSubmit = getRole(suggestSession.email) === "owner"
         const s3Key = isOwnerSubmit
           ? `emojis/${shortcode.replace(/:/g, "")}${ext}`
           : `pending_emojis/${Date.now()}-${randomBytes(6).toString("hex")}${ext}`;
