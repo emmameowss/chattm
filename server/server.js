@@ -1024,6 +1024,12 @@ function emitToUser(email, event, ...args) {
   }
 }
 
+function forEachUserSocket(email, callback) {
+  for (const [, s] of io.sockets.sockets) {
+    if (s.userEmail === email) callback(s);
+  }
+}
+
 io.on("connection", (socket) => {
   socket.userIP =
     socket.handshake.headers["x-forwarded-for"]?.split(",")[0].trim() ||

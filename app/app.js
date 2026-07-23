@@ -300,7 +300,7 @@ if (session) {
       btn.appendChild(badge);
     } else if (myRedVerified) {
       btn.appendChild(makeRedCheckBadge(13));
-    } else if (myVerified) {
+    } else if (role === "mod") {
       const badge = document.createElement("img");
       badge.src = "https://cdn.chattm.app/verified.png";
       badge.style.cssText =
