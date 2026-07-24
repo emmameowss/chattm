@@ -2235,7 +2235,7 @@ httpServer.on("request", async (req, res) => {
     req.on("end", async () => {
       try {
         const event = await verifyWebhook(req, body, {
-          signingSecret: process.env.CLERK_SIGNING_SECRET
+          signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET
         })
         if (
           event.type === "session.removed" ||
