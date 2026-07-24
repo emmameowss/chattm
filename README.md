@@ -28,9 +28,8 @@ available at: https://chattm.app, currently supports images and text, please not
 into your account's public metadata. please also make sure to replace the publishable key in index.html and login.html
 
 5. create a cloudflare r2 and fill in the details for it in .env, make sure you allow your domain through cors policy and enable public access
-6. optionally, add a filter.txt file in /server for filtered words, you can remove this after first launch as filter words get pulled into the database
-7. run npm i in server
-8. do npm run start or npm run dev
+6. run npm i in server
+7. do npm run start or npm run dev
 
 ## current features
 - usernames
