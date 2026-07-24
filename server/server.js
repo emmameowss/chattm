@@ -2230,42 +2230,51 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/clerk-webhook" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d })
+    const chunks = [];
+    req.on("data", (d) => chunks.push(d));
     req.on("end", async () => {
       try {
-        const event = await verifyWebhook(req, body, {
-          signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET
-        })
-        if (
-          event.type === "session.removed" ||
-          event.type === "session.ended" ||
-          event.type === "session.revoked"
-        ) {
-          const clerkSessionId = event.data.id
+        const rawBody = Buffer.concat(chunks);
 
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers)) {
+          if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+        }
+        const fetchRequest = new Request(`http://internal${req.url}`, {
+          method: "POST",
+          headers,
+          body: rawBody,
+        });
+
+        const event = await verifyWebhook(fetchRequest, {
+          signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
+        });
+
+        if (
+          event.type === "session.revoked" ||
+          event.type === "session.ended" ||
+          event.type === "session.removed"
+        ) {
+          const clerkSessionId = event.data.id;
           for (const [, s] of io.sockets.sockets) {
             if (s.clerkSessionId === clerkSessionId) {
-              s.emit('kicked', `your session has been revoked`);
-              s.skipLeaveMessage = true
-              s.disconnect()
+              s.emit("kicked", "your session was ended");
+              s.skipLeaveMessage = true;
+              s.disconnect();
             }
           }
+          clerkSessionCache.set(clerkSessionId, { active: false, checkedAt: Date.now() });
+        }
 
-          clerkSessionCache.set(clerkSessionId, {
-            active: false,
-            checkedAt: Date.now(),
-          })
-        }
-          res.writeHead(200)
-          res.end('ok')
+        res.writeHead(200);
+        res.end("ok");
       } catch (e) {
-        console.error('clerk webhook error: ', e)
-        res.writeHead(400)
-        res.end('invalid signature')
-        }
-    })
-    return
+        console.error("clerk webhook error:", e);
+        res.writeHead(400);
+        res.end("invalid signature");
+      }
+    });
+    return;
   }
 
   // server-side routing for the root page: pick login / ban / maintenance / chat
