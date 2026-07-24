@@ -39,6 +39,8 @@ written at 5am because I was bored
 * `/noguests` - disables signing in as a guest and expires all currently active guest sessions
 * `/allowguests` - reenables guest signins
 * `/setcolor [username] [color|pride|trans|bi|lesbian|nb|gay]` - changes another user's name color
+* `/hide [username]` - hides a person from the user list
+* `/unhide [username]` - unhides a person from the user list
 
 ---
 
