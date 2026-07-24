@@ -494,7 +494,7 @@ const commands = {
       setSetting("maintenance", maintenance ? "1" : "0");
       setSetting("maintenance_reason", reason);
       for (const [, s] of io.sockets.sockets) {
-        if (s.userEmail !== process.env.OWNER_EMAIL) {
+        if (!["mod", "admin", "owner"].includes(s.userRole)) {
           s.emit("maintenance", maintenance, reason);
           if (maintenance) s.disconnect();
         }
@@ -855,8 +855,7 @@ function isValidUsername(name) {
   return /^[a-zA-Z0-9- ]{1,20}$/.test(name) && name.trim() === name && !name.includes("  ");
 }
 // Clerk accounts use the raw (normalized) email as their in-app identity, so
-// every command / lookup treats them identically (a Clerk account for
-// OWNER_EMAIL is the owner).
+// every command / lookup treats them identically
 function normalizeEmail(email) {
   return String(email ?? "")
     .trim()
@@ -1005,7 +1004,7 @@ io.use(async (socket, next) => {
   socket.clerkId = user.clerkId ?? null;
   socket.userRole = user.role ?? 'user';
   socket.username = null;
-  if (maintenance && socket.userEmail !== process.env.OWNER_EMAIL) {
+  if (maintenance && !["mod", "admin", "owner"].includes(socket.userRole)) {
     return next(new Error("maintenance"));
   }
   next();
@@ -1263,7 +1262,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("createChannel", (rawName) => {
-    if (socket.userEmail !== process.env.OWNER_EMAIL) return;
+    if (!['owner'].includes(socket.userRole)) return;
     const name = String(rawName ?? "")
       .trim()
       .toLowerCase()
@@ -1283,7 +1282,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("deleteChannel", (rawName) => {
-    if (socket.userEmail !== process.env.OWNER_EMAIL) return;
+    if (!["owner"].includes(socket.userRole)) return;
     const name = String(rawName ?? "")
       .trim()
       .toLowerCase();
@@ -1314,7 +1313,7 @@ io.on("connection", (socket) => {
     // check if muted
     if (
       isMuted(socket.userEmail) &&
-      socket.userEmail !== process.env.OWNER_EMAIL
+      socket.userRole !== "owner"
     ) {
       const m = getMute(socket.userEmail);
       socket.emit(
@@ -1327,9 +1326,10 @@ io.on("connection", (socket) => {
     const now = Date.now();
     // verified users (and the owner) bypass the message cooldown
     const bypassCooldown =
-      socket.cachedVerified ||
+      socket.userRole === "mod" ||
       socket.cachedRedVerified ||
-      socket.userEmail === process.env.OWNER_EMAIL;
+      socket.userRole === "owner" ||
+      socket.userRole === "admin";
     if (
       !bypassCooldown &&
       lastmessage[socket.userEmail] &&
@@ -1340,7 +1340,7 @@ io.on("connection", (socket) => {
     }
     lastmessage[socket.userEmail] = now;
 
-    if (chatMuted && socket.userEmail !== process.env.OWNER_EMAIL) {
+    if (chatMuted && !["mod", "admin", "owner"].includes(socket.userRole)) {
       socket.emit("commandError", "chat is currently muted");
       return;
     }

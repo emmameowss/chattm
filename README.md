@@ -19,12 +19,18 @@ available at: https://chattm.app, currently supports images and text, please not
 1. clone the repository
 2. add your domain to cors allowed origins in server.js
 3. copy .env.example to .env
-4. fill out the .env file with your HCA app details (obtain them at https://auth.hackclub.com) and preferred port. preferrably also add your email to OWNER_EMAIL if you want the tag in the chat. this one isn't required and the site will function without it.
-5. create an aws s3 bucket and fill in the details for it in .env, make sure you allow public read access through bucket policy and allow your domain in CORS.
-6. add a privacy.html file in /app (needs to exist otherwise eeverything crashes)
-7. optionally, add a filter.txt file in /server for filtered words
-8. run npm i in server
-9. do npm run start or npm run dev
+4. fill out the .env file with your clerk details (https://clerk.com) and preferred port. for 99% of admin privileges you will need to put 
+```json
+{
+  "role": "owner"
+}
+```
+into your account's public metadata. please also make sure to replace the publishable key in index.html and login.html
+
+5. create a cloudflare r2 and fill in the details for it in .env, make sure you allow your domain through cors policy and enable public access
+6. optionally, add a filter.txt file in /server for filtered words, you can remove this after first launch as filter words get pulled into the database
+7. run npm i in server
+8. do npm run start or npm run dev
 
 ## current features
 - usernames
