@@ -1979,7 +1979,8 @@ httpServer.on("request", async (req, res) => {
   if (url.pathname === "/pending-emojis") {
     const peSessionId = url.searchParams.get("session");
     const peSession = peSessionId ? getSession(peSessionId) : null;
-    if (!peSession || peSession.role !== "owner" || peSession.role !== "admin") {
+    const peRole = peSession ? getRole(peSession.email) : "user"
+    if (!peSession || !["admin", "owner"].includes(peRole)) {
       res.writeHead(403, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "forbidden" }));
       return;
@@ -2013,7 +2014,8 @@ httpServer.on("request", async (req, res) => {
         } = JSON.parse(body);
         const sessionId = bodySession || url.searchParams.get("session");
         const sess = sessionId ? getSession(sessionId) : null;
-        if (!sess || sess.role !== "owner" || sess.role !== "admin") {
+        const sessRole = sess ? getRole(sess.email) : "user"
+        if (!sess || !["admin", "owner"].includes(sessRole)) {
           res.writeHead(403, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "forbidden" }));
           return;
@@ -2080,7 +2082,8 @@ httpServer.on("request", async (req, res) => {
         } = JSON.parse(body);
         const sessionId = bodySession || url.searchParams.get("session");
         const sess = sessionId ? getSession(sessionId) : null;
-        if (!sess || sess.role !== "owner" || sess.role !== "admin") {
+        const sessRole = sess ? getRole(sess.email) : "user"
+        if (!sess || !['owner', "admin"].includes(sessRole)) {
           res.writeHead(403, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "forbidden" }));
           return;
