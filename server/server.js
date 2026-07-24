@@ -360,6 +360,7 @@ const commands = {
       socket.emit("status", status);
     },
   },
+  /*
   "/reloadfilter": {
     minRole: "admin",
     run: (socket) => {
@@ -367,6 +368,7 @@ const commands = {
       socket.emit("commandError", `${filteredwords.length} loaded`);
     },
   },
+  */
   "/resetstrikes": {
     minRole: "mod",
     run: (socket, rest) => {
@@ -426,6 +428,7 @@ const commands = {
       }
     },
   },
+  /*
   "/removefilter": {
     minRole: "admin",
     run: (socket, rest) => {
@@ -452,6 +455,7 @@ const commands = {
       socket.emit("commandError", `added ${word} into the filter`);
     },
   },
+  */
   "/setcolor": {
     minRole: "admin",
     run: (socket, rest) => {
@@ -739,6 +743,7 @@ function isBlockedColor(color) {
   return r < 55 && g < 55 && b < 55;
 }
 
+/* chat filter has been removed
 function loadFilterWordsIntoMemory() {
   filteredwords.length = 0;
   getFilterWords().forEach((w) => filteredwords.push(w));
@@ -759,6 +764,8 @@ function containsFilteredWord(text) {
     ) || null
   );
 }
+
+*/
 
 console.log(`loaded ${getHistory().length} messages in history`);
 
