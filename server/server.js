@@ -44,9 +44,6 @@ import {
   isIpBanned,
   addIpBan,
   removeIpBan,
-  getFilterWords,
-  addFilterWord,
-  removeFilterWord,
   getSetting,
   setSetting,
   migrateFromFiles,
@@ -82,7 +79,11 @@ import {
   updatePendingEmoji,
   setRole,
   getRole,
+  isHidden,
+  setHidden,
+  removeHidden,
 } from "./db.js";
+import { SocketAddress } from "net";
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -639,6 +640,32 @@ const commands = {
       emitAllUserLists();
     },
   },
+  "/hide": {
+    minRole: 'admin',
+    run: (socket, rest) => {
+      const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
+      if (!targetEmail) {
+        socket.emit('commandError', `no user found with username ${rest}`)
+        return
+      }
+      setHidden(targetEmail)
+      emitAllUserLists()
+      socket.emit('commandError', `hid ${rest} from user list`)
+    },
+  },
+  "/unhide": {
+    minRole: 'admin',
+    run: (socket, rest) => {
+      const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
+      if (!targetEmail) {
+        socket.emit('commandError', `no user found with username ${rest}`)
+        return
+      }
+      removeHidden(targetEmail)
+      emitAllUserLists()
+      socket.emit('commandError', `unhid ${rest} on user list`)
+    },
+  },
 };
 
 commands["/colour"] = commands["/color"];
@@ -931,7 +958,8 @@ function emitUserList(channel = "main") {
   }
 
   // strip emails before broadcasting to this channel's clients
-  const publicUsers = users.map(({ email, ...rest }) => rest);
+  const visibleUsers = users.filter((u) => !isHidden(u.email))
+  const publicUsers = visibleUsers.map(({ email, ...rest }) => rest)
   io.to(roomOf(channel)).emit("userlist", publicUsers);
 
   // send full data (with emails) only to owners viewing this channel

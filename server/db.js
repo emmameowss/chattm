@@ -114,6 +114,10 @@ db.exec(`
     email TEXT PRIMARY KEY,
     role TEXT NOT NULL DEFAULT 'user'
   );
+
+  CREATE TABLE IF NOT EXISTS hidden_users (
+    email TEXT PRIMARY KEY
+  );
 `);
 
 // seed the default channel (idempotent)
@@ -395,6 +399,11 @@ const stmts = {
   // roles
   getRole: db.prepare(`SELECT role FROM roles WHERE email = ?`),
   setRole: db.prepare(`INSERT OR REPLACE INTO roles (email, role) VALUES (?, ?)`),
+
+  // hidden_users
+  isHidden: db.prepare(`SELECT 1 FROM hidden_users WHERE email = ?`),
+  setHidden: db.prepare(`INSERT OR IGNORE INTO hidden_users (email) VALUES (?)`),
+  removeHidden: db.prepare(`DELETE FROM hidden_users WHERE email = ?`)
 };
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -799,6 +808,20 @@ export function getRole(email) {
 
 export function setRole(email, role) {
   stmts.setRole.run(email, role);
+}
+
+// hidden users
+
+export function isHidden(email) {
+  return !!stmts.isHidden.get(email)
+}
+
+export function setHidden(email) {
+  stmts.setHidden.run(email)
+}
+
+export function removeHidden(email) {
+  stmts.removeHidden.run(email)
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────
