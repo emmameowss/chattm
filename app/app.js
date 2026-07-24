@@ -112,6 +112,12 @@ function devInstanceBanner() {
   }
 }
 
+function mobileWarning() {
+  if (window.innerWidth <= 600) {
+    showStatus(`site isn't optimized for mobile`, "hotpink");
+  }
+}
+
 function loadVersionStatus(forceRefresh = false) {
   fetch(`/version${forceRefresh ? "?refresh=1" : ""}`)
     .then((r) => r.json())
@@ -310,6 +316,7 @@ if (session) {
   }
 
   updateProfileBtn();
+  mobileWarning();
   document.querySelector("#profile-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     openProfile(username);
