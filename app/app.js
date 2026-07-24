@@ -2094,6 +2094,8 @@ if (session) {
     "/unverify [email]",
     "/redverify [email]",
     "/unredverify [email]",
+    "/hide [username]",
+    "/unhide [username]",
   ];
 
   // stores what to actually insert on Tab (may differ from displayed suggestion text)
