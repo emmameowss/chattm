@@ -83,7 +83,7 @@ import {
   setHidden,
   removeHidden,
 } from "./db.js";
-import { SocketAddress } from "net";
+import { verifyWebhook } from "@clerk/backend/webhooks"
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -1037,6 +1037,7 @@ io.use(async (socket, next) => {
   }
   socket.userEmail = user.email;
   socket.clerkId = user.clerkId ?? null;
+  socket.clerkSessionId = user.clerkSessionId ?? null;
   socket.userRole = user.role ?? 'user';
   socket.username = null;
   if (maintenance && !["mod", "admin", "owner"].includes(socket.userRole)) {
@@ -2226,6 +2227,45 @@ httpServer.on("request", async (req, res) => {
     });
     res.end(html);
     return;
+  }
+
+  if (url.pathname === "/clerk-webhook" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d })
+    req.on("end", async () => {
+      try {
+        const event = await verifyWebhook(req, body, {
+          signingSecret: process.env.CLERK_SIGNING_SECRET
+        })
+        if (
+          event.type === "session.removed" ||
+          event.type === "session.ended" ||
+          event.type === "session.revoked"
+        ) {
+          const clerkSessionId = event.data.id
+
+          for (const [, s] of io.sockets.sockets) {
+            if (s.clerkSessionId === clerkSessionId) {
+              s.emit('kicked', `your session has been revoked`);
+              s.skipLeaveMessage = true
+              s.disconnect()
+            }
+          }
+
+          clerkSessionCache.set(clerkSessionId, {
+            active: false,
+            checkedAt: Date.now(),
+          })
+        }
+          res.writeHead(200)
+          res.end('ok')
+      } catch (e) {
+        console.error('clerk webhook error: ', e)
+        res.writeHead(400)
+        res.end('invalid signature')
+        }
+    })
+    return
   }
 
   // server-side routing for the root page: pick login / ban / maintenance / chat
