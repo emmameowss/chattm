@@ -9,11 +9,9 @@ an incredibly simple chat app
 ![Hack Club Badge](https://img.shields.io/badge/Hack%20Club-EC3750?logo=hackclub&logoColor=fff&style=flat)
 
 
+![interface of the site](https://cdn.hackclub.com/019f9ba0-bcae-7a3d-bf84-c145ab91def0/20260726013327_2x.png)
 
-
-![interface of the site](https://cdn.hackclub.com/019e93b3-806e-702a-b857-b302d5e2b877/cleanshot_2026-06-04_at_19.34.14_2x.png)
-
-available at: https://chattm.app, currently supports images and text, please note that images are now permanently saved while ~~the most recent 25 text messages are saved and disappear upon server restart~~ all text messages are now stored forever
+available at: https://chattm.app
 
 ## Setup Instructions
 1. clone the repository
