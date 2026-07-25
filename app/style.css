@@ -1068,6 +1068,28 @@ body.login-page::after {
     gap: 6px;
 }
 
+#char-counter {
+    position: fixed;
+    bottom: 68px;
+    right: 196px;
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 90;
+}
+
+#char-counter.char-counter-warn {
+    color: var(--pink);
+}
+
+#char-counter.char-counter-over {
+    color: var(--danger);
+    font-style: normal;
+    font-weight: 500;
+}
+
 .channel-item {
     display: flex;
     align-items: center;
@@ -1084,6 +1106,14 @@ body.login-page::after {
 
 .channel-item:hover {
     background: var(--border);
+}
+
+#app-version {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.5;
+    padding: 4px 10px 4px;
+    text-align: center;
 }
 
 .channel-item.active {
@@ -2468,6 +2498,22 @@ body:has(#dev-banner) #version-status {
     #upload-error,
     #upload-status {
         bottom: 132px;
+    }
+
+    #char-counter {
+        bottom: 132px;
+        right: 12px;
+        font-size: 10px;
+    }
+
+    #char-counter.char-counter-warn {
+        color: var(--pink);
+    }
+
+    #char-counter.char-counter-over {
+        color: var(--danger);
+        font-style: normal;
+        font-weight: 500;
     }
 
     .msg-content,

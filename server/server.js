@@ -83,7 +83,7 @@ import {
   setHidden,
   removeHidden,
 } from "./db.js";
-import { SocketAddress } from "net";
+import { verifyWebhook } from "@clerk/backend/webhooks"
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -179,6 +179,7 @@ await syncEmojisFromS3();
 
 const msgcooldown = 1000;
 const lastmessage = {};
+const MAX_MESSAGE_LENGTH = 2000
 
 const rateLimits = new Map();
 function checkRateLimit(ip, key, max, windowMs) {
@@ -1036,6 +1037,7 @@ io.use(async (socket, next) => {
   }
   socket.userEmail = user.email;
   socket.clerkId = user.clerkId ?? null;
+  socket.clerkSessionId = user.clerkSessionId ?? null;
   socket.userRole = user.role ?? 'user';
   socket.username = null;
   if (maintenance && !["mod", "admin", "owner"].includes(socket.userRole)) {
@@ -1355,6 +1357,11 @@ io.on("connection", (socket) => {
         `you are muted${m.until ? " until " + new Date(m.until).toLocaleString() : ""} - reason: ${m.reason}`,
       );
       return;
+    }
+
+    if (typeof data.text === "string" && data.text.length > MAX_MESSAGE_LENGTH) {
+      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters)`)
+      return
     }
 
     const now = Date.now();
@@ -2224,6 +2231,54 @@ httpServer.on("request", async (req, res) => {
       "Set-Cookie": clearSessionCookie(),
     });
     res.end(html);
+    return;
+  }
+
+  if (url.pathname === "/clerk-webhook" && req.method === "POST") {
+    const chunks = [];
+    req.on("data", (d) => chunks.push(d));
+    req.on("end", async () => {
+      try {
+        const rawBody = Buffer.concat(chunks);
+
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers)) {
+          if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+        }
+        const fetchRequest = new Request(`http://internal${req.url}`, {
+          method: "POST",
+          headers,
+          body: rawBody,
+        });
+
+        const event = await verifyWebhook(fetchRequest, {
+          signingSecret: process.env.CLERK_WEBHOOK_SIGNING_SECRET,
+        });
+
+        if (
+          event.type === "session.revoked" ||
+          event.type === "session.ended" ||
+          event.type === "session.removed"
+        ) {
+          const clerkSessionId = event.data.id;
+          for (const [, s] of io.sockets.sockets) {
+            if (s.clerkSessionId === clerkSessionId) {
+              s.emit("kicked", "your session was ended");
+              s.skipLeaveMessage = true;
+              s.disconnect();
+            }
+          }
+          clerkSessionCache.set(clerkSessionId, { active: false, checkedAt: Date.now() });
+        }
+
+        res.writeHead(200);
+        res.end("ok");
+      } catch (e) {
+        console.error("clerk webhook error:", e);
+        res.writeHead(400);
+        res.end("invalid signature");
+      }
+    });
     return;
   }
 
