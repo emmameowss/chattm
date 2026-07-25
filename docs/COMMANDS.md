@@ -22,22 +22,7 @@ written at 5am because I was bored
 
 ---
 
-### Verification
-* `/verify [email]` - "verifies" a user, this gives the a verified badge and basic moderation permissions
-* `/unverify [email]` - removes a user's verification and moderation permissions
-* `/redverify [email]` - cosmetic, no functional purpose, gives you a cool gradient name you can't usually get and a special badge
-* `/unredverify [email]` - removes red verification (idk how else to call it)
-
----
-
 ### Admin
-* `/clear` - clears the chat in the channel it's sent in
-* `/mutechat` - mutes the current channel
-* `/unmutechat` - unmutes the current channel
-* `/status [text]` shows a "status" above the message input field globally
-* `/maintenance [reason (optional)]` - toggles maintenance mode globally (no reason turns it off)
-* `/noguests` - disables signing in as a guest and expires all currently active guest sessions
-* `/allowguests` - reenables guest signins
 * `/setcolor [username] [color|pride|trans|bi|lesbian|nb|gay]` - changes another user's name color
 * `/hide [username]` - hides a person from the user list
 * `/unhide [username]` - unhides a person from the user list
@@ -46,3 +31,21 @@ written at 5am because I was bored
 
 ### Misc
 * `/reloademojis` - fetches emojis from R2 and adds new ones to the database
+
+---
+
+### Removal planned
+
+all of these commands are currently planned to be removed with the full release of the revamped admin panel
+
+* `/clear` - clears the chat in the channel it's sent in
+* `/mutechat` - mutes the current channel
+* `/unmutechat` - unmutes the current channel
+* `/status [text]` shows a "status" above the message input field globally
+* `/maintenance [reason (optional)]` - toggles maintenance mode globally (no reason turns it off)
+* `/noguests` - disables signing in as a guest and expires all currently active guest sessions
+* `/allowguests` - reenables guest signins
+* `/verify [email]` - "verifies" a user, this gives the a verified badge and basic moderation permissions
+* `/unverify [email]` - removes a user's verification and moderation permissions
+* `/redverify [email]` - cosmetic, no functional purpose, gives you a cool gradient name you can't usually get and a special badge
+* `/unredverify [email]` - removes red verification (idk how else to call it)
