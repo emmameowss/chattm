@@ -761,6 +761,17 @@ function getRequestUser(req) {
   return user;
 }
 
+function isDevRequest(req) {
+  const hostname = (req.headers.host || "").split(":")[0]
+  return ["localhost", "127.0.0.1", "beta.chattm.app"].includes(hostname)
+}
+
+function getClerkKey(req) {
+  return isDevRequest(req)
+    ? process.env.CLERK_PUBLISHABLE_KEY_DEV
+    : process.env.CLERK_PUBLISHABLE_KEY
+}
+
 function isBlockedColor(color) {
   const lower = color.toLowerCase();
   // block near-white (unreadable on light surfaces)
@@ -2333,7 +2344,7 @@ httpServer.on("request", async (req, res) => {
       const html = await renderPage("maintenance.html", {
         REASON: reason ? `<p>${escapeHtml(reason)}</p>` : "",
       });
-      res.writeHead(200, { "content-type": "text/html" });
+      res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
       res.end(html);
       return;
     }
@@ -2342,7 +2353,7 @@ httpServer.on("request", async (req, res) => {
       const html = await renderPage("ban.html", {
         REASON: escapeHtml(getBanReason(user.email) || "no reason given"),
       });
-      res.writeHead(200, { "content-type": "text/html" });
+      res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
       res.end(html);
       return;
     }
@@ -2364,8 +2375,9 @@ httpServer.on("request", async (req, res) => {
       const html = await renderPage("login.html", {
         GUEST_SECTION: guestSection,
         MESSAGES: messages.join("\n        "),
+        CLERK_KEY: getClerkKey(req)
       });
-      const headers = { "content-type": "text/html" };
+      const headers = { "content-type": "text/html", "cache-control": "no-store" };
       // drop a stale cookie whose session no longer resolves
       if (parseCookies(req).session) headers["Set-Cookie"] = clearSessionCookie();
       res.writeHead(200, headers);
@@ -2373,6 +2385,10 @@ httpServer.on("request", async (req, res) => {
       return;
     }
     // authenticated, not banned, not in maintenance → fall through to index.html
+    const html = await renderPage("index.html", { CLERK_KEY: getClerkKey(req) });
+    res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
+    res.end(html);
+    return;
   }
 
   if (req.method === "GET") {
