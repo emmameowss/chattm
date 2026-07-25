@@ -1108,6 +1108,14 @@ body.login-page::after {
     background: var(--border);
 }
 
+#app-version {
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.5;
+    padding: 4px 10px 4px;
+    text-align: center;
+}
+
 .channel-item.active {
     color: var(--pink);
     background: var(--pink-dim);
