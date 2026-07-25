@@ -180,6 +180,7 @@ await syncEmojisFromS3();
 
 const msgcooldown = 1000;
 const lastmessage = {};
+const MAX_MESSAGE_LENGTH = 2000
 
 const rateLimits = new Map();
 function checkRateLimit(ip, key, max, windowMs) {
@@ -1357,6 +1358,11 @@ io.on("connection", (socket) => {
         `you are muted${m.until ? " until " + new Date(m.until).toLocaleString() : ""} - reason: ${m.reason}`,
       );
       return;
+    }
+
+    if (typeof data.text === "string" && data.text.length > MAX_MESSAGE_LENGTH) {
+      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters`)
+      return
     }
 
     const now = Date.now();
