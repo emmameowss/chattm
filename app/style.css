@@ -1068,6 +1068,28 @@ body.login-page::after {
     gap: 6px;
 }
 
+#char-counter {
+    position: fixed;
+    bottom: 68px;
+    right: 20px;
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 90;
+}
+
+#char-counter.char-counter-warn {
+    color: var(--pink);
+}
+
+#char-counter.char-counter-over {
+    color: var(--danger);
+    font-style: normal;
+    font-weight: 500;
+}
+
 .channel-item {
     display: flex;
     align-items: center;
@@ -2471,12 +2493,9 @@ body:has(#dev-banner) #version-status {
     }
 
     #char-counter {
-        position: fixed;
-        bottom: 72px;
-        right: 20px;
-        font-size: 11px;
-        color: var(--muted);
-        pointer-events: none;
+        bottom: 132px;
+        right: 12px;
+        font-size: 10px;
     }
 
     #char-counter.char-counter-warn {
@@ -2485,6 +2504,7 @@ body:has(#dev-banner) #version-status {
 
     #char-counter.char-counter-over {
         color: var(--danger);
+        font-style: normal;
         font-weight: 500;
     }
 
