@@ -2470,6 +2470,24 @@ body:has(#dev-banner) #version-status {
         bottom: 132px;
     }
 
+    #char-counter {
+        position: fixed;
+        bottom: 72px;
+        right: 20px;
+        font-size: 11px;
+        color: var(--muted);
+        pointer-events: none;
+    }
+
+    #char-counter.char-counter-warn {
+        color: var(--pink);
+    }
+
+    #char-counter.char-counter-over {
+        color: var(--danger);
+        font-weight: 500;
+    }
+
     .msg-content,
     .msg-username {
         font-size: 12px;

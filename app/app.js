@@ -398,6 +398,34 @@ if (session) {
     applyTooltips();
   });
 
+  const charCounterBtn = document.querySelector("#char-counter-btn")
+  const charCounterEl = document.querySelector("#char-counter")
+  let showCharCounter = localStorage.getItem("showCharCounter") === "true"
+  const MAX_MESSAGE_LENGTH = 2000
+
+  function applyCharCounter() {
+    charCounterBtn.innerHTML = showCharCounter
+      ? '<i class="ti ti-abc"></i> hide char counter'
+      : '<i class="ti ti-abc"></i> show char counter';
+    charCounterEl.style.display = showCharCounter ? "block" : none;
+    if (showCharCounter) updateCharCounter()
+  }
+
+  function updateCharCounter() {
+    if (!showCharCounter) return
+    const len = document.querySelector("#message-input").value.length
+    charCounterEl.textContent = `${len}/${MAX_MESSAGE_LENGTH}`
+    charCounterEl.classList.toggle("char-counter-warn", len > MAX_MESSAGE_LENGTH * 0.9)
+    charCounterEl.classList.toggle("char-counter-over", len > MAX_MESSAGE_LENGTH)
+  }
+
+  applyCharCounter()
+  charCounterBtn.addEventListener('click', () => {
+    showCharCounter = !showCharCounter
+    localStorage.setItem('showCharCounter', showCharCounter)
+    applyCharCounter()
+  })
+
   // avatar
   const avatarInput = document.querySelector("#avatar-input");
 
@@ -1102,6 +1130,7 @@ if (session) {
     socket.emit("typing");
     clearTimeout(typeTimeout);
     typeTimeout = setTimeout(() => socket.emit("stopTyping"), 2000);
+    updateCharCounter()
   });
 
   const typingUsers = new Set();
@@ -1247,6 +1276,7 @@ if (session) {
       });
       textInput.value = "";
       fileInput.value = "";
+      updateCharCounter()
       document.querySelector("#attach-btn").style.borderColor = "";
       document.querySelector("#attach-btn").style.color = "";
     } else {
@@ -1257,6 +1287,7 @@ if (session) {
         replyTo,
       });
       textInput.value = "";
+      updateCharCounter()
     }
     if (replyingTo) cancelReply();
     textInput.focus();
