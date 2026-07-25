@@ -405,8 +405,8 @@ if (session) {
 
   function applyCharCounter() {
     charCounterBtn.innerHTML = showCharCounter
-      ? '<i class="ti ti-abc"></i> hide char counter'
-      : '<i class="ti ti-abc"></i> show char counter';
+      ? '<i class="ti ti-abc"></i> hide character counter'
+      : '<i class="ti ti-abc"></i> show character counter';
     charCounterEl.style.display = showCharCounter ? "block" : "none";
     if (showCharCounter) updateCharCounter()
   }
