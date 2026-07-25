@@ -400,7 +400,7 @@ if (session) {
 
   const charCounterBtn = document.querySelector("#char-counter-btn")
   const charCounterEl = document.querySelector("#char-counter")
-  let showCharCounter = localStorage.getItem("showCharCounter") === "true"
+  let showCharCounter = localStorage.getItem("showCharCounter") !== "false"
   const MAX_MESSAGE_LENGTH = 2000
 
   function applyCharCounter() {
