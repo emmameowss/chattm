@@ -1361,7 +1361,7 @@ io.on("connection", (socket) => {
     }
 
     if (typeof data.text === "string" && data.text.length > MAX_MESSAGE_LENGTH) {
-      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters`)
+      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters)`)
       return
     }
 
