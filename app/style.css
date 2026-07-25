@@ -1070,8 +1070,8 @@ body.login-page::after {
 
 #char-counter {
     position: fixed;
-    bottom: 68px;
-    right: 20px;
+    bottom: 70px;
+    right: 196px;
     font-size: 12px;
     color: var(--muted);
     font-style: italic;
