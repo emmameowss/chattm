@@ -2337,6 +2337,90 @@ body:has(#dev-banner) #version-status {
     text-align: left;
 }
 
+body.admin-page {
+    display: block;
+    overflow: auto;
+    height: auto;
+    min-height: 100vh;
+    padding: 55px 20px 20px;
+}
+
+.admin-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-nav-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.admin-nav-back {
+    margin-left: auto;
+}
+
+.admin-nav a {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-decoration: none;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.admin-nav a:hover {
+    border-color: var(--pink);
+    color: var(--pink);
+    background: var(--pink-dim);
+}
+
+.admin-nav a.active {
+    border-color: var(--pink);
+    color: var(--pink);
+    background: var(--pink-dim);
+}
+
+#admin-actions-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 280px;
+}
+
+#admin-actions-content button {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+#admin-actions-content button:hover {
+    background: var(--danger-dim);
+}
+
+#admin-users-list,
+#admin-emoji-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 500px;
+}
+
+body.admin-page::before,
+body.admin-page::after {
+    display: none;
+}
+
 @media (max-width: 600px) {
     h1 {
         font-size: 12px;

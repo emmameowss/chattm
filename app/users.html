@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>chat™ admin | users</title>
+        <link rel="stylesheet" href="/style.css"
+    </head>
+    <body class="admin-page">
+        <h1>chat™</h1>
+        <nav class="admin-nav">
+          <div class="admin-nav-tabs">
+            <a href="/admin">home</a>
+            <a href="/admin/users" class="active">users</a>
+            <a href="/admin/emoji">emoji</a>
+          </div>
+          <a href="/" class="admin-nav-back">← back to chat™</a>
+        </nav>
+        <div id="admin-users-list"></div>
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+          const session = localStorage.getItem('session')
+          if (!session) window.location.href = "/"
+          const socket = io(window.location.origin, {
+            auth: { session },
+            transports: ["websocket"]
+          })
+
+          function nameHash(name) {
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            return hash;
+          }
+
+          function renderUsers(users) {
+            const list = document.querySelector('#admin-users-list')
+            list.innerHTML = ""
+            const hca = users.filter((u) => !u.guest)
+            const guests = users.filter((u) => u.guest)
+            function section(label, arr) {
+              if (!arr.length) return
+              const header = document.createElement("div")
+              header.className = "admin-user-section"
+              header.textContent = `${label} - ${arr.length}`
+              list.appendChild(header)
+              for (const u of arr) {
+                const row = document.createElement("div")
+                row.innerHTML = `
+                  <div class="admin-user-info">
+                    <span class="admin-user-name">${u.username}${u.role !== "user" ? ` (${u.role})` : ""}</span>
+                    <span class="admin-user-email">${u.email}</span>
+                  </div>
+                `
+                row.addEventListener('contextmenu', (e) => {
+                  e.preventDefault()
+                  const action = prompt(
+                    // placeholder again, will eventually bring the actual context menus and prompts and whatnot into admin but i cba
+                    `${u.username}: type verify / unverify / redverify / unredverify / hide / unhide`,
+                  )
+                  if (action) socket.emit("message", { text: `/${action} ${u.email}` });
+                })
+                list.appendChild(row)
+              }
+            }
+            section('accounts', hca)
+            section('guests', guests)
+          }
+
+          socket.on('adminUserlist', renderUsers)
+          // same thing as admin.html
+          socket.on('commandError', (msg) => alert(msg))
+        </script>
+    </body>
+</html>

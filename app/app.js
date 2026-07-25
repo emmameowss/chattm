@@ -2566,7 +2566,9 @@ if (session) {
     adminBackdrop.style.display = "none";
     setAdminTab("actions");
   }
-  document.querySelector("#admin-btn").addEventListener("click", openAdmin);
+  document.querySelector("#admin-btn").addEventListener("click", () => {
+    window.location.href = "/admin";
+  });
   document.querySelector("#admin-close").addEventListener("click", closeAdmin);
   adminBackdrop.addEventListener("click", closeAdmin);
   adminTabActions.addEventListener("click", () => setAdminTab("actions"));

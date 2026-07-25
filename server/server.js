@@ -736,6 +736,17 @@ async function renderPage(file, replacements = {}) {
   return html;
 }
 
+function requireAdminPage(req, res) {
+  const user = getRequestUser(req)
+  const role = user ? getRole(user.email) : "user"
+  if (!user || !["admin", "owner"].includes(role)) {
+    res.writeHead(302, { Location: '/' })
+    res.end()
+    return null;
+  }
+  return { user, role }
+}
+
 // resolve the cookie session, mirroring the socket middleware's guest-expiry check
 function getRequestUser(req) {
   const sessionId = parseCookies(req).session;
@@ -914,11 +925,10 @@ function emitAllUserLists() {
   for (const c of listChannels()) emitUserList(c.name);
 }
 
-function emitUserList(channel = "main") {
+function buildUserList(channel = "main") {
   const onlineEmails = new Set();
   const users = [];
 
-  // online users: use data already cached on the socket - zero DB reads
   for (const [id, s] of io.sockets.sockets) {
     if (!s.username) continue;
     if (s.currentChannel !== channel) continue;
@@ -929,8 +939,8 @@ function emitUserList(channel = "main") {
       color: s.cachedColor ?? null,
       avatar: s.cachedAvatar ?? null,
       guest: s.userEmail.endsWith("@guest"),
-      isOwner: ["owner"].includes(s.userRole),
-      role: s.userRole ?? 'user',
+      isOwner: s.userRole === "owner",
+      role: s.userRole ?? "user",
       verified: s.cachedVerified ?? false,
       redVerified: s.cachedRedVerified ?? false,
       status: s.cachedStatus ?? "online",
@@ -938,7 +948,6 @@ function emitUserList(channel = "main") {
     });
   }
 
-  // offline users: single JOIN query - all fields in one SELECT
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   for (const row of getRecentUsers(cutoff)) {
     if (onlineEmails.has(row.email)) continue;
@@ -949,7 +958,7 @@ function emitUserList(channel = "main") {
       avatar: row.avatar ?? null,
       guest: false,
       isOwner: row.role === "owner",
-      role: row.role ?? 'user',
+      role: row.role ?? "user",
       verified: !!row.verified,
       redVerified: !!row.red_verified,
       status: row.status ?? "online",
@@ -957,12 +966,14 @@ function emitUserList(channel = "main") {
     });
   }
 
-  // strip emails before broadcasting to this channel's clients
-  const visibleUsers = users.filter((u) => !isHidden(u.email))
-  const publicUsers = visibleUsers.map(({ email, ...rest }) => rest)
+  return users.filter((u) => !isHidden(u.email));
+}
+
+function emitUserList(channel = "main") {
+  const users = buildUserList(channel);
+  const publicUsers = users.map(({ email, ...rest }) => rest);
   io.to(roomOf(channel)).emit("userlist", publicUsers);
 
-  // send full data (with emails) only to owners viewing this channel
   for (const [, s] of io.sockets.sockets) {
     if (
       ["admin", "owner"].includes(s.userRole) &&
@@ -1140,6 +1151,11 @@ io.on("connection", (socket) => {
     const p = String(pronouns ?? "").slice(0, 40);
     setProfilePronouns(socket.userEmail, p);
     socket.emit("savedProfile", getProfileData(socket.userEmail));
+  });
+
+  socket.on("getAdminUsers", () => {
+    if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
+    socket.emit("adminUserlist", buildUserList(socket.currentChannel));
   });
 
   socket.on("getProfile", (reqUsername) => {
@@ -2275,6 +2291,30 @@ httpServer.on("request", async (req, res) => {
       }
     });
     return;
+  }
+
+  if (url.pathname === "/admin" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("admin.html", {})
+    res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
+  }
+
+  if (url.pathname === "/admin/users" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("users.html", {})
+    res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
+  }
+
+  if (url.pathname === "/admin/emoji" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("emoji.html", {})
+    res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
   }
 
   // server-side routing for the root page: pick login / ban / maintenance / chat

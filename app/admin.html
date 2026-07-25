@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>chat™ admin</title>
+        <link rel="stylesheet" href="/style.css">
+    </head>
+    <body class="admin-page">
+        <h1>chat™</h1>
+        <nav class="admin-nav">
+          <div class="admin-nav-tabs">
+            <a href="/admin" class="active">home</a>
+            <a href="/admin/users">users</a>
+            <a href="/admin/emoji">emoji</a>
+          </div>
+          <a href="/" class="admin-nav-back">← back to chat™</a>
+        </nav>
+        <div id="admin-actions-content">
+          <button id="owner-mutechat-btn">toggle chat mute</button>
+          <button id="owner-maintenance-btn">toggle maintenance</button>
+          <button id="owner-clear-btn">clear channel history</button>
+          <button id="owner-refresh-version-btn">refresh version status</button>
+        </div>
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+          const session = localStorage.getItem('session')
+          if (!session) window.location.href = "/"
+          const socket = io(window.location.origin, {
+            auth: { session },
+            transports: ["websocket"]
+          })
+
+          let chatMutedb = false
+          socket.on("init", ({ chatMuted }) => { chatMutedb = chatMuted })
+
+          socket.on("connect", () => {
+            socket.emit("getAdminUsers");
+          });
+          socket.on("adminUserlist", renderUsers);
+
+          document.querySelector("#owner-mutechat-btn").addEventListener('click', () => {
+            socket.emit('message', { text: chatMutedb ? "/unmutechat" : "/mutechat" })
+          })
+
+          document.querySelector("#owner-maintenance-btn").addEventListener('click', () => {
+            // browser prompt instead of custom prompt used on the rest of the site is ap laceholder for now
+            const reason = prompt("maintenance reason: (leave blank to turn off)")
+            if (reason === null) return
+            socket.emit('message', { text: `/maintenance ${reason}` })
+          })
+
+          document.querySelector('#owner-clear-btn').addEventListener('click', () => {
+            // browser prompt is also a placeholder here, having to work with ui/frontend is hard enough already
+            if (confirm("clear all chat history? this can't be reversed")) {
+              socket.emit('message', { text: "/clear" })
+            }
+          })
+
+          document.querySelector('#owner-refresh-version-btn').addEventListener('click', async () => {
+            await fetch('/version?refresh=1')
+            // no feedback to end user here, i really don't want to use the browser prompt for this it's so annoying and the commandError/status functioanlity isn't present here
+          })
+
+          // no choice but to implement this as much as i hate browser prompts, if something calls commandError and there's no handler for it it could probably crash the entire site and i don't want that
+          socket.on('commandError', (msg) => alert(msg))
+        </script>
+    </body>
+</html>
