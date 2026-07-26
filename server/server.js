@@ -1713,25 +1713,25 @@ httpServer.on("request", async (req, res) => {
         const allowedTypes = isAvatar
           ? imageTypes
           : [
-              ...imageTypes,
-              "video/mp4",
-              "video/quicktime",
-              "audio/mpeg",
-              "audio/ogg",
-              "audio/wav",
-              "application/pdf",
-              "text/plain",
-              "text/markdown",
-              "application/zip",
-              "application/x-rar-compressed",
-              "application/x-7z-compressed",
-              "application/x-tar",
-              "application/gzip",
-              "application/json",
-              "text/csv",
-              "image/vnd.adobe.photoshop",
-              "application/figma",
-            ];
+            ...imageTypes,
+            "video/mp4",
+            "video/quicktime",
+            "audio/mpeg",
+            "audio/ogg",
+            "audio/wav",
+            "application/pdf",
+            "text/plain",
+            "text/markdown",
+            "application/zip",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed",
+            "application/x-tar",
+            "application/gzip",
+            "application/json",
+            "text/csv",
+            "image/vnd.adobe.photoshop",
+            "application/figma",
+          ];
         if (!allowedTypes.includes(file.mimetype)) {
           res.writeHead(400);
           res.end(JSON.stringify({ error: "file type not allowed" }));
@@ -2196,6 +2196,76 @@ httpServer.on("request", async (req, res) => {
       }
     });
     return;
+  }
+
+  if (url.pathname === "/admin/mutechat" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : "user"
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { "content-type": "application/json" })
+          res.end(JSON.stringify({ error: "forbidden" }))
+          return
+        }
+
+        chatMuted = !chatMuted
+        if (chatMuted) {
+          io.emit('mutechat', 'chat has been muted')
+        } else {
+          io.emit('unmutechat')
+        }
+
+        res.writeHead(200, { "content-type": "application/json" })
+        res.end(JSON.stringify({ success: true, muted: chatMuted }))
+      } catch (e) {
+        res.writeHead(400, { "content-type": 'application/json' })
+        res.end(JSON.stringify({ error: "invalid request" }))
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/maintenance" && req.method === "POST") {
+    let body = ""
+    req.on("data", (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, reason: newReason } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': "application/json" })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+
+        const reasonText = newReason || ''
+        if (reasonText) {
+          maintenance = true
+          reason = reasonText
+          setSetting('maintenance', '1')
+          setSetting('maintenance_reason', reason)
+          io.emit('status', `maintenance mode: ${reason}`)
+        } else {
+          maintenance = false
+          reason = ""
+          setSetting('maintenance', '0')
+          setSetting('maintenance_reason', "")
+          io.emit('status', "")
+        }
+
+        res.writeHead(200, { "content-type": 'application/json' })
+        res.end(JSON.stringify({ success: true, maintenance, reason }))
+      } catch (e) {
+        res.writeHead(400, { "content-type": "application/json" })
+        res.end(JSON.stringify({ error: 'invalid request' }))
+      }
+    })
+    return
   }
 
   if (url.pathname === "/messages") {
