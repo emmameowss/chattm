@@ -324,7 +324,6 @@ if (session) {
   }
 
   updateProfileBtn();
-  mobileWarning();
   document.querySelector("#profile-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     openProfile(username);
