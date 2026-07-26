@@ -645,15 +645,16 @@ button:active {
     background: var(--surface);
     padding: 24px;
     overflow-y: auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .admin-users-detail-empty {
     color: var(--muted);
     font-size: 13px;
     text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
 }
 
 .admin-users-detail-content {
