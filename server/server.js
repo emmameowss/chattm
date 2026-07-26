@@ -2332,7 +2332,169 @@ httpServer.on("request", async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/admin/unverify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
 
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: "email required" }));
+          return
+        }
+
+        const currentRole = getRole(targetEmail);
+        if (currentRole === "mod") {
+          setRole(targetEmail, 'user');
+        }
+        removeVerified(targetEmail);
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+  if (url.pathname === "/admin/redverify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess | sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'email required' }))
+          return
+        }
+
+        setRedVerified(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+  if (url.pathname === "/admin/unredverify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: "email required" }));
+          return
+        }
+
+        removeRedVerified(targetEmail);
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+  if (url.pathname === "/admin/hide" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || !['owner', 'admin'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        setHidden(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/unhide" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || !['owner', 'admin'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        removeHidden(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
 
   if (url.pathname === "/messages") {
     const messagesIp =
