@@ -2453,6 +2453,13 @@ body.admin-page {
     text-align: left;
     border-color: var(--danger);
     color: var(--danger);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-actions-buttons button i {
+    font-size: 14px;
 }
 
 .admin-actions-buttons button:hover {
