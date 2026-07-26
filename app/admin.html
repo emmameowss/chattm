@@ -16,10 +16,31 @@
           <a href="/" class="admin-nav-back">← back to chat™</a>
         </nav>
         <div id="admin-actions-content">
-          <button id="owner-mutechat-btn">toggle chat mute</button>
-          <button id="owner-maintenance-btn">toggle maintenance</button>
-          <button id="owner-clear-btn">clear channel history</button>
-          <button id="owner-refresh-version-btn">refresh version status</button>
+            <div class="admin-section">
+                <h3 class="admin-section-title">quick actions</h3>
+                <div class="admin-actions-buttons">
+                    <button id="owner-mutechat-btn">toggle chat mute</button>
+                    <button id="owner-maintenance-btn">toggle maintenance</button>
+                    <button id="owner-clear-btn">clear channel history</button>
+                    <button id="owner-refresh-version-btn">refresh version status</button>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3 class="admin-section-title">server stats</h3>
+                <div id="admin-stats-grid" class="admin-stats-grid">
+                    <div class="admin-loading">loading...</div>
+                </div>
+            </div>
+
+            <div class="admin-section"?
+                <h3 class="admin-section-title">online now</h3>
+                <div class="admin-online-users">
+                    <div class="admin-online-count">
+                        <span class="count" id="admin-online-count">-</span>
+                        <span>users online</span>
+                    </div>
+                </div>
         </div>
         <script src="/socket.io/socket.io.js"></script>
         <script>
@@ -32,6 +53,47 @@
 
           let chatMutedb = false
           socket.on("init", ({ chatMuted }) => { chatMutedb = chatMuted })
+
+          async function loadStats() {
+            try {
+              const res = await fetch('/stats')
+              const data = await res.json()
+
+              function formatBytes(bytes) {
+                if (bytes === 0) return '0 B'
+                const k = 1024
+                const sizes = ["B", "KB", "MB", "GB"]
+                const i = Math.floor(Math.log(bytes) / Math.log(k))
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+              }
+
+              const rows = [
+                ['accounts', data.users.toLocaleString()],
+                ['total messages', data.messages.toLocaleString()],
+                ['images uploaded', data.messages.toLocaleString()],
+                ['custom emojis', data.emoji.toLocaleString()],
+                ['storage used', formatBytes(data.totalSize)],
+              ];
+
+              document.querySelector('#admin-stats-grid').innerHTML = rows
+                .map(([label, value]) =>
+                  `<div class="admin-stat-row">
+                    <span class="admin-stat-label">${label}</span>
+                    <span class="admin-stat-value">${value}</span>
+                  </div>`
+                )
+                .join('');
+            } catch (e) {
+              document.querySelector('#admin-stats-grid').innerHTML =
+                '<div class="admin-loading">failed to load stats</div>'
+            }
+          }
+
+          socket.on('usercount', (count) => {
+            document.querySelector('#admin-online-count').textContent = count;
+          })
+
+          loadStats()
 
           document.querySelector('#owner-mutechat-btn').addEventListener('click', async () => {
             try {

@@ -2420,13 +2420,34 @@ body.admin-page {
 }
 
 #admin-actions-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    max-width: 100%;
+}
+
+.admin-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.admin-actions-buttons {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-width: 280px;
 }
 
-#admin-actions-content button {
+.admin-actions-buttons button {
     width: 100%;
     justify-content: flex-start;
     text-align: left;
@@ -2434,8 +2455,71 @@ body.admin-page {
     color: var(--danger);
 }
 
-#admin-actions-content button:hover {
+.admin-actions-buttons button:hover {
     background: var(--danger-dim);
+}
+
+.admin-stats-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+    transition: border-color 0.15s;
+}
+
+.admin-stat-row:hover {
+    border-color: var(--pink);
+}
+
+.admin-stat-label {
+    color: var(--muted);
+}
+
+.admin-stat-value {
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-online-users {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-online-count {
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-online-count .count {
+    font-weight: 600;
+    color: var(--pink);
+    font-size: 14px;
+}
+
+.admin-loading {
+    color: var(--muted);
+    font-size: 12px;
+    font-style: italic;
+    padding: 10px 12px;
 }
 
 #admin-users-list,
