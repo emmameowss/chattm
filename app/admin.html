@@ -38,23 +38,66 @@
           });
           socket.on("adminUserlist", renderUsers);
 
-          document.querySelector("#owner-mutechat-btn").addEventListener('click', () => {
-            socket.emit('message', { text: chatMutedb ? "/unmutechat" : "/mutechat" })
-          })
-
-          document.querySelector("#owner-maintenance-btn").addEventListener('click', () => {
-            // browser prompt instead of custom prompt used on the rest of the site is ap laceholder for now
-            const reason = prompt("maintenance reason: (leave blank to turn off)")
-            if (reason === null) return
-            socket.emit('message', { text: `/maintenance ${reason}` })
-          })
-
-          document.querySelector('#owner-clear-btn').addEventListener('click', () => {
-            // browser prompt is also a placeholder here, having to work with ui/frontend is hard enough already
-            if (confirm("clear all chat history? this can't be reversed")) {
-              socket.emit('message', { text: "/clear" })
+          document.querySelector('#owner-mutechat-btn').addEventListener('click', async () => {
+            try {
+              const res = await fetch ('/admin/mutechat', {
+                method: "POST",
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ session }),
+                });
+              const data = await res.json();
+              if (data.success) {
+                chatMutedb = data.muted;
+                // alert() is a placeholder like last time
+                alert(data.muted ? 'chat muted' : 'chat unmuted')
+              } else {
+                alert('failed to toggle mute')
+              }
+            } catch (e) {
+              alert('error: ' + e.message);
             }
-          })
+          });
+
+          document.querySelector('#owner-maintenance-btn').addEventListener('click', async () => {
+            const reason = prompt('maintenance reason: (leave blank to turn off)');
+            if (reason === null) return
+            try {
+              const res = await fetch('/admin/maintenance', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ session, reason })
+              });
+              const data = await res.json();
+              if (data.success) {
+                alert(data.maintenance ? `maintenance on: ${data.reason}` : `maintenance disabled`)
+              } else {
+                alert('failed to toggle maintenance')
+              }
+            } catch (e) {
+              alert('error: ' + e.message)
+            }
+          });
+
+          // this only clears main for now, will implement like a channel picker/switcher eventually
+
+          document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
+            if (!confirm('clear all chat history?')) return
+            try {
+              const res = await fetch('/admin/clear', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ session, channel: 'main' })
+              });
+              const data = await res.json();
+              if (data.success) {
+                alert('chat cleared')
+              } else {
+                alert('failed to clear chat')
+              }
+            } catch (e) {
+              alert('error: ' + e.message)
+            }
+          });
 
           document.querySelector('#owner-refresh-version-btn').addEventListener('click', async () => {
             await fetch('/version?refresh=1')
