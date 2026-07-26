@@ -1062,11 +1062,11 @@ body.login-page::after {
     padding: 4px 8px;
 }
 
-#channels-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
+    #channels-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
 
 #char-counter {
     position: fixed;
@@ -2369,33 +2369,61 @@ body:has(#dev-banner) #version-status {
 
 @media (max-width: 600px) {
     h1 {
-        font-size: 12px;
-        top: 10px;
-        left: 12px;
+        font-size: 11px;
+        padding: 4px 12px;
+        line-height: 1;
     }
 
     #version-status {
-        top: 10px;
-        padding-left: 65px;
+        display: none;
     }
 
     #username-form {
-        top: auto;
-        bottom: 60px;
-        right: 0;
-        left: 0;
-        padding: 8px 12px;
-        background: var(--bg);
-        border-top: 1px solid var(--border);
+        top: 4px;
+        bottom: auto;
+        right: 12px;
+        left: auto;
+        padding: 0;
+        background: transparent;
+        border-top: none;
         display: flex;
         gap: 6px;
-        z-index: 101;
+        z-index: 201;
         position: fixed;
+        flex-direction: row;
+        align-items: center;
     }
 
     #username-form input[type="text"] {
         flex: 1;
         width: auto;
+    }
+
+    #profile-btn {
+        padding: 1px 6px;
+        font-size: 10px;
+        height: 22px;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #profile-btn img,
+    #profile-btn .btn-avatar-placeholder {
+        width: 16px;
+        height: 16px;
+    }
+
+    .divider {
+        height: 24px;
+        margin: 0 4px;
+    }
+
+    #more-btn {
+        padding: 0 8px;
+        height: 26px;
+        min-width: 26px;
     }
 
     input[type="text"] {
@@ -2408,12 +2436,16 @@ body:has(#dev-banner) #version-status {
     }
 
     ul {
-        top: 64px;
+        top: 61px;
         left: 0;
         right: 0;
-        bottom: 116px;
+        bottom: 64px;
         padding: 8px 12px;
         max-width: 100%;
+    }
+
+    html.replying ul {
+        bottom: 104px;
     }
 
     body::before,
@@ -2423,7 +2455,8 @@ body:has(#dev-banner) #version-status {
 
     #channels {
         position: fixed;
-        top: 32px;
+        top: 27px;
+        height: 34px;
         left: 0;
         right: 0;
         width: auto;
@@ -2437,6 +2470,11 @@ body:has(#dev-banner) #version-status {
         border-right: none;
         border-bottom: 1px solid var(--border);
         z-index: 99;
+        scrollbar-width: none;
+    }
+
+    #channels::-webkit-scrollbar {
+        display: none;
     }
 
     #channels-header {
@@ -2445,14 +2483,21 @@ body:has(#dev-banner) #version-status {
 
     .channel-item {
         flex: 0 0 auto;
-        padding: 4px 8px;
+        padding: 4px 10px;
         white-space: nowrap;
+        min-height: 26px;
+        font-size: 11px;
     }
 
     #add-channel-btn {
         flex: 0 0 auto;
+        width: auto;
+        height: 26px;
         margin-top: 0;
         white-space: nowrap;
+        padding: 0 10px;
+        line-height: 26px;
+        font-size: 11px;
     }
 
     #composer-wrap {
@@ -2461,33 +2506,16 @@ body:has(#dev-banner) #version-status {
     }
 
     #userlist {
-        position: fixed;
-        top: 8px;
-        right: 12px;
-        max-width: 120px;
-        text-align: right;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 11px;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        border-left: none;
-        padding-left: 0;
-    }
-
-    #userlist strong {
         display: none;
     }
 
     #bottom-hints {
-        bottom: 128px;
+        bottom: 72px;
         left: 12px;
     }
 
     html.replying #bottom-hints {
-        bottom: 160px;
+        bottom: 112px;
     }
 
     #typing-indicator,
@@ -2497,11 +2525,11 @@ body:has(#dev-banner) #version-status {
 
     #upload-error,
     #upload-status {
-        bottom: 132px;
+        bottom: 76px;
     }
 
     #char-counter {
-        bottom: 132px;
+        bottom: 76px;
         right: 12px;
         font-size: 10px;
     }
@@ -2519,6 +2547,28 @@ body:has(#dev-banner) #version-status {
     .msg-content,
     .msg-username {
         font-size: 12px;
+    }
+
+    .msg-content img:not(.custom-emoji) {
+        max-width: 100%;
+    }
+
+    li.msg {
+        gap: 8px;
+    }
+
+    .msg-avatar {
+        width: 32px;
+    }
+
+    .msg-avatar .avatar,
+    .avatar-placeholder {
+        width: 32px;
+        height: 32px;
+    }
+
+    li.msg-cont {
+        padding-left: 40px;
     }
 
     #signout span,
@@ -2548,27 +2598,24 @@ body:has(#dev-banner) #version-status {
         display: none;
     }
 
-    #more-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-
     #more-menu {
         position: fixed;
-        bottom: 116px;
+        bottom: auto;
+        top: 30px;
         right: 12px;
-        top: auto;
         left: auto;
-        margin-bottom: 0;
+        margin-top: 0;
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
         flex-direction: column;
         padding: 6px;
         gap: 4px;
-        min-width: 140px;
+        min-width: 160px;
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
         z-index: 300;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
     }
 
     #more-menu.open {
@@ -2591,32 +2638,34 @@ body:has(#dev-banner) #version-status {
     #more-menu .menu-divider::before {
         content: "";
         position: absolute;
-        top: 50% !important;
+        top: 50%;
         left: 0;
         right: 0;
         height: 1px;
         background: var(--border);
-        transform: translateY(-50%) !important;
+        transform: translateY(-50%);
     }
 
-    body:has(#dev-banner) h1 {
-        top: 56px;
+    #emoji-picker {
+        bottom: 68px;
+        left: 12px;
+        grid-template-columns: repeat(6, 36px);
+        max-width: calc(100vw - 24px);
     }
 
-    body:has(#dev-banner) #version-status {
-        top: 56px;
+    #my-emoji-panel {
+        bottom: 68px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        max-width: 300px;
     }
 
-    body:has(#dev-banner) #userlist {
-        top: 56px;
+    #app-version {
+        font-size: 9px;
+        padding: 4px 8px;
     }
 
-    body:has(#dev-banner) ul {
-        top: 92px;
-    }
-
-    body:has(#dev-banner) #username-form {
-        top: auto;
-        bottom: 60px;
+    #dev-banner {
+        display: none;
     }
 }
