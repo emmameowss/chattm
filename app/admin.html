@@ -17,30 +17,70 @@
           <a href="/" class="admin-nav-back">← back to chat™</a>
         </nav>
         <div id="admin-actions-content">
-            <div class="admin-section">
-                <h3 class="admin-section-title">quick actions</h3>
-                <div class="admin-actions-buttons">
-                    <button id="owner-mutechat-btn"><i class='ti ti-microphone off'></i> toggle chat mute</button>
-                    <button id="owner-maintenance-btn"><i class="ti ti-tool"></i> toggle maintenance</button>
-                    <button id="owner-clear-btn"><i class="ti ti-trash"></i> clear channel history</button>
-                    <button id="owner-refresh-version-btn"><i class="ti ti-refresh"></i> refresh version status</button>
-                </div>
-            </div>
-
-            <div class="admin-section">
-                <h3 class="admin-section-title">server stats</h3>
-                <div id="admin-stats-grid" class="admin-stats-grid">
-                    <div class="admin-loading">loading...</div>
-                </div>
-            </div>
-
-            <div class="admin-section">
-                <h3 class="admin-section-title">online now</h3>
-                <div class="admin-online-users">
-                    <div class="admin-online-count">
-                        <span class="count" id="admin-online-count">-</span>
-                        <span>users online</span>
+            <div class="admin-sections-grid">
+                <div class="admin-section">
+                    <h3 class="admin-section-title">quick actions</h3>
+                    <div class="admin-actions-buttons">
+                        <button id="owner-mutechat-btn"><i class="ti ti-microphone-off"></i> toggle chat mute</button>
+                        <button id="owner-maintenance-btn"><i class="ti ti-tool"></i> toggle maintenance</button>
+                        <button id="owner-clear-btn"><i class="ti ti-trash"></i> clear channel history</button>
+                        <button id="owner-refresh-version-btn"><i class="ti ti-refresh"></i> refresh version status</button>
                     </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3 class="admin-section-title">status</h3>
+                    <div class="admin-status-grid">
+                        <div class="admin-status-item" id="chat-mute-status">
+                            <div class="admin-status-indicator"></div>
+                            <div class="admin-status-info">
+                                <span class="admin-status-label">chat mute</span>
+                                <span class="admin-status-value">-</span>
+                            </div>
+                        </div>
+                        <div class="admin-status-item" id="maintenance-status">
+                            <div class="admin-status-indicator"></div>
+                            <div class="admin-status-info">
+                                <span class="admin-status-label">maintenance mode</span>
+                                <span class="admin-status-value">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3 class="admin-section-title">server stats</h3>
+                    <div id="admin-stats-grid" class="admin-stats-grid">
+                        <div class="admin-loading">loading...</div>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <h3 class="admin-section-title">online now</h3>
+                    <div class="admin-online-users">
+                        <div class="admin-online-count">
+                            <span class="count" id="admin-online-count">-</span>
+                            <span>users online</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3 class="admin-section-title">quick links</h3>
+                <div class="admin-quick-links">
+                    <a href="https://dashboard.clerk.com" target="_blank" rel="noopener noreferrer" class="admin-link">
+                        <i class="ti ti-key"></i>
+                        <span>clerk dashboard</span>
+                    </a>
+                    <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer" class="admin-link">
+                        <i class="ti ti-cloud"></i>
+                        <span>cloudflare dashboard</span>
+                    </a>
+                    <a href="https://github.com/emmameowss/chattm" target="_blank" rel="noopener noreferrer" class="admin-link">
+                        <i class="ti ti-brand-github"></i>
+                        <span>github repo</span>
+                    </a>
                 </div>
             </div>
         </div>
@@ -110,8 +150,68 @@
             }, 3000)
           }
 
+          function updateChatMuteStatus(muted) {
+            const statusItem = document.querySelector('#chat-mute-status')
+            const statusValue = statusItem.querySelector(".admin-status-value")
+
+            if (muted) {
+              statusItem.classList.add('active')
+              statusItem.classList.remove('inactive')
+              statusValue.textContent = 'chat is muted'
+            } else {
+              statusItem.classList.add('inactive')
+              statusItem.classList.remove('active')
+              statusValue.textContent = "chat isn't muted"
+            }
+          }
+
+          function updateMaintenanceStatus(maintenance, reason) {
+            const statusItem = document.querySelector('#maintenance-status')
+            const statusValue = statusItem.querySelector(".admin-status-value")
+
+            if (maintenance) {
+              statusItem.classList.add('active')
+              statusItem.classList.remove('inactive')
+              statusValue.textContent = reason || 'maintenance mode enabled'
+            } else {
+              statusItem.classList.add('inactive')
+              statusItem.classList.remove('active')
+              statusValue.textContent = 'maintenance mode is disabled'
+            }
+          }
+
           let chatMutedb = false
-          socket.on("init", ({ chatMuted }) => { chatMutedb = chatMuted })
+          socket.on("init", ({ chatMuted }) => {
+            chatMutedb = chatMuted
+            updateChatMuteStatus(chatMuted)
+
+            fetch('/maintenance')
+              .then(r => r.json())
+              .then(data => {
+                updateMaintenanceStatus(data.maintenance, data.reason)
+              })
+              .catch(e => showToast(`failed to fetch maintenance status: ${e}`, "error"))
+          })
+
+          socket.on('mutechat', () => {
+            chatMutedb = true
+            updateChatMuteStatus(true)
+          })
+
+          socket.on('unmutechat', () => {
+            chatMutedb = false
+            updateChatMuteStatus(false)
+          })
+
+          socket.on("status", (statusText) => {
+            if (statusText && statusText.toLowerCase().includes('maintenance')) {
+              const reasonMatch = statusText.match(/maintenance mode:?\s*(.+)/i);
+              const reason = reasonMatch ? reasonMatch[1] : statusText;
+              updateMaintenanceStatus(true, reason);
+            } else if (!statusText) {
+              updateMaintenanceStatus(false, '');
+            }
+          });
 
           async function loadStats() {
             try {
@@ -164,7 +264,7 @@
               const data = await res.json();
               if (data.success) {
                 chatMutedb = data.muted;
-                // alert() is a placeholder like last time
+                updateChatMuteStatus(data.muted)
                 showToast(data.muted ? 'chat muted' : 'chat unmuted')
               } else {
                 showToast('failed to toggle mute')
@@ -189,6 +289,7 @@
               });
               const data = await res.json();
               if (data.success) {
+                updateMaintenanceStatus(data.maintenance, data.reason)
                 showToast(data.maintenance ? `maintenance on: ${data.reason}` : `maintenance disabled`)
               } else {
                 showToast('failed to toggle maintenance')

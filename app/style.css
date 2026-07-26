@@ -2420,10 +2420,20 @@ body.admin-page {
 }
 
 #admin-actions-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 100%;
+}
+
+.admin-sections-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 20px;
-    max-width: 100%;
+}
+
+#admin-actions-content > .admin-section:last-child {
+    max-width: 400px;
 }
 
 .admin-section {
@@ -2527,6 +2537,103 @@ body.admin-page {
     font-size: 12px;
     font-style: italic;
     padding: 10px 12px;
+}
+
+.admin-status-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s;
+}
+
+.admin-status-item:hover {
+    border-color: var(--pink);
+}
+
+.admin-status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+}
+
+.admin-status-item.active .admin-status-indicator {
+    background: var(--danger);
+    box-shadow: 0 0 8px rgba(255, 59, 48, 0.4);
+}
+
+.admin-status-item.inactive .admin-status-indicator {
+    background: var(--border);
+}
+
+.admin-status-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.admin-status-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.admin-status-value {
+    font-size: 11px;
+    color: var(--text);
+}
+
+.admin-status-item.active .admin-status-label {
+    color: var(--danger);
+}
+
+.admin-quick-links {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    font-size: 12px;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.admin-link:hover {
+    border-color: var(--pink);
+    background: var(--pink-dim);
+    color: var(--pink);
+}
+
+.admin-link i {
+    font-size: 14px;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.admin-link:hover i {
+    color: var(--pink);
 }
 
 #toast-container {
