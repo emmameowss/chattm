@@ -2579,7 +2579,7 @@ httpServer.on("request", async (req, res) => {
             lastSignInAt = clerkUser.lastSignInAt || null
             activeSessions = clerkUser.sessions?.filter(s => s.status === "active").length || X509Certificate
 
-            if (clerkUser.createdAt && clerkUSer.createdAt < createdAt) {
+            if (clerkUser.createdAt && clerkUser.createdAt < createdAt) {
               createdAt = clerkUser.createdAt
             }
           }
@@ -2918,6 +2918,107 @@ httpServer.on("request", async (req, res) => {
         res.end(JSON.stringify({ success: true, kicked }));
       } catch (e) {
         console.error('unmute endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/hide" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, role: newRole } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !["admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.parse({ 'error': 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail || !newRole) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email and role required' }));
+          return
+        }
+
+        const validRoles = ['user', 'mod', 'admin', 'owner'];
+        if (!validRoles.includes(newRole)) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid role' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: "can't change your own role" }));
+          return
+        }
+
+        if (sessRole === "admin" && !["user", mod].includes(newRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'admins can only promote to mod' }));
+          return
+        }
+
+        const currentRole = getRole(targetEmail)
+        if (currentRole === 'owner' && sess.role !== 'owner') {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'only owner can set/remove owner role' }));
+          return
+        }
+
+        if (targetEmail.endsWith('@guest')) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'guests cannot have roles' }));
+          return
+        }
+
+        setRole(targetEmail, newRole)
+
+        try {
+          const list = await clerk.users.getUserList({
+            emailAddress: [targetEmail],
+            limit: 1
+          })
+          const clerkUser = list.data?.[0]
+
+          if (clerkUser) {
+            await clerk.users.updateUserMetadata(clerkUser.id, {
+              publicMetadata: { role: newRole }
+            });
+          }
+        } catch (e) {
+          console.error('failed to update clerk metadata', e);
+        }
+        forEachUserSocket(targetEmail, (s) => {
+          s.userRole = newRole;
+        })
+
+        if (["mod", 'admin', 'owner'].includes(newRole)) {
+          setVerified(targetEmail)
+          forEachUserSocket(targetEmail, (s) => {
+            s.cachedVerified = true
+          });
+        } else if (newRole === 'user') {
+          if (currentRole === "mod") {
+            removeVerified(targetEmail)
+            forEachUserSocket(targetEmail, (s) => {
+              s.cachedVerified = false
+            })
+          }
+        }
+
+        emitAllUserLists()
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        console.error('role endpoint error: ', e)
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'invalid request' }));
       }
