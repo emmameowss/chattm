@@ -338,7 +338,7 @@ const commands = {
     minRole: "admin",
     run: (socket) => {
       clearMessages(socket.currentChannel);
-      io.to(roomOf(socket.currentChannel).emit("clear"));
+      io.to(roomOf(socket.currentChannel)).emit("clear");
     },
   },
   "/mutechat": {

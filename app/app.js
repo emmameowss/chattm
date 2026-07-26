@@ -19,6 +19,19 @@ function nameHash(name) {
   return hash;
 }
 
+function showStatus(msg, color = "gray") {
+  const e = document.querySelector("#upload-status");
+  e.textContent = msg;
+  e.style.display = "block";
+  e.style.color = color || "gray";
+}
+
+function hideStatus() {
+  const e = document.querySelector("#upload-status");
+  e.style.display = "none";
+  e.textContent = "";
+}
+
 function getNameColor(name) {
   if (!name) return "var(--muted)";
   if (name.toLowerCase() === "emma") return "hotpink";
@@ -1822,18 +1835,7 @@ if (session) {
   }
 
   // status stuff
-  function showStatus(msg, color = "gray") {
-    const e = document.querySelector("#upload-status");
-    e.textContent = msg;
-    e.style.display = "block";
-    e.style.color = color || "gray";
-  }
 
-  function hideStatus() {
-    const e = document.querySelector("#upload-status");
-    e.style.display = "none";
-    e.textContent = "";
-  }
   // beep
   function getaudioctx() {
     if (!audioctx) {
