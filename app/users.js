@@ -1,5 +1,3 @@
-import { parse } from "path/win32";
-
 const session = localStorage.getItem('session');
 if (!session) window.location.href = '/';
 
@@ -357,45 +355,54 @@ function renderUsers(users) {
   section('guests', guests);
 }
 
-function renderDetailView(user) {
-  const detail = document.querySelector('#admin-users-detail');
-  detail.innerHTML = '';
+async function renderDetailView(user) {
+  const detail = document.querySelector('#admin-users-detail')
+  detail.innerHTML = '<div class="admin-loading">Loading...</div>';
 
-  const content = document.createElement('div');
-  content.className = 'admin-users-detail-content';
+  const userInfo = await fetchUserInfo(user.email);
+  if (!userInfo) {
+    detail.innerHTML = '<div class="admin-users-detail-empty">Failed to load user details</div>';
+    return;
+  }
 
-  const header = document.createElement('div');
-  header.className = 'admin-detail-header';
+  const fullUser = { ...user, ...userInfo };
+  selectedUser = fullUser
 
-  const avatar = document.createElement('div');
+  detail.innerHTML = ''
+  const content = document.createElement('div')
+  content.className = 'admin-users-detailed-content'
+
+  const header = document.createElement('div')
+  header.className = 'admin-detail-header'
+
+  const avatar = document.createElement('div')
   avatar.className = 'admin-detail-avatar';
-  if (user.avatar) {
-    const img = document.createElement('img');
-    img.src = user.avatar;
-    avatar.appendChild(img);
+  if (fullUser.avatar) {
+    const img = document.createElement('img')
+    img.src = fullUser.avatar
+    avatar.appendChild(img)
   } else {
-    avatar.textContent = (user.username || "?")[0].toUpperCase();
-    avatar.style.backgroundColor = `hsl(${nameHash(user.username) % 360}, 55%, 38%)`;
+    avatar.textContent = (fullUser.username || "?")[0].toUpperCase();
+    avatar.style.backgroundColor = `hsl(${nameHash(fullUser.username) % 360}, 55%, 38%)`;
     avatar.style.color = "#fff";
   }
-  header.appendChild(avatar);
+  header.appendChild(avatar)
 
-  const info = document.createElement('div');
-  info.className = 'admin-detail-info';
+  const info = document.createElement('div')
+  info.className = 'admin-detail-info'
 
-  const name = document.createElement('div');
-  name.className = 'admin-detail-name';
-  name.style.color = getNameColor(user.username);
-  name.textContent = user.username;
+  const name = document.createElement('div')
+  name.className = 'admin-detail-name'
+  name.style.color = getNameColor(fullUser.username)
+  name.textContent = fullUser.username
 
-  // Add badges directly to name element
-  if (user.role === "owner") {
+  if (fullUser.role === "owner") {
     name.appendChild(makeBadge(
       "https://cdn.chattm.app/verified_owner.png",
       20,
-      "this user is verified to be the owner of chat™"
+      "this user is the owner of chat™"
     ));
-  } else if (user.role === "admin" || user.role === "mod") {
+  } else if (fullUser.role === "admin" || fullUser.role === "mod") {
     name.appendChild(makeBadge(
       "https://cdn.chattm.app/verified.png",
       20,
@@ -403,15 +410,15 @@ function renderDetailView(user) {
     ));
   }
 
-  if (user.redVerified) {
+  if (fullUser.redVerified) {
     name.appendChild(makeBadge(
       "https://cdn.chattm.app/verified_red.png",
       20,
-      "this checkmark is only held by my girlfriend and z. you cannot get it."
+      "meow"
     ));
   }
 
-  if (user.guest) {
+  if (fullUser.guest) {
     const guestText = document.createElement('span');
     guestText.style.cssText = 'font-size: 11px; color: var(--muted); padding: 2px 6px; background: var(--bg); border-radius: 3px; text-transform: uppercase; font-weight: 600; margin-left: 8px;';
     guestText.textContent = 'guest';
@@ -420,68 +427,40 @@ function renderDetailView(user) {
 
   info.appendChild(name);
 
-  const email = document.createElement('div');
-  email.className = 'admin-detail-email';
-  email.textContent = user.email;
-  info.appendChild(email);
+  const email = document.createElement('div')
+  email.className = 'admin-detail-email'
+  email.textContent = fullUser.email
+  info.appendChild(email)
 
-  header.appendChild(info);
-  content.appendChild(header);
+  header.appendChild(info)
+  content.appendChild(header)
 
-  const accountSection = document.createElement('div');
-  accountSection.className = 'admin-detail-section';
+  if (fullUser.banned || fullUser.muted) {
+    const modStatusSection = document.createElement('div')
+    modStatusSection.className = 'admin-detail-section'
 
-  const accountTitle = document.createElement('div');
-  accountTitle.className = 'admin-detail-section-title';
-  accountTitle.textContent = 'account info';
-  accountSection.appendChild(accountTitle);
+    const modStatusTitle = document.createElement('div')
+    modStatusTitle.className = 'admin-detail-section-title'
+    modStatusTitle.textContent = 'moderation statys'
+    modStatusSection.appendChild(modStatusTitle)
 
-  const fields = [
-    { label: "role", value: user.role || 'user' },
-    { label: "status", value: user.online ? "online" : 'offline' },
-    { label: "account type", value: user.guest ? 'guest' : 'registered' },
-    { label: 'verified', value: user.verified ? 'yes' : 'no' },
-  ];
+    if (fullUser.banned) {
+      const bannedBox = document.createElement('div')
+      bannedBox.className = 'admin-mod-status-box danger'
+      bannedBox.innerHTML = `<strong>banned</strong><br>${fullUser.banReason || 'no reason provided'}`
+      modStatusSection.appendChild(bannedBox)
+    }
 
-  fields.forEach(({ label, value }) => {
-    const field = document.createElement('div');
-    field.className = 'admin-detail-field';
+    if (fullUser.muted) {
+      const mutedBox = document.createElement('div');
+      mutedBox.className = 'admin-mod-status-box warning';
+      const until = fullUser.muteUntil ? ` until ${formatDate(fullUser.muteUntil)}` : ' (permanent)';
+      mutedBox.innerHTML = `<strong>muted${until}</strong><br>${fullUser.muteReason || 'no reason provided'}`;
+      modStatusSection.appendChild(mutedBox);
+    }
+    content.appendChild(modStatusSection)
+  }
 
-    const fieldLabel = document.createElement('span');
-    fieldLabel.className = 'admin-detail-field-label';
-    fieldLabel.textContent = label;
-    field.appendChild(fieldLabel);
-
-    const fieldValue = document.createElement('span');
-    fieldValue.className = 'admin-detail-field-value';
-    fieldValue.textContent = value;
-    field.appendChild(fieldValue);
-
-    accountSection.appendChild(field);
-  });
-
-  content.appendChild(accountSection);
-
-  const actionsSection = document.createElement('div');
-  actionsSection.className = 'admin-detail-section';
-
-  const actionsTitle = document.createElement('div');
-  actionsTitle.className = 'admin-detail-section-title';
-  actionsTitle.textContent = 'quick actions';
-  actionsSection.appendChild(actionsTitle);
-
-  const actionsDiv = document.createElement('div');
-  actionsDiv.className = 'admin-detail-actions';
-  actionsDiv.innerHTML = `
-    <button>Ban User</button>
-    <button>Kick User</button>
-    <button>Mute User</button>
-    <button>${user.verified ? 'Unverify' : 'Verify'} User</button>
-  `;
-  actionsSection.appendChild(actionsDiv);
-
-  content.appendChild(actionsSection);
-  detail.appendChild(content);
 }
 
 socket.on('adminUserlist', renderUsers);
