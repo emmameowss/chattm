@@ -644,7 +644,7 @@ button:active {
     border-radius: var(--radius);
     background: var(--surface);
     padding: 24px;
-    overflow-y: auto;
+    overflow-y: visible;
 }
 
 .admin-users-detail-empty {
@@ -659,7 +659,9 @@ button:active {
 
 .admin-users-detail-content {
     width: 100%;
-    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .admin-user-section {
@@ -827,11 +829,18 @@ button:active {
 }
 
 .admin-detail-section {
-    margin-bottom: 24px;
+    margin-bottom: 0;
 }
 
 .admin-detail-section:last-child {
     margin-bottom: 0;
+}
+
+.admin-users-sections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    width: 100%;
 }
 
 .admin-detail-section-title {

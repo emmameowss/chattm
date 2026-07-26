@@ -167,7 +167,7 @@ async function banUser(email, username) {
 }
 
 async function kickUser(email, username) {
-  const reason = showModal({
+  const reason = await showModal({
     message: `kick ${username}?\n\nreason:`,
     withInput: true,
     defaultValue: 'oops my finger slipped'
@@ -461,12 +461,156 @@ async function renderDetailView(user) {
     content.appendChild(modStatusSection)
   }
 
-}
+  const sectionsGrid = document.createElement('div')
+  sectionsGrid.className = 'admin-users-sections-grid'
 
-socket.on('adminUserlist', renderUsers);
+  const accountSection = document.createElement('div')
+    accountSection.className = 'admin-detail-section'
+
+    const accountTitle = document.createElement('div')
+    accountTitle.className = 'admin-detail-section-title'
+    accountTitle.textContent = 'account info'
+    accountSection.appendChild(accountTitle)
+
+    const accountFields = [
+      { label: 'role', value: fullUser.role || 'user' },
+      { label: 'status', value: fullUser.online ? 'online' : 'fffline' },
+      { label: 'account type', value: fullUser.guest ? 'guest' : 'registered' },
+      { label: 'verified', value: (fullUser.role === 'mod' || fullUser.role === 'admin' || fullUser.role === 'owner') ? 'yes' : 'no' },
+      { label: 'joined', value: formatDate(fullUser.createdAt) },
+      { label: 'total messages', value: fullUser.messageCount.toLocaleString() },
+    ];
+
+    accountFields.forEach(({label,value}) => {
+      const field = document.createElement('div')
+      field.className = 'admin-detail-field'
+
+      const fieldLabel = document.createElement('span')
+      fieldLabel.className = 'admin-detail-field-label'
+      fieldLabel.textContent = label
+      field.appendChild(fieldLabel)
+
+      const fieldValue = document.createElement('span')
+      fieldValue.className = 'admin-detail-field-value'
+      fieldValue.textContent = value
+      field.appendChild(fieldValue)
+
+      accountSection.appendChild(field)
+    });
+
+    sectionsGrid.appendChild(accountSection)
+
+  if (!fullUser.guest && fullUser.clerkId) {
+      const clerkSection = document.createElement('div');
+      clerkSection.className = 'admin-detail-section';
+
+      const clerkTitle = document.createElement('div');
+      clerkTitle.className = 'admin-detail-section-title';
+      clerkTitle.textContent = 'clerk info';
+      clerkSection.appendChild(clerkTitle);
+
+      const clerkIdField = document.createElement('div');
+      clerkIdField.className = 'admin-detail-field';
+
+      const clerkIdLabel = document.createElement('span');
+      clerkIdLabel.className = 'admin-detail-field-label';
+      clerkIdLabel.textContent = 'clerk id';
+      clerkIdField.appendChild(clerkIdLabel);
+
+      const clerkIdValue = document.createElement('span');
+      clerkIdValue.className = 'admin-clerk-id';
+      clerkIdValue.textContent = fullUser.clerkId.slice(0, 20) + '...';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.innerHTML = '<i class="ti ti-copy"></i>';
+      copyBtn.onclick = () => copyToClipboard(fullUser.clerkId);
+      clerkIdValue.appendChild(copyBtn);
+
+      clerkIdField.appendChild(clerkIdValue);
+      clerkSection.appendChild(clerkIdField);
+
+      const clerkFields = [
+        { label: 'active sessions', value: fullUser.activeSessions.toString() },
+        { label: 'last sign in', value: fullUser.lastSignInAt ? timeAgo(fullUser.lastSignInAt) : 'never' },
+      ];
+
+      clerkFields.forEach(({ label, value }) => {
+        const field = document.createElement('div');
+        field.className = 'admin-detail-field';
+
+        const fieldLabel = document.createElement('span');
+        fieldLabel.className = 'admin-detail-field-label';
+        fieldLabel.textContent = label;
+          field.appendChild(fieldLabel);
+
+          const fieldValue = document.createElement('span');
+          fieldValue.className = 'admin-detail-field-value';
+          fieldValue.textContent = value;
+          field.appendChild(fieldValue);
+
+        clerkSection.appendChild(field);
+      });
+
+      sectionsGrid.appendChild(clerkSection);
+  }
+
+  const actionsSection = document.createElement('div');
+    actionsSection.className = 'admin-detail-section';
+
+    const actionsTitle = document.createElement('div');
+    actionsTitle.className = 'admin-detail-section-title';
+    actionsTitle.textContent = 'mod actions';
+    actionsSection.appendChild(actionsTitle);
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'admin-detail-actions';
+
+    if (!fullUser.banned) {
+      const banBtn = document.createElement('button');
+      banBtn.className = 'danger';
+      banBtn.innerHTML = '<i class="ti ti-ban"></i> ban user';
+      banBtn.onclick = () => banUser(fullUser.email, fullUser.username);
+      actionsDiv.appendChild(banBtn);
+    }
+
+    const kickBtn = document.createElement('button');
+    kickBtn.className = 'warning';
+    kickBtn.innerHTML = '<i class="ti ti-user-x"></i> kick user';
+    kickBtn.onclick = () => kickUser(fullUser.email, fullUser.username);
+    actionsDiv.appendChild(kickBtn);
+
+    if (fullUser.muted) {
+      const unmuteBtn = document.createElement('button');
+      unmuteBtn.className = 'success';
+      unmuteBtn.innerHTML = '<i class="ti ti-volume"></i> unmute user';
+      unmuteBtn.onclick = () => unmuteUser(fullUser.email, fullUser.username);
+      actionsDiv.appendChild(unmuteBtn);
+    } else {
+      const muteBtn = document.createElement('button');
+      muteBtn.className = 'warning';
+      muteBtn.innerHTML = '<i class="ti ti-volume-3"></i> mute user';
+      muteBtn.onclick = () => muteUser(fullUser.email, fullUser.username);
+      actionsDiv.appendChild(muteBtn);
+    }
+
+    actionsSection.appendChild(actionsDiv);
+    sectionsGrid.appendChild(actionsSection);
+
+    content.appendChild(sectionsGrid);
+    detail.appendChild(content);
+}
+socket.on('adminUserlist', (users) => {
+  renderUsers(users);
+  if (selectedUser) {
+    const updated = users.find(u => u.email === selectedUser.email);
+    if (updated) {
+      refreshDetailView();
+    }
+  }
+});
 
 socket.on('connect', () => {
   socket.emit('getAdminUsers');
 });
 
-socket.on('commandError', (msg) => alert(msg));
+socket.on('commandError', (msg) => showToast(msg, 'error'));
