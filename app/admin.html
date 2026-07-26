@@ -33,11 +33,6 @@
           let chatMutedb = false
           socket.on("init", ({ chatMuted }) => { chatMutedb = chatMuted })
 
-          socket.on("connect", () => {
-            socket.emit("getAdminUsers");
-          });
-          socket.on("adminUserlist", renderUsers);
-
           document.querySelector('#owner-mutechat-btn').addEventListener('click', async () => {
             try {
               const res = await fetch ('/admin/mutechat', {

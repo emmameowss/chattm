@@ -65,7 +65,10 @@
             section('guests', guests)
           }
 
-          socket.on('adminUserlist', renderUsers)
+          socket.on("connect", () => {
+            socket.emit("getAdminUsers");
+          });
+          socket.on("adminUserlist", renderUsers);
           // same thing as admin.html
           socket.on('commandError', (msg) => alert(msg))
         </script>
