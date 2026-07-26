@@ -1,3 +1,5 @@
+import { parse } from "path/win32";
+
 const session = localStorage.getItem('session');
 if (!session) window.location.href = '/';
 
@@ -30,6 +32,239 @@ function makeBadge(src, size, tooltip) {
   wrap.appendChild(img);
   return wrap;
 }
+
+function showModal({ message, withInput = false, defaultValue = '' }) {
+  return new Promise((resolve) => {
+    const overlay = document.querySelector('#modal-overlay');
+    const msgEl = document.querySelector('#modal-message');
+    const inputEl = document.querySelector('#modal-input');
+    const confirmBtn = document.querySelector('#modal-confirm');
+    const cancelBtn = document.querySelector('#modal-cancel');
+
+    msgEl.textContent = message;
+    inputEl.style.display = withInput ? "block" : "none";
+    inputEl.value = defaultValue;
+    overlay.style.display = "flex";
+    if (withInput) inputEl.focus();
+
+    function cleanUp(result) {
+      overlay.style.display = "none";
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      if (withInput) inputEl.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+    function onConfirm() {
+      cleanUp(withInput ? inputEl.value : true);
+    }
+    function onCancel() {
+      cleanUp(withInput ? null : false);
+    }
+    function onKey(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onConfirm();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    }
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+    if (withInput) inputEl.addEventListener("keydown", onKey);
+  });
+}
+
+function showToast(message, type = 'info') {
+  const container = document.querySelector('#toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    toast.style.transition = 'opacity 0.2s, transform 0.2s';
+    setTimeout(() => toast.remove(), 200);
+  }, 3000);
+}
+
+function timeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
+}
+
+function formatDate(timestamp) {
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Copied to clipboard', 'success');
+  }).catch(() => {
+    showToast('Failed to copy', 'error');
+  });
+}
+
+async function fetchUserInfo(email) {
+  try {
+    const res = await fetch(`/admin/user/info?session=${encodeURIComponent(session)}&email=${encodeURIComponent(email)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.error('failed to fetch user info: ', e);
+    return null
+  }
+}
+
+async function refreshDetailView() {
+  if (!selectedUser) return
+  const info = await fetchUserInfo(selectedUser.email)
+  if (info) {
+    selectedUser = { ...selectedUser, ...info };
+    renderDetailView(selectedUser);
+  }
+}
+
+async function banUser(email, username) {
+  const reason = await showModal({
+    message: `ban ${username}?\n\nreason:`,
+    withInput: true,
+    defaultValue: 'bad'
+  });
+  if (!reason) return
+
+  try {
+    const res = await fetch('/admin/user/ban', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session, email, reason })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('user banned!', 'success');
+      await refreshDetailView()
+      socket.emit('getAdminUsers');
+    } else {
+      showToast(data.error || 'failed to ban user', 'error')
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+  }
+}
+
+async function kickUser(email, username) {
+  const reason = showModal({
+    message: `kick ${username}?\n\nreason:`,
+    withInput: true,
+    defaultValue: 'oops my finger slipped'
+  });
+  if (!reason) return
+
+  try {
+    const res = await fetch('/admin/user/kick', {
+      method: "POST",
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session, email, reason })
+    });
+    const data = await res.json()
+    if (data.success) {
+      showToast(data.kicked ? 'user kicked' : 'user was offline', 'success')
+    } else {
+      showToast(data.errror || 'failed to kick', 'error')
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+  }
+}
+
+async function muteUser(email, username) {
+  const durationChoice = await showModal({
+    message: `mute ${username}?\n\n duration: 15m, 1h, 24h, forever, or custom`,
+    withInput: true,
+    defaultValue: '1h'
+  });
+  if (!durationChoice) return
+
+  let duration;
+  const choice = durationChoice.toLowerCase().trim();
+  if (choice === "15m") duration = 15;
+  else if (choice === '1h') duration = 60;
+  else if (choice === '24h') duration = 1440;
+  else if (choice === 'forever') duration = null;
+  else {
+    duration = parseInt(choice);
+    if (isNaN(duration) || duration <= 0) {
+      showToast('invalid duration', 'error');
+      return
+    }
+  }
+
+  const reason = await showModal({
+    message: 'reason:',
+    withInput: true,
+    defaultValue: 'not meowing enough'
+  })
+  if (!reason) return
+  try {
+    const res = await fetch('/admin/user/mute', {
+      method: "POST",
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session, email, duration, reason })
+    });
+    const data = await res.json()
+    if (data.success) {
+      showToast('user muted', 'success');
+      await refreshDetailView()
+      socket.emit('getAdminUsers')
+    } else {
+      showToast(data.error || 'failed to mute user', 'error')
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+  }
+}
+
+async function unmuteUser(email, username) {
+  const confirmed = await showModal({
+    message: `unmute ${username}?`
+  });
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch('/admin/user/unmute', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session, email })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('user unmuted', 'success');
+      await refreshDetailView();
+      socket.emit('getAdminUsers');
+    } else {
+      showToast(data.error || 'failed to unmute user', 'error');
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error');
+  }
+}
+
 
 let selectedUser = null;
 let usersData = [];
