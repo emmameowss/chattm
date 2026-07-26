@@ -3026,6 +3026,239 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
+  if (url.pathname === "/admin/user/revoke-session" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, sessionId: targetSessionId } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : "user"
+
+        if (!sess || !['admin', 'owner'].includes(sessRole)) {
+          res.writeHead(403, { "content-type": 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetSessionId) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'sessionId required' }));
+          return
+        }
+
+        try {
+          await clerk.sessions.revokeSession(targetSessionId)
+
+          clerkSessionCache.set(targetSessionId, {
+            active: false,
+            checkedAt: Date.now()
+          });
+
+          for (const [, s] of io.sockets.sockets) {
+            if (s.clerkSessionId === targetSessionId) {
+              s.emit('kicked', 'session revoked by admin')
+              s.skipLeaveMessage = true
+              s.disconnect()
+            }
+          }
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          console.error('failed to revoke session: ', e);
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'failed to revoke session' }));
+        }
+      } catch (e) {
+        console.error('revoke-session error: ', e);
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/revoke-all-sessions" && req.method === "POST") {
+    let body = "";
+    req.on("data", (d) => { body += d; });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !["admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return;
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot revoke your own sessions' }));
+          return
+        }
+
+        if (targetEmail.endsWith('@guest')) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'guest users do not have clerk sessions' }));
+          return
+        }
+
+        let clerkId = null
+        const sessionRow = db.prepare(
+          "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+        ).get(targetEmail)
+        clerkId = sessionRow?.clerk_id || null
+
+        if (!clerkId) {
+          try {
+            const list = await clerk.users.getUserList({
+              emailAddress: [targetEmail],
+              limit: 1
+            })
+            clerkId = list.data?.[0]?.id || null;
+          } catch (e) {
+            console.error('failed to fetch clerk id: ', e);
+          }
+        }
+        if (!clerkId) {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true, revokedCount: 0 }));
+          return
+        }
+
+        try {
+          const clerkUser = await clerk.users.getUser(clerkId);
+          let revokedCount = 0;
+
+          for (const sess of clerkUser.sessions || []) {
+            if (sess.status === "active") {
+              try {
+                await clerk.sessions.revokeSession(sess.id);
+                clerkSessionCache.set(sess.id, {
+                  active: false,
+                  checkedAt: Date.now()
+                })
+                revokedCount++;
+              } catch (e) {
+                console.error(`failed to revoke session ${sess.id}: `, e)
+              }
+            }
+          }
+
+          forEachUserSocket(targetEmail, (s) => {
+            s.emit('kicked', 'session revoked by admin')
+            s.skipLeaveMessage = true
+            s.disconnect()
+          })
+
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true, revokedCount }));
+        } catch (e) {
+          console.error("Failed to revoke sessions:", e);
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "failed to revoke sessions" }));
+        }
+      } catch (e) {
+        console.error("/admin/user/revoke-all-sessions error:", e);
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "invalid request" }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/ban-clerk" && req.method === "POST") {
+    let body = "";
+    req.on("data", (d) => { body += d; });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : "user";
+
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "owner only" }));
+          return;
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "email required" }));
+          return;
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot ban yourself" }));
+          return;
+        }
+
+        if (targetEmail.endsWith("@guest")) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot Clerk-ban guest users" }));
+          return;
+        }
+        let clerkId = null;
+        const sessionRow = db.prepare(
+          "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+        ).get(targetEmail);
+        clerkId = sessionRow?.clerk_id || null;
+
+        if (!clerkId) {
+          try {
+            const list = await clerk.users.getUserList({
+              emailAddress: [targetEmail],
+              limit: 1
+            });
+            clerkId = list.data?.[0]?.id || null;
+          } catch (e) {
+            console.error("failed to find clerk id: ", e);
+          }
+        }
+
+        if (!clerkId) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "no clerk account found" }));
+          return;
+        }
+        try {
+          await clerk.users.banUser(clerkId)
+
+          addBan(targetEmail, 'clerk account banned')
+
+          forEachUserSocket(targetEmail, (s) => {
+            s.emit('banned', 'clerk account banned')
+            s.skipLeaveMessage = true
+            s.disconnect()
+          })
+
+          emitAllUserLists()
+
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          console.error('failed to clerk ban: ', e);
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'failed to ban' }));
+        }
+      } catch (e) {
+        console.error('clerk ban endpoint error: ', e);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
   if (url.pathname === "/messages") {
     const messagesIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
