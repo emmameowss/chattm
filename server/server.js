@@ -2268,6 +2268,72 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
+  if (url.pathname === "/admin/clear" && req.method === "POST") {
+    let body = ""
+    req.on("data", (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, channel } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+        if (!sess || !['owner', 'admin'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+
+        const targetChannel = channel || 'main'
+        clearMessages(targetChannel)
+        io.to(roomOf(targetChannel)).emit('clear')
+
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(400, { 'content-type': "application/json" })
+        res.end(JSON.stringify({ error: 'invalid request' }))
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/verify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess | sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'email required' }))
+          return
+        }
+
+        const currentRole = getRole(targetEmail)
+        if (!["mod", 'admin', 'owner'].includes(currentRole)) {
+          setRole(targetEmail, 'mod')
+        }
+        setVerified(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+
+
   if (url.pathname === "/messages") {
     const messagesIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
