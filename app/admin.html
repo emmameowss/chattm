@@ -52,6 +52,63 @@
             transports: ["websocket"]
           })
 
+          function showModal({ message, withInput = false, defaultValue = '' }) {
+            return new Promise((resolve) => {
+              const overlay = document.querySelector('#modal-overlay');
+              const msgEl = document.querySelector('#modal-message');
+              const inputEl = document.querySelector('#modal-input');
+              const confirmBtn = document.querySelector('#modal-confirm')
+              const cancelBtn = document.querySelector('#modal-cancel')
+
+              msgEl.textContent = message;
+              inputEl.style.display = withInput ? "block" : "none"
+              inputEl.value = defaultValue
+              overlay.style.display = "flex"
+              if (withInput) inputEl.focus()
+
+              function cleanUp(result) {
+                overlay.style.display = "none";
+                confirmBtn.removeEventListener('click', onConfirm);
+                cancelBtn.removeEventListener('click', onCancel);
+                if (withInput) inputEl.removeEventListener('keydown', onKey)
+                resolve(result)
+              }
+              function onConfirm() {
+                cleanUp(withInput ? inputEl.value : true)
+              }
+              function onCancel() {
+                cleanUp(withInput ? null : false)
+              }
+              function onKey(e) {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  onConfirm()
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  onCancel();
+                }
+              }
+              confirmBtn.addEventListener('click', onConfirm)
+              cancelBtn.addEventListener('click', onCancel)
+              if (withInput) inputEl.addEventListener("keydown", onKey)
+            })
+          }
+
+          function showToast(message, type = 'info') {
+            const container = document.querySelector('#toast-container');
+            const toast = document.createElement('div')
+            toast.className = `toast ${type}`
+            toast.textContent = message;
+            container.appendChild(toast)
+
+            setTimeout(() => {
+              toast.style.opacity = '0'
+              toast.style.transform = 'translateY(10px)';
+              toast.style.transition = 'opacity 0.2s, transform 0.2s'
+              setTimeout(() => toast.remove(), 200)
+            }, 3000)
+          }
+
           let chatMutedb = false
           socket.on("init", ({ chatMuted }) => { chatMutedb = chatMuted })
 
@@ -107,17 +164,21 @@
               if (data.success) {
                 chatMutedb = data.muted;
                 // alert() is a placeholder like last time
-                alert(data.muted ? 'chat muted' : 'chat unmuted')
+                showToast(data.muted ? 'chat muted' : 'chat unmuted')
               } else {
-                alert('failed to toggle mute')
+                showToast('failed to toggle mute')
               }
             } catch (e) {
-              alert('error: ' + e.message);
+              showToast('error: ' + e.message);
             }
           });
 
           document.querySelector('#owner-maintenance-btn').addEventListener('click', async () => {
-            const reason = prompt('maintenance reason: (leave blank to turn off)');
+            const reason = await showModal({
+              message: "maintenance reason (leave blank to turn off)",
+              withInput: true,
+              defaultValue: ''
+            })
             if (reason === null) return
             try {
               const res = await fetch('/admin/maintenance', {
@@ -127,19 +188,22 @@
               });
               const data = await res.json();
               if (data.success) {
-                alert(data.maintenance ? `maintenance on: ${data.reason}` : `maintenance disabled`)
+                showToast(data.maintenance ? `maintenance on: ${data.reason}` : `maintenance disabled`)
               } else {
-                alert('failed to toggle maintenance')
+                showToast('failed to toggle maintenance')
               }
             } catch (e) {
-              alert('error: ' + e.message)
+              showToast('error: ' + e.message)
             }
           });
 
           // this only clears main for now, will implement like a channel picker/switcher eventually
 
           document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
-            if (!confirm('clear all chat history?')) return
+            const confirmed = await showModal({
+              message: 'clear main channel chat history?'
+            });
+            if (!confirmed) return
             try {
               const res = await fetch('/admin/clear', {
                 method: 'POST',
@@ -148,22 +212,39 @@
               });
               const data = await res.json();
               if (data.success) {
-                alert('chat cleared')
+                showToast('chat cleared')
               } else {
-                alert('failed to clear chat')
+                showToast('failed to clear chat')
               }
             } catch (e) {
-              alert('error: ' + e.message)
+              showToast('error: ' + e.message)
             }
           });
 
           document.querySelector('#owner-refresh-version-btn').addEventListener('click', async () => {
-            await fetch('/version?refresh=1')
-            // no feedback to end user here, i really don't want to use the browser prompt for this it's so annoying and the commandError/status functioanlity isn't present here
+            try {
+              showToast('refreshing version status...', 'info')
+              await fetch('/version?refresh=1')
+              showToast('version status refreshed', 'success')
+            } catch (e) {
+              showToast('failed to refresh version', 'error')
+            }
           })
 
           // no choice but to implement this as much as i hate browser prompts, if something calls commandError and there's no handler for it it could probably crash the entire site and i don't want that
-          socket.on('commandError', (msg) => alert(msg))
+          socket.on('commandError', (msg) => showToast(msg))
         </script>
+
+        <div id="modal-overlay" style="display: none;">
+            <div id="modal-box">
+                <p id="modal-message"></p>
+                <input type="text" id="modal-input" style="display: none;"/>
+                <div id="modal-actions">
+                    <button type="button" id="modal-cancel">cancel</button>
+                    <button type="button" id="modal-confirm">confirm</button>
+                </div>
+            </div>
+        </div>
+        <div id="toast-container"></div>
     </body>
 </html>
