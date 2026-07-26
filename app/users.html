@@ -156,76 +156,69 @@
             const content = document.createElement('div')
             content.className = 'admin-users-detail-content'
 
-            const header = document.createElement('div')
-            header.className = 'admin-detail-header'
+            const header = document.createElement('div');
+            header.className = 'admin-detail-header';
 
-            const avatar = document.createElement('div')
-            avatar.className = 'admin-detail-avatar'
+            const avatar = document.createElement('div');
+            avatar.className = 'admin-detail-avatar';
             if (user.avatar) {
-              const img = document.createElement('img')
-              img.src = user.avatar
-              avatar.appendChild(img)
+              const img = document.createElement('img');
+              img.src = user.avatar;
+              avatar.appendChild(img);
             } else {
-              avatar.textContent = (user.username ||"?")[0].toUpperCase()
-              avatar.style.backgroundColor = `hsl(${nameHash(user.username) % 360}, 55%, 38%`
-              avatar.style.color = "#fff"
+              avatar.textContent = (user.username || "?")[0].toUpperCase();
+              avatar.style.backgroundColor = `hsl(${nameHash(user.username) % 360}, 55%, 38%)`;
+              avatar.style.color = "#fff";
             }
-            header.appendChild(avatar)
+            header.appendChild(avatar);
 
-            const info = document.createElement('div')
-            info.className = 'admin-detail-info'
+            const info = document.createElement('div');
+            info.className = 'admin-detail-info';
 
-            const name = document.createElement('div')
-            name.className = 'admin-detail-name'
-            name.style.color = getNameColor(user.username)
-            name.textContent = user.username
-            info.appendChild(name)
+            const name = document.createElement('div');
+            name.className = 'admin-detail-name';
+            name.style.color = getNameColor(user.username);
+            name.textContent = user.username;
 
-            const email = document.createElement('div')
-            email.className = 'admin-detail-email'
-            email.textContent = user.email
-            info.appendChild(email)
-
-            const badges = document.createElement('div')
-            badges.className = 'admin-detail-badges'
-            badges.style.display = 'flex'
-            badges.style.alignItems = 'center'
-            badges.style.gap = '4px'
-
+            // Add badges directly to name element
             if (user.role === "owner") {
-              const badge = makeBadge(
+              name.appendChild(makeBadge(
                 "https://cdn.chattm.app/verified_owner.png",
                 20,
-                "this user is the owner of chat™"
-              )
-              badges.appendChild(badge)
-            } else if (user.role === "mod" || user.role === "admin") {
-              const badge = makeBadge(
+                "this user is verified to be the owner of chat™"
+              ));
+            } else if (user.role === "admin" || user.role === "mod") {
+              name.appendChild(makeBadge(
                 "https://cdn.chattm.app/verified.png",
                 20,
-                "this user is a moderator or admin"
-              )
-              badges.appendChild(badge)
+                "this user has been verified"
+              ));
             }
 
             if (user.redVerified) {
-              const badge = makeBadge(
+              name.appendChild(makeBadge(
                 "https://cdn.chattm.app/verified_red.png",
                 20,
-                "meow"
-              )
-              badges.appendChild(badge)
+                "this checkmark is only held by my girlfriend and z. you cannot get it."
+              ));
             }
 
             if (user.guest) {
-              const guestText = document.createElement('span')
-              guestText.style.cssText = 'font-size: 11px; color: var(--muted); padding: 2px 6px; background: var(--bg); border-radius: 3px;';
-              guestText.textContent = 'guest'
-              badges.appendChild(guestText)
+              const guestText = document.createElement('span');
+              guestText.style.cssText = 'font-size: 11px; color: var(--muted); padding: 2px 6px; background: var(--bg); border-radius: 3px; text-transform: uppercase; font-weight: 600; margin-left: 8px;';
+              guestText.textContent = 'guest';
+              name.appendChild(guestText);
             }
 
-            header.appendChild(info)
-            content.appendChild(header)
+            info.appendChild(name);
+
+            const email = document.createElement('div');
+            email.className = 'admin-detail-email';
+            email.textContent = user.email;
+            info.appendChild(email);
+
+            header.appendChild(info);
+            content.appendChild(header);
 
             const accountSection = document.createElement('div')
             accountSection.className = 'admin-detail-section'
