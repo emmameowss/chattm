@@ -4,7 +4,7 @@ import { createServer } from "http";
 import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
-import { randomBytes } from "crypto";
+import { randomBytes, X509Certificate } from "crypto";
 import { readFile, appendFile } from "fs/promises";
 import { extname, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
@@ -2493,6 +2493,201 @@ httpServer.on("request", async (req, res) => {
         res.end(JSON.stringify({ error: 'invalid request' }));
       }
     })
+    return
+  }
+
+  if (url.pathname === '/admin/user/info' && req.method === "GET") {
+    try {
+      const sessionId = url.searchParams.get('session')
+      const targetEmail = url.searchParams.get('email')
+
+      const sess = sessionId ? getSession(sessionId) : null
+      const sessRole = sess ? getRole(sess.email) : 'user'
+
+      if (!sess | !["admin", 'owner'].includes(sessRole)) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return
+      }
+
+      if (!targetEmail) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return
+      }
+
+      const role = getRole(targetEmail)
+      const verified = isVerified(targetEmail)
+      const redVerified = isRedVerified(targetEmail)
+      const banned = isBanned(targetEmail)
+      const banReason = banned ? getBanReason(targetEmail) : null
+      const muteData = getMute(targetEmail)
+      const muted = !!muteData
+      const muteReason = muteData?.reason || null
+      const mutedUntil = muteData?.until || null
+
+      let username = null
+      for (const [, s] of io.sockets.sockets) {
+        if (s.userEmail === targetEmail && s.username) {
+          username = s.username
+          break
+        }
+      }
+      if (!username) {
+        username = getStoredUsername(targetEmail) || 'unknown';
+      }
+
+      const online = [...io.sockets.sockets.values()].some(
+        s => s.userEmail === targetEmail && s.username
+      );
+
+      const messageCount = db.prepare(
+        "SELECT COUNT(*) as count FROM messages WHERE owner_email = ?"
+      ).get(targetEmail)?.count || 0;
+
+      const profileData = getProfileData(targetEmail)
+      let createdAt = profileData?.lastSeen || Date.now()
+
+      const firstMessage = db.prepare(
+        "SELECT MIN(time) as first FROM messages WHERE owner_email = ?"
+      ).get(targetEmail)
+      if (firstMessage?.first && firstMessage.first < createdAt) {
+        createdAt = firstMessage.first
+      }
+
+      let clerkId = null
+      let lastSignInAt = null
+      let activeSessions = 0;
+
+      if (!targetEmail.endsWith("@guest")) {
+        try {
+          const sessionRow = db.prepare(
+            "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+          ).get(targetEmail)
+          clerkId = sessionRow?.clerk_id || null
+
+          if (!clerkId) {
+            const list = await clerk.users.getUserList({
+              emailAddress: [targetEmail],
+              limit: 1
+            })
+            clerkId = list.data?.[0]?.id || null
+          }
+
+          if (clerkId) {
+            const clerkUser = await clerk.users.getUser(clerkId);
+            lastSignInAt = clerkUser.lastSignInAt || null
+            activeSessions = clerkUser.sessions?.filter(s => s.status === "active").length || X509Certificate
+
+            if (clerkUser.createdAt && clerkUSer.createdAt < createdAt) {
+              createdAt = clerkUser.createdAt
+            }
+          }
+        } catch (e) {
+          console.error('failed to fetch clerk data: ', e)
+        }
+      }
+
+      const result = {
+        email: targetEmail,
+        username,
+        role,
+        verified,
+        redVerified,
+        guest: targetEmail.endsWith("@guest"),
+        online,
+        clerkId,
+        createdAt,
+        lastSignInAt,
+        messageCount,
+        activeSessions,
+        banned,
+        banReason,
+        muted,
+        muteReason,
+        mutedUntil
+      };
+
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'internal server error' }));
+    }
+    return
+  }
+
+  if (url.pathname === "/admin/user/sessions" && req.method === "GET") {
+    try {
+      const sessionId = url.searchParams.get('session')
+      const targetEmail = url.searchParams.get('email')
+
+      const sess = sessionId ? getSession(sessionId) : null
+      const sessRole = sess ? getRole(sess.email) : 'user'
+
+      if (!sess || !['admin', 'owner'].includes(sessRole)) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return
+      }
+
+      if (!targetEmail) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return
+      }
+
+      if (targetEmail.endsWith('@guest')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ sessions: [] }));
+        return
+      }
+
+      let clerkId = null
+      const sessionRow = db.prepare(
+        "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+      ).get(targetEmail)
+      clerkId = sessionRow?.clerkId || null
+
+      if (!clerkId) {
+        try {
+          const list = await clerk.users.getUserList({
+            emailAddress: [targetEmail],
+            limit: 1
+          })
+          clerkId = list.data?.[0]?.id || null
+        } catch (e) {
+          console.error('failed to fetch clerk id: ', e)
+         }
+      }
+
+      if (!clerkId) {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ sessions: [] }));
+        return
+      }
+
+      try {
+        const clerkUser = await clerk.users.getUser(clerkId)
+        const sessions = (clerkUser.sessions || []).map(s => ({
+          id: s.id,
+          status: s.status,
+          lastActiveAt: s.lastActiveAt,
+          createdAt: s.createdAt
+        }))
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ sessions }));
+      } catch (e) {
+        console.error('failed to fetch sessions', e)
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'failed to fetch sessions' }));
+      }
+    } catch (e) {
+      console.error('endpoint error: ', e)
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'internal server error' }));
+    }
     return
   }
 
