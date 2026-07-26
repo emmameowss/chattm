@@ -2691,6 +2691,69 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
+  if (url.pathname === "/admin/user/ban" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, reason } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !["admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot ban urself' }));
+          return
+        }
+
+        const targetRole = getRole(targetEmail)
+        const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+        const sessRoleValue = roleValues[sessRole] || 0
+        const targetRoleValue = roleValues[targetRole] || 0
+
+        if (targetRoleValue >= sessRoleValue) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot ban user with equal or higher role" }));
+          return;
+        }
+
+        const banReason = reason || 'no reason given'
+
+        addBan(targetEmail, banReason)
+
+        for (const [, s] of io.sockets.sockets) {
+          if (s.userEmail === targetEmail) {
+            addIpBan(s.userIp)
+            s.emit('banned', banReason)
+            s.skipLeaveMessage = true
+            s.disconnect()
+          }
+        }
+
+        emitAllUserLists()
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        console.error('ban endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
   if (url.pathname === "/messages") {
     const messagesIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
