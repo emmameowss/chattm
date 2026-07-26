@@ -5,6 +5,8 @@ import { existsSync } from "fs";
 const db = new Database("chat.db");
 db.pragma("journal_mode = WAL");
 
+export { db };
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,

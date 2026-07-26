@@ -17,6 +17,7 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  db,
   getHistory,
   addMessage,
   deleteMessage,
@@ -2504,7 +2505,7 @@ httpServer.on("request", async (req, res) => {
       const sess = sessionId ? getSession(sessionId) : null
       const sessRole = sess ? getRole(sess.email) : 'user'
 
-      if (!sess | !["admin", 'owner'].includes(sessRole)) {
+      if (!sess || !["admin", 'owner'].includes(sessRole)) {
         res.writeHead(403, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'forbidden' }));
         return
@@ -2524,7 +2525,7 @@ httpServer.on("request", async (req, res) => {
       const muteData = getMute(targetEmail)
       const muted = !!muteData
       const muteReason = muteData?.reason || null
-      const mutedUntil = muteData?.until || null
+      const muteUntil = muteData?.until || null
 
       let username = null
       for (const [, s] of io.sockets.sockets) {
@@ -2546,7 +2547,7 @@ httpServer.on("request", async (req, res) => {
       ).get(targetEmail)?.count || 0;
 
       const profileData = getProfileData(targetEmail)
-      let createdAt = profileData?.lastSeen || Date.now()
+      let createdAt = profileData?.last_seen || Date.now()
 
       const firstMessage = db.prepare(
         "SELECT MIN(time) as first FROM messages WHERE owner_email = ?"
@@ -2577,7 +2578,7 @@ httpServer.on("request", async (req, res) => {
           if (clerkId) {
             const clerkUser = await clerk.users.getUser(clerkId);
             lastSignInAt = clerkUser.lastSignInAt || null
-            activeSessions = clerkUser.sessions?.filter(s => s.status === "active").length || X509Certificate
+            activeSessions = clerkUser.sessions?.filter(s => s.status === "active").length || 0
 
             if (clerkUser.createdAt && clerkUser.createdAt < createdAt) {
               createdAt = clerkUser.createdAt
@@ -2605,12 +2606,13 @@ httpServer.on("request", async (req, res) => {
         banReason,
         muted,
         muteReason,
-        mutedUntil
+        muteUntil
       };
 
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(result));
     } catch (e) {
+      console.error('Error in /admin/user/info:', e);
       res.writeHead(500, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: 'internal server error' }));
     }
@@ -2647,7 +2649,7 @@ httpServer.on("request", async (req, res) => {
       const sessionRow = db.prepare(
         "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
       ).get(targetEmail)
-      clerkId = sessionRow?.clerkId || null
+      clerkId = sessionRow?.clerk_id || null
 
       if (!clerkId) {
         try {
