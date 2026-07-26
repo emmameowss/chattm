@@ -2754,6 +2754,177 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
+  if (url.pathname === "/admin/user/kick" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, reason } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['mod', "admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot kick urself' }));
+          return
+        }
+
+        const targetRole = getRole(targetEmail)
+        const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+        const sessRoleValue = roleValues[sessRole] || 0
+        const targetRoleValue = roleValues[targetRole] || 0
+
+        if (targetRoleValue >= sessRoleValue) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot kick user with equal or higher role" }));
+          return;
+        }
+
+        const kickReason = reason || 'no reason given'
+
+        let kicked = false
+        for (const [, s] of io.sockets.sockets) {
+          if (s.userEmail === targetEmail) {
+            s.emit('kicked', kickReason)
+            s.skipLeaveMessage = true
+            s.disconnect()
+            kicked = true;
+          }
+        }
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true, kicked }));
+      } catch (e) {
+        console.error('kick endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/mute" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, duration, reason } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['mod', "admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot mute urself' }));
+          return
+        }
+
+        const targetRole = getRole(targetEmail)
+        const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+        const sessRoleValue = roleValues[sessRole] || 0
+        const targetRoleValue = roleValues[targetRole] || 0
+
+        if (targetRoleValue >= sessRoleValue) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot mute user with equal or higher role" }));
+          return;
+        }
+
+        const muteReason = reason || 'no reason given'
+
+        let until = null
+        if (duration !== null && duration !== undefined) {
+          const durationNum = parseInt(duration)
+          if (isNaN(durationNum) || durationNum < 0) {
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid duration' }));
+            return
+          }
+          until = Date.now() + (durationNum * 60 * 1000)
+        }
+
+        setMute(targetEmail, muteReason, until);
+
+        forEachUserSocket(targetEmail, (s) => {
+          s.emit('muted', { reason: muteReason, until });
+        });
+
+        emitAllUserLists()
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true, kicked }));
+      } catch (e) {
+        console.error('mute endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/unmute" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['mod', "admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        deleteMute(targetEmail)
+
+        forEachUserSocket(targetEmail, (s) => {
+          s.emit('unmuted')
+        });
+
+        emitAllUserLists()
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true, kicked }));
+      } catch (e) {
+        console.error('unmute endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
   if (url.pathname === "/messages") {
     const messagesIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
