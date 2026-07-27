@@ -1034,25 +1034,41 @@ button:active {
     pointer-events: none;
 }
 
-.admin-sessions-button {
+.admin-sessions-btn {
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 6px;
-    border-color: var(--border);
-    color: var(--text);
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     font-size: 12px;
-    padding: 8px 12px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
 }
 
-.admin-sessions-button:hover {
-    background: var(--bg);
+.admin-sessions-btn:hover {
+    background: var(--surface);
     border-color: var(--pink);
 }
 
-.admin-sessions-button i {
+.admin-sessions-btn i {
     font-size: 14px;
+    color: var(--muted);
+}
+
+.admin-sessions-btn .button-label {
+    flex: 1;
+    text-align: left;
+    color: var(--muted);
+}
+
+.admin-sessions-btn .button-value {
+    font-weight: 600;
+    color: var(--pink);
 }
 
 .admin-sessions-modal {
