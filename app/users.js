@@ -346,7 +346,7 @@ async function viewUserSessions(email, clerkId) {
   document.body.appendChild(modal)
 
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove()
+    if (e.target === modal && !document.querySelector('#modal-overlay[style*="flex"]')) modal.remove()
   })
 
   try {
@@ -407,7 +407,7 @@ async function viewUserSessions(email, clerkId) {
       const revokeBtn = document.createElement('button')
       revokeBtn.className = 'admin-session-revoke-btn'
       revokeBtn.innerHTML = '<i class="ti ti-logout"></i> revoke'
-      revokeBtn.onclick = () => revokeSession(email, sess.id, item, revokeAllBtn, data.sessions.length)
+      revokeBtn.onclick = () => revokeSession(email, sess.id, item, revokeAllBtn, data.sessions.length, modal)
       actions.appendChild(revokeBtn)
 
       itemHeader.appendChild(actions)
@@ -425,12 +425,20 @@ async function viewUserSessions(email, clerkId) {
   }
 }
 
-async function revokeSession(email, sessionId, itemElement, revokeAllBtn, totalSessions) {
+async function revokeSession(email, sessionId, itemElement, revokeAllBtn, totalSessions, modal) {
+  modal.style.display = 'none';
+
   const confirmed = await showModal({
     message: 'revoke session?',
     withInput: false
   })
-  if (!confirmed) return
+
+  if (!confirmed) {
+    modal.style.display = 'flex';
+    return;
+  }
+
+  modal.style.display = 'flex';
 
   const btn = itemElement.querySelector('.admin-session-revoke-btn')
   btn.disabled = true
@@ -469,11 +477,19 @@ async function revokeSession(email, sessionId, itemElement, revokeAllBtn, totalS
 }
 
 async function revokeAllSessions(email, clerkId, modal) {
+  modal.style.display = 'none';
+
   const confirmed = await showModal({
     message: 'revoke all sessions for this user?',
     withInput: false
   })
-  if (!confirmed) return
+
+  if (!confirmed) {
+    modal.style.display = 'flex';
+    return;
+  }
+
+  modal.style.display = 'flex';
 
   const btn = modal.querySelector('.admin-sessions-revoke-all-btn')
   btn.disabled = true
