@@ -256,7 +256,9 @@ if (session) {
 
   let chosenUsername = null;
   try {
-    const me = await fetch(`/me?session=${encodeURIComponent(session)}`).then(
+    const me = await fetch(`/me`, {
+      credentials: 'same-origin'
+    }).then(
       (r) => r.json(),
     );
     if (!me.guest && !me.username)
@@ -971,10 +973,11 @@ if (session) {
         formData.append("notes", emojiSuggestNotes.value.trim());
         formData.append("username", username || "");
         const res = await fetch(
-          `/suggest-emoji?session=${encodeURIComponent(session || "")}`,
+          `/suggest-emoji`,
           {
             method: "POST",
             body: formData,
+            credentials: 'same-origin'
           },
         );
         const json = await res.json();
@@ -1020,7 +1023,10 @@ if (session) {
     myEmojiList.innerHTML = '<div class="my-emoji-empty">loading...</div>';
     try {
       const res = await fetch(
-        `/my-pending-emojis?session=${encodeURIComponent(session || "")}`,
+        `/my-pending-emojis`,
+        {
+          credentials: 'same-origin'
+        }
       );
       if (!res.ok) throw new Error(await res.text());
       const items = await res.json();
@@ -1772,10 +1778,11 @@ if (session) {
     formData.append("file", file);
     formData.append("username", username);
     const res = await fetch(
-      `${window.location.origin}/upload?session=${encodeURIComponent(session || "")}`,
+      `${window.location.origin}/upload`,
       {
         method: "POST",
         body: formData,
+        credentials: 'same-origin'
       },
     );
     const { url } = await res.json();
@@ -1855,9 +1862,8 @@ if (session) {
 
   // sign out button thingys
   document.querySelector("#signout").addEventListener("click", () => {
-    const session = localStorage.getItem("session");
     localStorage.removeItem("session");
-    window.location.href = `/signout?session=${session}`;
+    window.location.href = `/signout`;
   });
 
   // stats panel
@@ -2415,7 +2421,10 @@ if (session) {
       '<div class="admin-emoji-loading">loading...</div>';
     try {
       const res = await fetch(
-        `/pending-emojis?session=${encodeURIComponent(session || "")}`,
+        `/pending-emojis`,
+        {
+          credentials: 'same-origin'
+        }
       );
       const items = await res.json();
       adminEmojiList.innerHTML = "";

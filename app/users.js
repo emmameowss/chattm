@@ -130,7 +130,9 @@ function copyToClipboard(text) {
 
 async function fetchUserInfo(email) {
   try {
-    const res = await fetch(`/admin/user/info?session=${encodeURIComponent(session)}&email=${encodeURIComponent(email)}`);
+    const res = await fetch(`/admin/user/info?email=${encodeURIComponent(email)}`, {
+      credentials: 'same-origin'
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -407,7 +409,9 @@ async function viewUserSessions(email, clerkId) {
   })
 
   try {
-    const res = await fetch(`/admin/user/sessions?session=${encodeURIComponent(session)}&email=${encodeURIComponent(email)}`)
+    const res = await fetch(`/admin/user/sessions?email=${encodeURIComponent(email)}`, {
+      credentials: 'same-origin'
+    });
     const data = await res.json()
 
     if (!res.ok || !data.sessions) {
@@ -653,7 +657,9 @@ async function unbanUser(email, username) {
 
 async function fetchClerkStatus(email) {
   try {
-    const res = await fetch(`/admin/user/clerk-status?session=${encodeURIComponent(session)}&email=${encodeURIComponent(email)}`)
+    const res = await fetch(`/admin/user/clerk-status?email=${encodeURIComponent(email)}`, {
+      credentials: 'same-origin'
+    });
     if (!res.ok) return false
     const data = await res.json()
     return data.clerkBanned || false

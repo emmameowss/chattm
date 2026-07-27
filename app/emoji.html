@@ -21,7 +21,9 @@
           if (!session) window.location.href = "/"
 
           async function loadPending() {
-            const res = await fetch(`/pending-emojis?session=${encodeURIComponent(session)}`)
+            const res = await fetch(`/pending-emojis`, {
+              credentials: 'same-origin'
+            })
             const items = await res.json()
             const list = document.querySelector('#admin-emoji-list')
             list.innerHTML = ''
@@ -55,7 +57,8 @@
             await fetch(`/admin/emoji/${action}`, {
               method: "POST",
               headers: { "content-type": 'application/json' },
-              body: JSON.stringify({ id, session, reason })
+              body: JSON.stringify({ id, session, reason }),
+              credentials: 'same-origin'
             })
             await loadPending()
           }

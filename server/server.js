@@ -1616,7 +1616,7 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/me") {
-    const sessionId = url.searchParams.get("session");
+    const sessionId = parseCookies(req).session;
     const s = getSession(sessionId);
     if (!s) {
       res.writeHead(401);
@@ -1634,8 +1634,7 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/signout") {
-    const sessionId =
-      url.searchParams.get("session") || parseCookies(req).session;
+    const sessionId = parseCookies(req).session;
     if (sessionId) {
       deleteSession(sessionId);
     }
@@ -1682,7 +1681,7 @@ httpServer.on("request", async (req, res) => {
       return;
     }
 
-    const uploadSessionId = url.searchParams.get("session");
+    const uploadSessionId = parseCookies(req).session;
     const uploadSession = uploadSessionId ? getSession(uploadSessionId) : null;
     if (!uploadSession) {
       res.writeHead(401);
@@ -1916,7 +1915,7 @@ httpServer.on("request", async (req, res) => {
       res.end();
       return;
     }
-    const suggestSessionId = url.searchParams.get("session");
+    const suggestSessionId = parseCookies(req).session;
     const suggestSession = suggestSessionId
       ? getSession(suggestSessionId)
       : null;
@@ -2039,7 +2038,7 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/my-pending-emojis") {
-    const mpeSessionId = url.searchParams.get("session");
+    const mpeSessionId = parseCookies(req).session;
     const mpeSession = mpeSessionId ? getSession(mpeSessionId) : null;
     if (!mpeSession) {
       res.writeHead(401, { "content-type": "application/json" });
@@ -2057,7 +2056,7 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/pending-emojis") {
-    const peSessionId = url.searchParams.get("session");
+    const peSessionId = parseCookies(req).session;
     const peSession = peSessionId ? getSession(peSessionId) : null;
     const peRole = peSession ? getRole(peSession.email) : "user"
     if (!peSession || !["admin", "owner"].includes(peRole)) {
@@ -2509,7 +2508,7 @@ httpServer.on("request", async (req, res) => {
 
   if (url.pathname === '/admin/user/info' && req.method === "GET") {
     try {
-      const sessionId = url.searchParams.get('session')
+      const sessionId = parseCookies(req).session;
       const targetEmail = url.searchParams.get('email')
 
       const sess = sessionId ? getSession(sessionId) : null
@@ -2641,7 +2640,7 @@ httpServer.on("request", async (req, res) => {
 
   if (url.pathname === "/admin/user/sessions" && req.method === "GET") {
     try {
-      const sessionId = url.searchParams.get('session')
+      const sessionId = parseCookies(req).session;
       const targetEmail = url.searchParams.get('email')
 
       const sess = sessionId ? getSession(sessionId) : null
@@ -3364,7 +3363,7 @@ httpServer.on("request", async (req, res) => {
 
   if (url.pathname === "/admin/user/clerk-status" && req.method === "GET") {
     try {
-      const sessionId = url.searchParams.get('session')
+      const sessionId = parseCookies(req).session;
       const targetEmail = url.searchParams.get('email')
 
       const sess = sessionId ? getSession(sessionId) : null
