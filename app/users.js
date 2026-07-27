@@ -213,7 +213,7 @@ async function kickUser(email, username) {
       await refreshDetailView()
       socket.emit('getAdminUsers');
     } else {
-      showToast(data.errror || 'failed to kick', 'error')
+      showToast(data.error || 'failed to kick', 'error')
       btn.classList.remove('loading');
       btn.disabled = false;
       btn.innerHTML = originalHTML;
