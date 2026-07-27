@@ -1905,6 +1905,12 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/suggest-emoji") {
+
+    // will reenable after full admin panel completed
+    res.writeHead(503, {'content-type': 'application/json'})
+    res.end(JSON.stringify({error: 'emoji submissions are currently disabled because the actual rewritten systems have not even been touched yet'}))
+    return
+    /*
     if (req.method !== "POST") {
       res.writeHead(405);
       res.end();
@@ -2028,6 +2034,8 @@ httpServer.on("request", async (req, res) => {
       }
     });
     return;
+
+    */
   }
 
   if (url.pathname === "/my-pending-emojis") {
