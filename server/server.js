@@ -3014,7 +3014,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const currentRole = getRole(targetEmail)
-        if (currentRole === 'owner' && sess.role !== 'owner') {
+        if (currentRole === 'owner' && sessRole !== 'owner') {
           res.writeHead(403, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'only owner can set/remove owner role' }));
           return
