@@ -697,7 +697,7 @@ async function lesbians(user) {
 
     const modStatusTitle = document.createElement('div')
     modStatusTitle.className = 'admin-detail-section-title'
-    modStatusTitle.textContent = 'moderation statys'
+    modStatusTitle.textContent = 'moderation status'
     modStatusSection.appendChild(modStatusTitle)
 
     if (fullUser.banned) {

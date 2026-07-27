@@ -2894,7 +2894,7 @@ httpServer.on("request", async (req, res) => {
         emitAllUserLists()
 
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ success: true, kicked }));
+        res.end(JSON.stringify({ success: true, muteReason, until }));
       } catch (e) {
         console.error('mute endpoint error: ', e)
         res.writeHead(400, { 'content-type': 'application/json' });
