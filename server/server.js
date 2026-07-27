@@ -2940,7 +2940,7 @@ httpServer.on("request", async (req, res) => {
 
         if (!sess || !["admin", 'owner'].includes(sessRole)) {
           res.writeHead(403, { 'content-type': 'application/json' });
-          res.end(JSON.parse({ 'error': 'forbidden' }));
+          res.end(JSON.stringify({ 'error': 'forbidden' }));
           return
         }
 
@@ -2963,7 +2963,7 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
-        if (sessRole === "admin" && !["user", mod].includes(newRole)) {
+        if (sessRole === "admin" && !["user", "mod"].includes(newRole)) {
           res.writeHead(403, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'admins can only promote to mod' }));
           return
