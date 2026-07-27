@@ -3306,6 +3306,54 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
+  if (url.pathname === "/admin/user/unban" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => {body += d})
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['admin', 'owner'].includes(sessRole)) {
+          res.writeHead(403, {'content-type': 'application/json'})
+          res.end(JSON.stringify({error: 'forbidden'}))
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, {'content-type': 'application/json'})
+          res.end(JSON.stringify({error: 'email required'}))
+          return
+        }
+
+        removeBan(targetEmail)
+
+        for (const [,s] of io.sockets.sockets) {
+          if (s.userEmail === targetEmail && s.userIp) {
+            removeIpBan(s.userIp)
+          }
+        }
+
+        for (const [,s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userUnbanned', targetEmail)
+          }
+        }
+
+        emitAllUserLists()
+
+        res.writeHead(200, {'content-type': 'application/json'})
+        res.end(JSON.stringify({success: true}))
+      } catch (e) {
+        console.error('unban endpoint error:', e);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'internal server error' }));
+      }
+    })
+    return
+  }
+
   if (url.pathname === "/messages") {
     const messagesIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||

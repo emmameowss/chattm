@@ -607,6 +607,44 @@ async function banClerkAccount(email, username, clerkId) {
   }
 }
 
+async function unbanUser(email, username) {
+  const confirmed = await showModal({
+    message: `unban ${username}?`,
+    withInput: false
+  })
+  if (!confirmed) return
+
+  const btn = event.target.closest('button');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> unbanning...';
+
+  try {
+    const res = await fetch('/admin/user/unban', {
+      method: "POST",
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({session, email})
+    })
+    const data = await res.json()
+    if (data.success) {
+      showToast('user unbanned', 'success')
+      await refreshDetailView()
+      socket.emit('getAdminUsers')
+    } else {
+      showToast(data.error || 'failed to unban user', 'error')
+      btn.classList.remove('loading')
+      btn.disabled = false
+      btn.innerHTML = originalHTML
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+    btn.classList.remove('loading')
+    btn.disabled = false
+    btn.innerHTML = originalHTML
+  }
+}
+
 
 let selectedUser = null;
 let usersData = [];
@@ -928,7 +966,13 @@ async function lesbians(user) {
       actionsDiv.appendChild(banClerkBtn)
     }
 
-    if (!fullUser.banned) {
+    if (fullUser.banned) {
+      const unbanBtn = document.createElement('button');
+      unbanBtn.className = 'positive';
+      unbanBtn.innerHTML = '<i class="ti ti-ban"></i> unban user';
+      unbanBtn.onclick = () => banUser(fullUser.email, fullUser.username);
+      actionsDiv.appendChild(unbanBtn);
+    } else {
       const banBtn = document.createElement('button');
       banBtn.className = 'destructive';
       banBtn.innerHTML = '<i class="ti ti-ban"></i> ban user';
