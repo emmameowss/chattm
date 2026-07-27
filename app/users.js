@@ -150,6 +150,12 @@ async function banUser(email, username) {
   });
   if (!reason) return
 
+  const btn = event.target.closest('button');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> banning...';
+
   try {
     const res = await fetch('/admin/user/ban', {
       method: 'POST',
@@ -163,9 +169,15 @@ async function banUser(email, username) {
       socket.emit('getAdminUsers');
     } else {
       showToast(data.error || 'failed to ban user', 'error')
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error')
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
   }
 }
 
@@ -177,6 +189,12 @@ async function kickUser(email, username) {
   });
   if (!reason) return
 
+  const btn = event.target.closest('button');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> kicking...';
+
   try {
     const res = await fetch('/admin/user/kick', {
       method: "POST",
@@ -186,11 +204,19 @@ async function kickUser(email, username) {
     const data = await res.json()
     if (data.success) {
       showToast(data.kicked ? 'user kicked' : 'user was offline', 'success')
+      await refreshDetailView()
+      socket.emit('getAdminUsers');
     } else {
       showToast(data.errror || 'failed to kick', 'error')
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error')
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
   }
 }
 
@@ -222,6 +248,13 @@ async function muteUser(email, username) {
     defaultValue: 'not meowing enough'
   })
   if (!reason) return
+
+  const btn = event.target.closest('button');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> muting...';
+
   try {
     const res = await fetch('/admin/user/mute', {
       method: "POST",
@@ -235,9 +268,15 @@ async function muteUser(email, username) {
       socket.emit('getAdminUsers')
     } else {
       showToast(data.error || 'failed to mute user', 'error')
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error')
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
   }
 }
 
@@ -246,6 +285,12 @@ async function unmuteUser(email, username) {
     message: `unmute ${username}?`
   });
   if (!confirmed) return;
+
+  const btn = event.target.closest('button');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  const originalHTML = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> unmuting...';
 
   try {
     const res = await fetch('/admin/user/unmute', {
@@ -260,9 +305,15 @@ async function unmuteUser(email, username) {
       socket.emit('getAdminUsers');
     } else {
       showToast(data.error || 'failed to unmute user', 'error');
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
   }
 }
 
@@ -516,6 +567,43 @@ async function revokeAllSessions(email, clerkId, modal) {
     showToast('error: ' + e.message, 'error')
     btn.disabled = false
     btn.innerHTML = '<i class="ti ti-logout></i> revoke all sessions'
+  }
+}
+
+async function banClerkAccount(email, username, clerkId) {
+  const confirmed = await showModal({
+    message: 'ban clerk account? this decision cannot be reversed from the chat™ admin panel.',
+    withInput: false
+  })
+  if (!confirmed) return
+
+  const btn = event.target.closest('button')
+  btn.classList.add('loading')
+  btn.disabled = true
+  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> banning account...';
+
+  try {
+    const res = await fetch('/admin/user/ban-clerk', {
+      method: "POST",
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({session,email,clerkId})
+    })
+    const data = await res.json()
+
+    if (data.success) {
+      showToast('clerk account has been banned', 'success')
+      await refreshDetailView()
+    } else {
+      showToast(data.error || 'failed to ban clerk account', 'error')
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-ban"></i> ban clerk account';
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-ban"></i> ban clerk account';
   }
 }
 
@@ -827,29 +915,42 @@ async function lesbians(user) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'admin-detail-actions';
 
+    if (uRole === "owner" && !fullUser.guest && fullUser.clerkId) {
+      const banClerkSection = document.createElement('div');
+      banClerkSection.className = 'admin-ban-clerk-section';
+
+      const banClerkBtn = document.createElement('button');
+      banClerkBtn.className = 'admin-ban-clerk-btn';
+      banClerkBtn.innerHTML = '<i class="ti ti-ban"></i> ban clerk account';
+      banClerkBtn.onclick = () => banClerkAccount(fullUser.email, fullUser.username, fullUser.clerkId);
+
+
+      actionsDiv.appendChild(banClerkBtn)
+    }
+
     if (!fullUser.banned) {
       const banBtn = document.createElement('button');
-      banBtn.className = 'danger';
+      banBtn.className = 'destructive';
       banBtn.innerHTML = '<i class="ti ti-ban"></i> ban user';
       banBtn.onclick = () => banUser(fullUser.email, fullUser.username);
       actionsDiv.appendChild(banBtn);
     }
 
     const kickBtn = document.createElement('button');
-    kickBtn.className = 'warning';
+    kickBtn.className = 'moderate';
     kickBtn.innerHTML = '<i class="ti ti-user-x"></i> kick user';
     kickBtn.onclick = () => kickUser(fullUser.email, fullUser.username);
     actionsDiv.appendChild(kickBtn);
 
     if (fullUser.muted) {
       const unmuteBtn = document.createElement('button');
-      unmuteBtn.className = 'success';
+      unmuteBtn.className = 'positive';
       unmuteBtn.innerHTML = '<i class="ti ti-volume"></i> unmute user';
       unmuteBtn.onclick = () => unmuteUser(fullUser.email, fullUser.username);
       actionsDiv.appendChild(unmuteBtn);
     } else {
       const muteBtn = document.createElement('button');
-      muteBtn.className = 'warning';
+      muteBtn.className = 'moderate';
       muteBtn.innerHTML = '<i class="ti ti-volume-3"></i> mute user';
       muteBtn.onclick = () => muteUser(fullUser.email, fullUser.username);
       actionsDiv.appendChild(muteBtn);
@@ -916,5 +1017,36 @@ socket.on('connect', () => {
 socket.on('uRole', (role) => {
   uRole = role
 })
+
+// Auto-refresh on user data changes
+socket.on('userBanned', (bannedEmail) => {
+  if (selectedUser && selectedUser.email === bannedEmail) {
+    refreshDetailView();
+  }
+});
+
+socket.on('userUnbanned', (unbannedEmail) => {
+  if (selectedUser && selectedUser.email === unbannedEmail) {
+    refreshDetailView();
+  }
+});
+
+socket.on('userMuted', (mutedEmail) => {
+  if (selectedUser && selectedUser.email === mutedEmail) {
+    refreshDetailView();
+  }
+});
+
+socket.on('userUnmuted', (unmutedEmail) => {
+  if (selectedUser && selectedUser.email === unmutedEmail) {
+    refreshDetailView();
+  }
+});
+
+socket.on('userRoleChanged', (changedEmail) => {
+  if (selectedUser && selectedUser.email === changedEmail) {
+    refreshDetailView();
+  }
+});
 
 socket.on('commandError', (msg) => showToast(msg, 'error'));

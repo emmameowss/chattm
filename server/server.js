@@ -2761,6 +2761,13 @@ httpServer.on("request", async (req, res) => {
           }
         }
 
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userBanned', targetEmail);
+          }
+        }
+
         emitAllUserLists()
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
@@ -2891,6 +2898,13 @@ httpServer.on("request", async (req, res) => {
           s.emit('muted', { reason: muteReason, until });
         });
 
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userMuted', targetEmail);
+          }
+        }
+
         emitAllUserLists()
 
         res.writeHead(200, { 'content-type': 'application/json' });
@@ -2930,6 +2944,13 @@ httpServer.on("request", async (req, res) => {
         forEachUserSocket(targetEmail, (s) => {
           s.emit('unmuted')
         });
+
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userUnmuted', targetEmail);
+          }
+        }
 
         emitAllUserLists()
 
@@ -3029,6 +3050,13 @@ httpServer.on("request", async (req, res) => {
             forEachUserSocket(targetEmail, (s) => {
               s.cachedVerified = false
             })
+          }
+        }
+
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userRoleChanged', targetEmail);
           }
         }
 

@@ -841,7 +841,7 @@ button:active {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 16px;
     width: 100%;
-    margin-top: 8px;
+    margin-top: 12px;
 }
 
 .admin-detail-section-title {
@@ -926,6 +926,98 @@ button:active {
 .admin-detail-actions button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.admin-detail-actions button.loading {
+    opacity: 0.7;
+    pointer-events: none;
+    position: relative;
+}
+
+.admin-detail-actions button.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Button color coding */
+.admin-detail-actions button.destructive {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.admin-detail-actions button.destructive:hover {
+    background: var(--danger-dim);
+}
+
+.admin-detail-actions button.moderate {
+    border-color: #fc0;
+    color: #fc0;
+}
+
+.admin-detail-actions button.moderate:hover {
+    background: rgba(255, 204, 0, 0.15);
+}
+
+.admin-detail-actions button.management {
+    border-color: #0a84ff;
+    color: #0a84ff;
+}
+
+.admin-detail-actions button.management:hover {
+    background: rgba(10, 132, 255, 0.15);
+}
+
+.admin-detail-actions button.positive {
+    border-color: #34c759;
+    color: #34c759;
+}
+
+.admin-detail-actions button.positive:hover {
+    background: rgba(52, 199, 89, 0.15);
+}
+
+.admin-ban-clerk-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.admin-ban-clerk-btn {
+    width: 100%;
+    justify-content: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-color: var(--danger);
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.admin-ban-clerk-btn:hover {
+    background: var(--danger-dim);
+}
+
+.admin-ban-clerk-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.admin-ban-clerk-btn.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.admin-ban-clerk-btn i {
+    font-size: 16px;
+}
+
+.admin-loading-spinner {
+    display: inline-block;
+    animation: spin 1s linear infinite;
 }
 
 .admin-clerk-id {
@@ -1258,12 +1350,12 @@ button:active {
         height: auto;
         max-height: none;
     }
-    
+
     .admin-users-sidebar {
         width: 100%;
         max-height: 400px;
     }
-    
+
     .admin-users-detail {
         min-height: 400px;
     }
@@ -3297,7 +3389,7 @@ body.admin-page {
         right: 10px;
         left: 10px;
     }
-    
+
     .toast {
         max-width: 100%;
     }
