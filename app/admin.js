@@ -164,6 +164,8 @@ async function loadStats() {
 
 socket.on('usercount', (count) => {
   document.querySelector('#admin-online-count').textContent = count;
+  const label = document.querySelector('.admin-online-count span:last-child');
+  label.textContent = count === 1 ? 'user online' : 'users online';
 });
 
 loadStats();
