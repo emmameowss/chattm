@@ -351,7 +351,7 @@ async function viewUserSessions(email, clerkId) {
 
   try {
     const res = await fetch(`/admin/user/sessions?session=${encodeURIComponent(session)}&email=${encodeURIComponent(email)}`)
-    const data = res.json()
+    const data = await res.json()
 
     if (!res.ok || !data.sessions) {
       body.innerHTML = '<div class="admin-sessions-empty">Failed to load sessions</div>';

@@ -2682,12 +2682,17 @@ httpServer.on("request", async (req, res) => {
       }
 
       try {
-        const clerkUser = await clerk.users.getUser(clerkId)
-        const sessions = (clerkUser.sessions || []).map(s => ({
+        const sessionList = await clerk.sessions.getSessionList({
+          userId: clerkId,
+          status: 'active'
+        });
+        
+        const sessions = (sessionList.data || []).map(s => ({
           id: s.id,
           status: s.status,
           lastActiveAt: s.lastActiveAt,
-          createdAt: s.createdAt
+          createdAt: s.createdAt,
+          clientType: s.latestActivity?.deviceType || 'unknown'
         }))
 
         res.writeHead(200, { 'content-type': 'application/json' });
