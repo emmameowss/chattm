@@ -645,6 +645,18 @@ async function unbanUser(email, username) {
   }
 }
 
+async function fetchClerkStatus(email) {
+  try {
+    const res = await fetch(`/admin/user/clerk-status?session=${encodeURIComponent(session)}&email=${encodeURIComponent(email)}`)
+    if (!res.ok) return false
+    const data = await res.json()
+    return data.clerkBanned || false
+  } catch (e) {
+    console.error('failed to fetch: ', e)
+    return false
+  }
+}
+
 
 let selectedUser = null;
 let usersData = [];
@@ -967,11 +979,20 @@ async function lesbians(user) {
     }
 
     if (fullUser.banned) {
-      const unbanBtn = document.createElement('button');
-      unbanBtn.className = 'positive';
-      unbanBtn.innerHTML = '<i class="ti ti-ban"></i> unban user';
-      unbanBtn.onclick = () => banUser(fullUser.email, fullUser.username);
-      actionsDiv.appendChild(unbanBtn);
+      const clerkBanned = await fetchClerkStatus(fullUser.email)
+
+      if (!clerkBanned) {
+        const unbanBtn = document.createElement('button');
+        unbanBtn.className = 'positive';
+        unbanBtn.innerHTML = '<i class="ti ti-ban"></i> unban user';
+        unbanBtn.onclick = () => unbanUser(fullUser.email, fullUser.username);
+        actionsDiv.appendChild(unbanBtn);
+      } else {
+        const bannedMsg = document.createElement('div');
+        bannedMsg.style.cssText = 'padding: 10px 12px; background: var(--danger-dim); border: 1px solid var(--danger); border-radius: var(--radius); color: var(--danger); font-size: 12px; text-align: center;';
+        bannedMsg.innerHTML = '<i class="ti ti-ban"></i> clerk account banned - cannot unban';
+        actionsDiv.appendChild(bannedMsg);
+      }
     } else {
       const banBtn = document.createElement('button');
       banBtn.className = 'destructive';

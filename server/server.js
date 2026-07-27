@@ -3354,6 +3354,61 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
+  if (url.pathname === "/admin/user/clerk-status" && req.method === "GET") {
+    try {
+      const sessionId = url.searchParams.get('session')
+      const targetEmail = url.searchParams.get('email')
+
+      const sess = sessionId ? getSession(sessionId) : null
+      const sessRole = sess ? getRole(sess.email) : 'user'
+
+      if (!sess || !['admin', 'owner'].includes(sessRole)) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return;
+      }
+
+      if (!targetEmail) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return;
+      }
+
+      if (targetEmail.endsWith('@guest')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ clerkBanned: false }));
+        return;
+      }
+
+      try {
+        const list = await clerk.users.getUserList({
+          emailAddress: [targetEmail],
+          limit: 1
+        });
+        const clerkUser = list.data?.[0];
+
+        if (!clerkUser) {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ clerkBanned: false }));
+          return;
+        }
+
+        const isBanned = clerkUser.banned || false;
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ clerkBanned: isBanned }));
+      } catch (e) {
+        console.error('failed to check clerk ban status:', e);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'failed to check clerk ban status' }));
+      }
+    } catch (e) {
+      console.error('clerk status error:', e);
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'failed to check clerk ban status' }));
+    }
+  }
+
   if (url.pathname === "/messages") {
     const messagesIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
