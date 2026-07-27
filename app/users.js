@@ -135,7 +135,7 @@ async function refreshDetailView() {
   const info = await fetchUserInfo(selectedUser.email)
   if (info) {
     selectedUser = { ...selectedUser, ...info };
-    renderDetailView(selectedUser);
+    lesbians(selectedUser);
   }
 }
 
@@ -345,7 +345,7 @@ function renderUsers(users) {
       row.addEventListener('click', () => {
         selectedUser = u;
         renderUsers(usersData);
-        renderDetailView(u);
+        lesbians(u);
       });
       sidebar.appendChild(row);
     }
@@ -355,7 +355,7 @@ function renderUsers(users) {
   section('guests', guests);
 }
 
-async function renderDetailView(user) {
+async function lesbians(user) {
   const detail = document.querySelector('#admin-users-detail')
   detail.innerHTML = '<div class="admin-loading">Loading...</div>';
 
