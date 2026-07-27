@@ -57,9 +57,9 @@
               headers: { "content-type": 'application/json' },
               body: JSON.stringify({ id, session, reason })
             })
-            loadPending()
+            await loadPending()
           }
-          loadPending()
+          await loadPending()
         </script>
     </body>
 </html>
