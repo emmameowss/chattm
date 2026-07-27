@@ -953,7 +953,7 @@ async function lesbians(user) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'admin-detail-actions';
 
-    if (uRole === "owner" && !fullUser.guest && fullUser.clerkId) {
+    if (uRole === "owner" && !fullUser.guest && fullUser.clerkId && !fullUser.banned) {
       const banClerkSection = document.createElement('div');
       banClerkSection.className = 'admin-ban-clerk-section';
 
