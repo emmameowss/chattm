@@ -19,6 +19,19 @@ function nameHash(name) {
   return hash;
 }
 
+function showStatus(msg, color = "gray") {
+  const e = document.querySelector("#upload-status");
+  e.textContent = msg;
+  e.style.display = "block";
+  e.style.color = color || "gray";
+}
+
+function hideStatus() {
+  const e = document.querySelector("#upload-status");
+  e.style.display = "none";
+  e.textContent = "";
+}
+
 function getNameColor(name) {
   if (!name) return "var(--muted)";
   if (name.toLowerCase() === "emma") return "hotpink";
@@ -112,11 +125,6 @@ function devInstanceBanner() {
   }
 }
 
-function mobileWarning() {
-  if (window.innerWidth <= 600) {
-    showStatus(`site isn't optimized for mobile`, "hotpink");
-  }
-}
 
 function loadVersionStatus(forceRefresh = false) {
   fetch(`/version${forceRefresh ? "?refresh=1" : ""}`)
@@ -316,7 +324,6 @@ if (session) {
   }
 
   updateProfileBtn();
-  mobileWarning();
   document.querySelector("#profile-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     openProfile(username);
@@ -1822,18 +1829,7 @@ if (session) {
   }
 
   // status stuff
-  function showStatus(msg, color = "gray") {
-    const e = document.querySelector("#upload-status");
-    e.textContent = msg;
-    e.style.display = "block";
-    e.style.color = color || "gray";
-  }
 
-  function hideStatus() {
-    const e = document.querySelector("#upload-status");
-    e.style.display = "none";
-    e.textContent = "";
-  }
   // beep
   function getaudioctx() {
     if (!audioctx) {
