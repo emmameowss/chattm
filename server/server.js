@@ -2686,7 +2686,7 @@ httpServer.on("request", async (req, res) => {
           userId: clerkId,
           status: 'active'
         });
-        
+
         const sessions = (sessionList.data || []).map(s => ({
           id: s.id,
           status: s.status,
@@ -2934,7 +2934,7 @@ httpServer.on("request", async (req, res) => {
         emitAllUserLists()
 
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ success: true, kicked }));
+        res.end(JSON.stringify({ success: true }));
       } catch (e) {
         console.error('unmute endpoint error: ', e)
         res.writeHead(400, { 'content-type': 'application/json' });
