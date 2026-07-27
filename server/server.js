@@ -2316,7 +2316,7 @@ httpServer.on("request", async (req, res) => {
         const sess = sessionId ? getSession(sessionId) : null
         const sessRole = sess ? getRole(sess.email) : 'user'
 
-        if (!sess | sessRole !== "owner") {
+        if (!sess || sessRole !== "owner") {
           res.writeHead(403, { 'content-type': 'application/json' })
           res.end(JSON.stringify({ error: 'forbidden' }))
           return
@@ -2388,7 +2388,7 @@ httpServer.on("request", async (req, res) => {
         const sess = sessionId ? getSession(sessionId) : null
         const sessRole = sess ? getRole(sess.email) : 'user'
 
-        if (!sess | sessRole !== "owner") {
+        if (!sess || sessRole !== "owner") {
           res.writeHead(403, { 'content-type': 'application/json' })
           res.end(JSON.stringify({ error: 'forbidden' }))
           return
