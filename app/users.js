@@ -425,6 +425,48 @@ async function viewUserSessions(email, clerkId) {
   }
 }
 
+async function revokeSession(email, sessionId, itemElement, revokeAllBtn, totalSessions) {
+  const confirmed = await showModal({
+    message: 'revoke session?',
+    withInput: false
+  })
+  if (!confirmed) return
+
+  const btn = itemElement.querySelector('.admin-session-revoke-btn')
+  btn.disabled = true
+  btn.innerHTML = '<i class="ti ti-loader"></i> revoking...';
+
+  try {
+    const res = await fetch('/admin/user/revoke-session', {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({session, email, sessionId})
+    });
+    const data = await res.json()
+
+    if (data.success) {
+      showToast('session revoked', 'success')
+      itemElement.remove()
+
+      const remaining = document.querySelectorAll('.admin-session-item').length
+      if (remaining === 0) {
+        document.querySelector('.admin-sessions-modal-body').innerHTML =
+          '<div class="admin-sessions-empty">No active sessions</div>';
+        revokeAllBtn.disabled = true
+      }
+
+      await refreshDetailView()
+    } else {
+      showToast(data.error || 'failed to revoke session', 'error')
+      btn.disabled = false
+      btn.innerHTML = '<i class="ti ti-logout"></i> revoke'
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+    btn.disabled = false
+    btn.innerHTML = '<i class="ti ti-logout"></i> revoke'
+  }
+}
 
 
 
