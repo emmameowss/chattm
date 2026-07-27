@@ -468,6 +468,40 @@ async function revokeSession(email, sessionId, itemElement, revokeAllBtn, totalS
   }
 }
 
+async function revokeAllSessions(email, clerkId, modal) {
+  const confirmed = await showModal({
+    message: 'revoke all sessions for this user?',
+    withInput: false
+  })
+  if (!confirmed) return
+
+  const btn = modal.querySelector('.admin-sessions-revoke-all-btn')
+  btn.disabled = true
+  btn.innerHTML = '<i class="ti ti-loader"></i> revoking...'
+
+  try {
+    const res = await fetch('/admin/user/revoke-all-sessions', {
+      method: "POST",
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({session,email})
+    })
+    const data = await res.json()
+
+    if (data.success) {
+      showToast(`revoked ${data.count} session(s)`, 'success')
+      modal.remove()
+      await refreshDetailView()
+    } else {
+      showToast(data.error || 'failed to revoke sessions', 'error')
+      btn.disabled = false
+      btn.innerHTML = '<i class="ti ti-logout></i> revoke all sessions'
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+    btn.disabled = false
+    btn.innerHTML = '<i class="ti ti-logout></i> revoke all sessions'
+  }
+}
 
 
 let selectedUser = null;
