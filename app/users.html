@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>chat™ admin | users</title>
+        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    </head>
+    <body class="admin-page">
+        <h1>chat™</h1>
+        <nav class="admin-nav">
+          <div class="admin-nav-tabs">
+            <a href="/admin">home</a>
+            <a href="/admin/users" class="active">users</a>
+            <a id='emoji'>emoji</a>
+          </div>
+          <a href="/" class="admin-nav-back">← back to chat™</a>
+        </nav>
+        <div class="admin-users-container">
+            <div class="admin-users-sidebar" id="admin-users-sidebar">
+
+            </div>
+
+            <div class="admin-users-detail" id="admin-users-detail">
+                <div class="admin-users-detail-empty">
+                    select a user to view details
+                </div>
+            </div>
+        </div>
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="/users.js"></script>
+        <div id="modal-overlay" style="display: none">
+            <div id="modal-box">
+                <p id="modal-message"></p>
+                <input type="text" id="modal-input" style="display: none" />
+                <div id="modal-actions">
+                    <button type="button" id="modal-cancel">cancel</button>
+                    <button type="button" id="modal-confirm">confirm</button>
+                </div>
+            </div>
+        </div>
+        <div id="toast-container"></div>
+    </body>
+</html>
