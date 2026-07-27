@@ -11,7 +11,7 @@ let uRole = 'user'
 
 const emojiTab = document.querySelector('#emoji')
 
-emoji.addEventListener('click', () => {
+emojiTab.addEventListener('click', () => {
   showToast('the emoji tab has not been implemented, check back later', 'info')
 })
 
