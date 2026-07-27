@@ -6,6 +6,12 @@ const socket = io(window.location.origin, {
   transports: ["websocket"]
 });
 
+const emojiTab = document.querySelector('#emoji')
+
+emoji.addEventListener('click', () => {
+  showToast('the emoji tab has not been implemented, check back later', 'info')
+})
+
 function showModal({ message, withInput = false, defaultValue = '' }) {
   return new Promise((resolve) => {
     const overlay = document.querySelector('#modal-overlay');

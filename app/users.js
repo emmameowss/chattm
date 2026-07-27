@@ -9,6 +9,12 @@ const socket = io(window.location.origin, {
 let uRole = 'user'
 
 
+const emojiTab = document.querySelector('#emoji')
+
+emoji.addEventListener('click', () => {
+  showToast('the emoji tab has not been implemented, check back later', 'info')
+})
+
 function nameHash(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
