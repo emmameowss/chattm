@@ -302,6 +302,131 @@ async function changeUserRole(email, username) {
   }
 }
 
+async function viewUserSessions(email, clerkId) {
+  const modal = document.createElement('div')
+  modal.className = 'admin-sessions-modal'
+
+  const content = document.createElement('div')
+  content.className = 'admin-sessions-modal-content'
+
+  const header = document.createElement('div')
+  header.className = 'admin-sessions-modal-header'
+
+  const title = document.createElement('div')
+  title.className = 'admin-sessions-modal-title'
+  title.textContent = 'active sessions'
+  header.appendChild(title)
+
+  const closeBtn = document.createElement('button')
+  closeBtn.className = 'admin-sessions-modal-close'
+  closeBtn.innerHTML = '<i class="ti ti-x"</i>'
+  closeBtn.onclick = () => modal.remove()
+  header.appendChild(closeBtn)
+
+  content.appendChild(header)
+
+  const body = document.createElement('div')
+  body.className = 'admin-sessions-modal-body'
+  body.innerHTML = '<div class="admin-sessions-loading">loading sessions...</div>'
+  content.appendChild(body)
+
+  const footer = document.createElement('div')
+  footer.className = 'admin-sessions-modal-footer'
+
+  const revokeAllBtn = document.createElement('button')
+  revokeAllBtn.className = 'admin-sessions-revoke-all-btn'
+  revokeAllBtn.innerHTML = '<i class="ti ti-logout"></i> revoke all sessions'
+  revokeAllBtn.onclick = () => revokeAllSessions(email, clerkId, modal)
+  revokeAllBtn.disabled = true
+  footer.appendChild(revokeAllBtn)
+
+  content.appendChild(footer)
+
+  modal.appendChild(content)
+  document.body.appendChild(modal)
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove()
+  })
+
+  try {
+    const res = await fetch(`/admin/user/sessions?session=${encodeURIComponent(session)}&email=${encodeURIComponent(email)}`)
+    const data = res.json()
+
+    if (!res.ok || !data.sessions) {
+      body.innerHTML = '<div class="admin-sessions-empty">Failed to load sessions</div>';
+      return;
+    }
+
+    if (data.sessions.length === 0) {
+      body.innerHTML = '<div class="admin-sessions-empty">No active sessions</div>';
+      return;
+    }
+
+    const list = document.createElement('div')
+    list.className = 'admin-sessions-list'
+
+    data.sessions.forEach(sess => {
+      const item = document.createElement('div')
+      item.className = 'admin-session-item'
+
+      const itemHeader = document.createElement('div')
+      itemHeader.className = 'admin-session-header'
+
+      const info = document.createElement('div')
+      info.className = 'admin-session-info'
+
+      const id = document.createElement('div')
+      id.className = 'admin-session-id'
+      id.textContent = sess.id
+      info.appendChild(id)
+
+      const meta = document.createElement('div')
+      meta.className = 'admin-session-meta'
+
+      if (sess.lastActiveAt) {
+        const lastActive = document.createElement('span')
+        lastActive.className = 'admin-session-meta-item'
+        lastActive.innerHTML = '<i class="ti ti-clock></i> ${timeAgo(sess.lastActiveAt)}'
+        meta.appendChild(lastActive)
+      }
+
+      if (sess.clientType) {
+        const client = document.createElement('span')
+        client.className = 'admin-session-meta-item'
+        client.innerHTML = `<i class="ti ti-device-${sess.clientType === 'mobile' ? 'mobile' : 'laptop'}"></i> ${sess.clientType}`;
+        meta.appendChild(client)
+      }
+
+      info.appendChild(meta)
+      itemHeader.appendChild(info)
+
+      const actions = document.createElement('div')
+      actions.className = 'admin-session-actions'
+
+      const revokeBtn = document.createElement('button')
+      revokeBtn.className = 'admin-session-revoke-btn'
+      revokeBtn.innerHTML = '<i class="ti ti-logout"></i> revoke'
+      revokeBtn.onclick = () => revokeSession(email, sess.id, item, revokeAllBtn, data.sessions.length)
+      actions.appendChild(revokeBtn)
+
+      itemHeader.appendChild(actions)
+      item.appendChild(itemHeader)
+      list.appendChild(item)
+    })
+
+    body.innerHTML = ''
+    body.appendChild(list)
+    revokeAllBtn.disabled = false
+
+  } catch (e) {
+    body.innerHTML = '<div class="admin-sessions-empty">Error loading sessions</div>';
+    console.error('failed to fetch sessions:', e);
+  }
+}
+
+
+
 
 let selectedUser = null;
 let usersData = [];
@@ -589,6 +714,12 @@ async function lesbians(user) {
 
         clerkSection.appendChild(field);
       });
+
+      const viewSessionsBtn = document.createElement('button')
+      viewSessionsBtn.className = 'admin-sessions-btn'
+      viewSessionsBtn.innerHTML = '<i class="ti ti-device-laptop"></i> view active sessions'
+      viewSessionsBtn.onclick = () => viewUserSessions(fullUser.email, fullUser.clerkId)
+      clerkSection.appendChild(viewSessionsBtn)
 
       sectionsGrid.appendChild(clerkSection);
   }

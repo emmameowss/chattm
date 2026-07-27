@@ -1029,6 +1029,212 @@ button:active {
     pointer-events: none;
 }
 
+.admin-role-selector button.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.admin-sessions-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-color: var(--border);
+    color: var(--text);
+    font-size: 12px;
+    padding: 8px 12px;
+}
+
+.admin-sessions-button:hover {
+    background: var(--bg);
+    border-color: var(--pink);
+}
+
+.admin-sessions-button i {
+    font-size: 14px;
+}
+
+.admin-sessions-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.admin-sessions-modal-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-sessions-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.admin-sessions-modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.admin-sessions-modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    min-width: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-sessions-modal-close:hover {
+    color: var(--text);
+}
+
+.admin-sessions-modal-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.admin-sessions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.admin-session-item {
+    padding: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.admin-session-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.admin-session-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.admin-session-id {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-session-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+.admin-session-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.admin-session-meta-item i {
+    font-size: 12px;
+}
+
+.admin-session-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.admin-session-revoke-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    min-width: auto;
+    border-color: var(--danger);
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.admin-session-revoke-btn:hover {
+    background: var(--danger-dim);
+}
+
+.admin-session-revoke-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.admin-sessions-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.admin-sessions-revoke-all-btn {
+    padding: 8px 16px;
+    font-size: 12px;
+    border-color: var(--danger);
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-sessions-revoke-all-btn:hover {
+    background: var(--danger-dim);
+}
+
+.admin-sessions-revoke-all-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.admin-sessions-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 40px 20px;
+}
+
+.admin-sessions-loading {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 40px 20px;
+}
+
 @media (max-width: 900px) {
     .admin-users-container {
         flex-direction: column;
