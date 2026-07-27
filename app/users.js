@@ -714,7 +714,7 @@ async function lesbians(user) {
 
     const accountFields = [
       { label: 'role', value: fullUser.role || 'user' },
-      { label: 'status', value: fullUser.online ? 'online' : 'fffline' },
+      { label: 'status', value: fullUser.online ? 'online' : 'offline' },
       { label: 'account type', value: fullUser.guest ? 'guest' : 'registered' },
       { label: 'verified', value: (fullUser.role === 'mod' || fullUser.role === 'admin' || fullUser.role === 'owner') ? 'yes' : 'no' },
       { label: 'joined', value: formatDate(fullUser.createdAt) },
