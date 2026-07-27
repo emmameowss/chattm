@@ -6,6 +6,9 @@ const socket = io(window.location.origin, {
   transports: ["websocket"]
 });
 
+let uRole = 'user'
+
+
 function nameHash(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -263,6 +266,42 @@ async function unmuteUser(email, username) {
   }
 }
 
+async function changeUserRole(email, username) {
+  const roleSelect = document.querySelector('#role-select')
+  const newRole = roleSelect.value
+  const currentRole = selectedUser.role
+
+  if (newRole === currentRole) {
+    showToast('role unchanged', 'info')
+    return
+  }
+
+  const btn = event.target.closest('button')
+  btn.classList.add('loading')
+  btn.disabled = true
+
+  try {
+    const res = await fetch('/admin/user/role', {
+      method: "POST",
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({session, email, role: newRole})
+    });
+    const data = await res.json()
+
+    if (data.success) {
+      showToast(`role updated to ${newRole}`, 'success')
+      await refreshDetailView()
+    } else {
+      showToast(data.error || 'failed to update role', 'error')
+    }
+  } catch (e) {
+    showToast('error: ' + e.message, 'error')
+  } finally {
+    btn.classList.remove('loading')
+    btn.disabled = false;
+  }
+}
+
 
 let selectedUser = null;
 let usersData = [];
@@ -496,7 +535,7 @@ async function lesbians(user) {
       field.appendChild(fieldValue)
 
       accountSection.appendChild(field)
-    });
+    })
 
     sectionsGrid.appendChild(accountSection)
 
@@ -596,6 +635,44 @@ async function lesbians(user) {
     actionsSection.appendChild(actionsDiv);
     sectionsGrid.appendChild(actionsSection);
 
+  // Role management section
+  if (uRole === "owner" && !fullUser.guest) {
+    const roleSection = document.createElement('div')
+    roleSection.className = 'admin-detail-section'
+
+    const roleTitle = document.createElement('div')
+    roleTitle.className = 'admin-detail-section-title'
+    roleTitle.textContent = 'role management'
+    roleSection.appendChild(roleTitle)
+
+    const roleSelector = document.createElement('div')
+    roleSelector.className = 'admin-role-selector'
+
+    const roleLabel = document.createElement('label')
+    roleLabel.textContent = 'role:'
+    roleSelector.appendChild(roleLabel)
+
+    const roleSelect = document.createElement('select')
+    roleSelect.id = 'role-select'
+    const roles = ["user", 'mod', 'admin', 'owner']
+    roles.forEach(role => {
+      const option = document.createElement('option')
+      option.value = role
+      option.textContent = role
+      if (role === fullUser.role) option.selected = true
+      roleSelect.appendChild(option)
+    })
+    roleSelector.appendChild(roleSelect)
+
+    const changeRoleBtn = document.createElement('button')
+    changeRoleBtn.innerHTML = '<i class="ti ti-check"></i> update';
+    changeRoleBtn.onclick = () => changeUserRole(fullUser.email, fullUser.username)
+    roleSelector.appendChild(changeRoleBtn)
+
+    roleSection.appendChild(roleSelector)
+    sectionsGrid.appendChild(roleSection)
+  }
+
     content.appendChild(sectionsGrid);
     detail.appendChild(content);
 }
@@ -612,5 +689,9 @@ socket.on('adminUserlist', (users) => {
 socket.on('connect', () => {
   socket.emit('getAdminUsers');
 });
+
+socket.on('uRole', (role) => {
+  uRole = role
+})
 
 socket.on('commandError', (msg) => showToast(msg, 'error'));

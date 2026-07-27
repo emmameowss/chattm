@@ -4,7 +4,7 @@ import { createServer } from "http";
 import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
-import { randomBytes, X509Certificate } from "crypto";
+import { randomBytes } from "crypto";
 import { readFile, appendFile } from "fs/promises";
 import { extname, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
@@ -994,6 +994,7 @@ function emitUserList(channel = "main") {
       s.currentChannel === channel
     ) {
       s.emit("adminUserlist", users);
+      s.emit('uRole', getRole(s.userEmail))
     }
   }
 }
@@ -1169,6 +1170,7 @@ io.on("connection", (socket) => {
   socket.on("getAdminUsers", () => {
     if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
     socket.emit("adminUserlist", buildUserList(socket.currentChannel));
+    socket.emit('uRole', getRole(socket.userEmail));
   });
 
   socket.on("getProfile", (reqUsername) => {
@@ -2927,7 +2929,7 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
-  if (url.pathname === "/admin/user/hide" && req.method === "POST") {
+  if (url.pathname === "/admin/user/role" && req.method === "POST") {
     let body = ''
     req.on('data', (d) => { body += d });
     req.on('end', async () => {
