@@ -2580,7 +2580,17 @@ httpServer.on("request", async (req, res) => {
           if (clerkId) {
             const clerkUser = await clerk.users.getUser(clerkId);
             lastSignInAt = clerkUser.lastSignInAt || null
-            activeSessions = clerkUser.sessions?.filter(s => s.status === "active").length || 0
+
+            try {
+              const sessionList = await clerk.sessions.getSessionList({
+                userId: clerkId,
+                status: 'active'
+              });
+              activeSessions = sessionList.data?.length || 0;
+            } catch (e) {
+              console.error('failed to fetch sessions:', e);
+              activeSessions = 0;
+            }
 
             if (clerkUser.createdAt && clerkUser.createdAt < createdAt) {
               createdAt = clerkUser.createdAt
