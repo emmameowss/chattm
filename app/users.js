@@ -882,7 +882,7 @@ async function lesbians(user) {
       { label: 'role', value: fullUser.role || 'user' },
       { label: 'status', value: fullUser.online ? 'online' : 'offline' },
       { label: 'account type', value: fullUser.guest ? 'guest' : 'registered' },
-      { label: 'verified', value: (fullUser.role === 'mod' || fullUser.role === 'admin' || fullUser.role === 'owner') ? 'yes' : 'no' },
+      { label: 'verified', value: (fullUser.role === 'mod' || fullUser.role === 'admin' || fullUser.role === 'owner' || fullUser.redVerified) ? 'yes' : 'no' },
       { label: 'joined', value: formatDate(fullUser.createdAt) },
       { label: 'total messages', value: fullUser.messageCount.toLocaleString() },
     ];
