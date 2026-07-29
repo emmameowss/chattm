@@ -288,13 +288,13 @@ async function muteUser(email, username) {
   }
 }
 
-async function unmuteUser(email, username) {
+async function unmuteUser(email, username, buttonElement) {
   const confirmed = await showModal({
     message: `unmute ${username}?`
   });
   if (!confirmed) return;
 
-  const btn = event.target.closest('button');
+  const btn = buttonElement || event.target.closest('button');
   btn.classList.add('loading');
   btn.disabled = true;
   const originalHTML = btn.innerHTML;
@@ -1023,7 +1023,7 @@ async function lesbians(user) {
       const unmuteBtn = document.createElement('button');
       unmuteBtn.className = 'positive';
       unmuteBtn.innerHTML = '<i class="ti ti-volume"></i> unmute user';
-      unmuteBtn.onclick = () => unmuteUser(fullUser.email, fullUser.username);
+      unmuteBtn.onclick = (e) => unmuteUser(fullUser.email, fullUser.username, e.currentTarget);
       actionsDiv.appendChild(unmuteBtn);
     } else {
       const muteBtn = document.createElement('button');
