@@ -1,15 +1,18 @@
-// persistent userid generation stuff
-let userId = localStorage.getItem("userId");
-if (!userId || userId == null) {
-  userId = crypto.randomUUID();
-  localStorage.setItem("userId", userId);
-}
-
 let unread = 0;
 let activity = false;
-let username = localStorage.getItem("username") || userId.slice(0, 5);
+let username = localStorage.getItem("username") || 'pending'
 let audioctx = null;
 let isOwner = false;
+
+// nuke the old userids forever
+function checkForUserId() {
+  if (localStorage.getItem('userId') && localStorage.getItem('uIdGone') !== true) {
+    localStorage.removeItem('userId')
+    localStorage.setItem('uIdGone', true)
+  }
+}
+
+checkForUserId()
 
 // colors
 function nameHash(name) {

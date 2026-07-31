@@ -721,7 +721,7 @@ function parseDuration(str) {
 }
 
 function isValidUsername(name) {
-  return /^[a-zA-Z0-9- ]{1,20}$/.test(name) && name.trim() === name && !name.includes("  ");
+  return /^[a-zA-Z0-9- ]{1,20}$/.test(name) && name.trim() === name && !name.includes("  ") && name !== "pending";
 }
 // Clerk accounts use the raw (normalized) email as their in-app identity, so
 // every command / lookup treats them identically
@@ -1068,10 +1068,14 @@ io.on("connection", (socket) => {
 
   socket.on("setUsername", (name) => {
     if (!isValidUsername(name)) {
-      socket.emit(
-        "commandError",
-        "invalid username, make sure it's within the character limit and uses only letters and numbers",
-      );
+      if (name === 'pending') {
+        socket.emit('commandError', 'you cannot set your username to "pending"')
+      } else {
+        socket.emit(
+          "commandError",
+          "invalid username, make sure it's within the character limit and uses only letters and numbers",
+        );
+      }
       return;
     }
     const prevUser = socket.username;
