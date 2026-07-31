@@ -18,19 +18,31 @@ logsTab.addEventListener('click', () => {
   showToast('action logs have not yet been implemented, check back later', 'info')
 })
 
-function showModal({ message, withInput = false, defaultValue = '' }) {
+
+function showModal({ message, withInput = false, withSelect = false, selectOptions = [], defaultValue = '' }) {
   return new Promise((resolve) => {
     const overlay = document.querySelector('#modal-overlay');
     const msgEl = document.querySelector('#modal-message');
     const inputEl = document.querySelector('#modal-input');
+    const selectEl = document.querySelector('#modal-select')
     const confirmBtn = document.querySelector('#modal-confirm');
     const cancelBtn = document.querySelector('#modal-cancel');
 
     msgEl.textContent = message;
     inputEl.style.display = withInput ? "block" : "none";
     inputEl.value = defaultValue;
+    selectEl.style.display = withSelect ? 'block' : "none";
+
+    if (withSelect && selectOptions.length > 0) {
+      selectEl.innerHTML = selectOptions.map(opt => 
+        `<option value="${opt}">${opt}</option>`
+      ).join('');
+      selectEl.value = defaultValue || selectOptions[0];
+    }
+
     overlay.style.display = "flex";
     if (withInput) inputEl.focus();
+    if (withSelect) selectEl.focus();
 
     function cleanUp(result) {
       overlay.style.display = "none";
@@ -40,10 +52,16 @@ function showModal({ message, withInput = false, defaultValue = '' }) {
       resolve(result);
     }
     function onConfirm() {
-      cleanUp(withInput ? inputEl.value : true);
+      if (withInput) {
+        cleanUp(inputEl.value)
+      } else if (withSelect) {
+        cleanUp(selectEl.value)
+      } else {
+        cleanUp(true)
+      }
     }
     function onCancel() {
-      cleanUp(withInput ? null : false);
+      cleanUp(withInput || withSelect ? null : false);
     }
     function onKey(e) {
       if (e.key === "Enter") {
