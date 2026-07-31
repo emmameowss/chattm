@@ -1738,6 +1738,16 @@ httpServer.on("request", async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/channels") {
+    res.writeHead(200, {
+      'content-type': 'application/json',
+      'cache-control': 'no-store'
+    });
+    const channels = listChannels()
+    res.end(JSON.stringify({channels}))
+    return;
+  }
+
   if (url.pathname === "/suggest-emoji") {
 
     // will reenable after full admin panel completed
