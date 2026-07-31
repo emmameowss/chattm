@@ -16,11 +16,13 @@
     --muted: #666;
     --pink: #f5a9b8;
     --pink-dim: rgba(245, 169, 184, 0.12);
+    --pink-dim-toast: #312829;
     --radius: 6px;
     --font-mono: "DM Mono", monospace;
     --font-sans: "DM Sans", sans-serif;
     --danger: #d97a7a;
     --danger-dim: rgba(217, 122, 122, 0.1);
+    --danger-dim-toast: #2a2020;
     --name-lightness: 65%;
 }
 
@@ -3375,13 +3377,13 @@ body.admin-page {
 
 .toast.success {
     border-color: var(--pink);
-    background: var(--pink-dim);
+    background: var(--pink-dim-toast);
     color: var(--pink);
 }
 
 .toast.error {
     border-color: var(--danger);
-    background: var(--danger-dim);
+    background: var(--danger-dim-toast);
     color: var(--danger);
 }
 

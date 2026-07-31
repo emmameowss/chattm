@@ -218,7 +218,7 @@ const commands = {
         target =
           findSocketByUsername(target)?.userEmail ?? getEmailByUsername(target);
         if (!target) {
-          socket.emit("commandError", `no user found with username ${args[0]}`);
+          socket.emit("commandError", `no user found with username ${args[0]}`, 'error');
           return;
         }
       }
@@ -236,21 +236,21 @@ const commands = {
           s.disconnect();
         }
       }
-      socket.emit("commandError", `banned ${targetEmail}`);
+      socket.emit("commandError", `banned ${targetEmail}`, 'success');
     },
   },
   "/unban": {
     minRole: "admin",
     run: (socket, rest) => {
       removeBan(rest);
-      socket.emit("commandError", `unbanned ${rest}`);
+      socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
   "/unbanip": {
     minRole: "admin",
     run: (socket, rest) => {
       removeIpBan(rest);
-      socket.emit("commandError", `unbanned ${rest}`);
+      socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
   "/kick": {
@@ -259,7 +259,7 @@ const commands = {
       const [targetUsername, ...reasonParts] = rest.split(" ");
       const kickReason = reasonParts.join(" ") || "kicked by server";
       if (!targetUsername) {
-        socket.emit("commandError", "usage: /kick <username> [reason]");
+        socket.emit("commandError", "usage: /kick <username> [reason]", 'error');
         return;
       }
       const target = findSocketByUsername(targetUsername);
@@ -267,13 +267,14 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
       target.emit("kicked", kickReason);
       target.skipLeaveMessage = true;
       target.disconnect();
-      socket.emit("commandError", `kicked ${targetUsername}`);
+      socket.emit("commandError", `kicked ${targetUsername}`, 'success');
       await appendFile(
         "kicks.log",
         `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${kickReason}\n`,
@@ -293,12 +294,13 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
       const durationMs = durationStr ? parseDuration(durationStr) : null;
       if (durationStr && !durationMs) {
-        socket.emit("commandError", "invalid duration format");
+        socket.emit("commandError", "invalid duration format", 'error');
         return;
       }
       setMute(
@@ -317,6 +319,7 @@ const commands = {
       socket.emit(
         "commandError",
         `muted ${targetUsername}${durationStr ? " for " + durationStr : ""}`,
+        'success',
       );
     },
   },
@@ -327,12 +330,12 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail || !getMute(targetEmail)) {
-        socket.emit("commandError", `${targetUsername} is not muted`);
+        socket.emit("commandError", `${targetUsername} is not muted`, 'info');
         return;
       }
       deleteMute(targetEmail);
       forEachUserSocket(targetEmail, (s) => s.emit("unmuted"));
-      socket.emit("commandError", `unmuted ${targetUsername}`);
+      socket.emit("commandError", `unmuted ${targetUsername}`, 'success');
     },
   },
   "/resetstrikes": {
@@ -345,11 +348,12 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
       deleteStrikes(targetEmail);
-      socket.emit("commandError", `reset strikes for ${targetUsername}`);
+      socket.emit("commandError", `reset strikes for ${targetUsername}`, 'success');
     },
   },
   "/noguests": {
@@ -365,7 +369,7 @@ const commands = {
           s.disconnect();
         }
       }
-      socket.emit("commandError", "guest logins have been disabled");
+      socket.emit("commandError", "guest logins have been disabled", 'success');
     },
   },
   "/allowguests": {
@@ -373,14 +377,14 @@ const commands = {
     run: (socket) => {
       guestsDisabled = false;
       setSetting("guests_disabled", "0");
-      socket.emit("commandError", "guest logins have been reenabled");
+      socket.emit("commandError", "guest logins have been reenabled", 'success');
     },
   },
   "/reloademojis": {
     minRole: "admin",
     run: async (socket) => {
       await syncEmojisFromS3();
-      socket.emit("commandError", "emoji sync complete");
+      socket.emit("commandError", "emoji sync complete", 'success');
     },
   },
   "/whois": {
@@ -388,9 +392,9 @@ const commands = {
     run: (socket, rest) => {
       const found = findSocketByUsername(rest);
       if (found) {
-        socket.emit("commandError", `${rest}: ${found.userEmail}`);
+        socket.emit("commandError", `${rest}: ${found.userEmail}`, 'success');
       } else {
-        socket.emit("commandError", `no user found with username "${rest}"`);
+        socket.emit("commandError", `no user found with username "${rest}"`, 'error');
       }
     },
   },
@@ -406,6 +410,7 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
@@ -419,13 +424,13 @@ const commands = {
       };
       const color = flagColors[colorInput] ?? colorInput;
       if (isBlockedColor(color)) {
-        socket.emit("commandError", "please choose another color");
+        socket.emit("commandError", "please choose another color", 'error');
         return;
       }
       setColor(targetEmail, color);
       forEachUserSocket(targetEmail, (s) => s.emit("colorChanged", color));
       emitAllUserLists();
-      socket.emit("commandError", `set ${targetUsername}'s color to ${color}`);
+      socket.emit("commandError", `set ${targetUsername}'s color to ${color}`, 'success');
     },
   },
   "/nick": {
@@ -433,11 +438,11 @@ const commands = {
     run: (socket, rest) => {
       const nick = rest;
       if (!isValidUsername(nick)) {
-        socket.emit("commandError", "invalid username");
+        socket.emit("commandError", "invalid username", 'error');
         return;
       }
       if (socket.userEmail.endsWith("@guest")) {
-        socket.emit("commandError", "guests cannot change their username");
+        socket.emit("commandError", "guests cannot change their username", 'error');
         return;
       }
       const prevUser = socket.username;
@@ -468,7 +473,7 @@ const commands = {
       };
       const color = prideFlags[colorinput] ?? colorinput;
       if (isBlockedColor(color)) {
-        socket.emit("commandError", "please choose a different color");
+        socket.emit("commandError", "please choose a different color", 'error');
         return;
       }
       setColor(socket.userEmail, color);
@@ -482,12 +487,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
-        socket.emit('commandError', `no user found with username ${rest}`)
+        socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       setHidden(targetEmail)
       emitAllUserLists()
-      socket.emit('commandError', `hid ${rest} from user list`)
+      socket.emit('commandError', `hid ${rest} from user list`, 'success')
     },
   },
   "/unhide": {
@@ -495,12 +500,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
-        socket.emit('commandError', `no user found with username ${rest}`)
+        socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       removeHidden(targetEmail)
       emitAllUserLists()
-      socket.emit('commandError', `unhid ${rest} on user list`)
+      socket.emit('commandError', `unhid ${rest} on user list`, 'success')
     },
   },
 };
@@ -1069,11 +1074,12 @@ io.on("connection", (socket) => {
   socket.on("setUsername", (name) => {
     if (!isValidUsername(name)) {
       if (name === 'pending') {
-        socket.emit('commandError', 'you cannot set your username to "pending"')
+        socket.emit('commandError', 'you cannot set your username to "pending"', 'error')
       } else {
         socket.emit(
           "commandError",
           "invalid username, make sure it's within the character limit and uses only letters and numbers",
+          'error',
         );
       }
       return;
@@ -1122,7 +1128,7 @@ io.on("connection", (socket) => {
     const isAdmin = ['mod', 'admin', 'owner'].includes(socket.userRole);
 
     if (!isOwnerOfMsg && !isAdmin) {
-      socket.emit("commandError", "you can only delete your own messages");
+      socket.emit("commandError", "you can only delete your own messages", 'error');
       return;
     }
     deleteMessage(messageId);
@@ -1157,9 +1163,10 @@ io.on("connection", (socket) => {
       return socket.emit(
         "commandError",
         "invalid channel name (use a-z, 0-9, - ; max 24)",
+        'error'
       );
     if (channelExists(name))
-      return socket.emit("commandError", "channel already exists");
+      return socket.emit("commandError", "channel already exists", 'error');
     createChannel(name, socket.userEmail);
     io.emit(
       "channels",
@@ -1173,7 +1180,7 @@ io.on("connection", (socket) => {
       .trim()
       .toLowerCase();
     if (name === "main")
-      return socket.emit("commandError", "the main channel cannot be deleted");
+      return socket.emit("commandError", "the main channel cannot be deleted", 'error');
     if (!channelExists(name)) return;
     deleteChannel(name);
     // move anyone viewing the deleted channel back to main
@@ -1205,12 +1212,13 @@ io.on("connection", (socket) => {
       socket.emit(
         "commandError",
         `you are muted${m.until ? " until " + new Date(m.until).toLocaleString() : ""} - reason: ${m.reason}`,
+        'error',
       );
       return;
     }
 
     if (typeof data.text === "string" && data.text.length > MAX_MESSAGE_LENGTH) {
-      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters)`)
+      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters)`, 'error')
       return
     }
 
@@ -1226,13 +1234,13 @@ io.on("connection", (socket) => {
       lastmessage[socket.userEmail] &&
       now - lastmessage[socket.userEmail] < msgcooldown
     ) {
-      socket.emit("commandError", "slow down");
+      socket.emit("commandError", "slow down", 'error');
       return;
     }
     lastmessage[socket.userEmail] = now;
 
     if (chatMuted && !["mod", "admin", "owner"].includes(socket.userRole)) {
-      socket.emit("commandError", "chat is currently muted");
+      socket.emit("showE", "chat is currently muted");
       return;
     }
 
@@ -1246,7 +1254,7 @@ io.on("connection", (socket) => {
       if (cmd) {
         const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
         if (cmd.minRole && (roleValues[socket.userRole] ?? 0) < roleValues[cmd.minRole]) {
-          socket.emit('commandError', "you don't have permission to use this command");
+          socket.emit('commandError', "you don't have permission to use this command", 'error');
           return;
         }
         await cmd.run(socket, rest, data);

@@ -438,6 +438,21 @@ if (session) {
     applyCharCounter()
   })
 
+  function showToast(message, type = 'info') {
+    const container = document.querySelector('#toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      toast.style.transition = 'opacity 0.2s, transform 0.2s';
+      setTimeout(() => toast.remove(), 200);
+    }, 3000);
+  }
+
   // avatar
   const avatarInput = document.querySelector("#avatar-input");
 
@@ -786,7 +801,7 @@ if (session) {
           });
           socket.emit("refreshAvatar");
         } catch (e) {
-          showError("couldn't update profile picture");
+          showToast("couldn't update profile picture", 'error');
           renderProfileAvatarWrap(myAvatar, false);
         }
       }
@@ -1271,7 +1286,7 @@ if (session) {
 
     if (file) {
       if (file.size > MAX_SIZE) {
-        showError("file too big (max is 50mb)");
+        showToast("file too big (max is 50mb)", 'error');
         fileInput.value = "";
         document.querySelector("#attach-btn").style.borderColor = "";
         document.querySelector("#attach-btn").style.color = "";
@@ -2231,9 +2246,15 @@ if (session) {
     }
   });
 
-  socket.on("commandError", (msg) => {
-    showError(msg);
+  socket.on("commandError", (msg, type) => {
+    showToast(msg, type);
   });
+
+  socket.on('showE', (msg) => {
+    const e = document.querySelector("#upload-error");
+    e.textContent = msg;
+    e.style.display = "block";
+  })
 
   let chatMutedb = false;
 
