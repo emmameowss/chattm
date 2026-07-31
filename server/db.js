@@ -219,7 +219,7 @@ const stmts = {
 
   // Channels
   listChannels: db.prepare(
-    `SELECT name, created_at, created_by FROM channels ORDER BY created_at ASC`,
+    `SELECT name, created_at FROM channels ORDER BY created_at ASC`,
   ),
   getChannel: db.prepare(`SELECT name FROM channels WHERE name = ?`),
   insertChannel: db.prepare(
