@@ -3408,6 +3408,10 @@ body.admin-page::after {
     display: none;
 }
 
+.noselect {
+    user-select: none;
+}
+
 @media (max-width: 600px) {
     h1 {
         font-size: 11px;
