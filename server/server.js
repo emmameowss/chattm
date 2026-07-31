@@ -775,25 +775,28 @@ function emitAllUserLists() {
 
 function buildUserList(channel = "main") {
   const onlineEmails = new Set();
+  const onlineUsers = new Map();
   const users = [];
 
   for (const [id, s] of io.sockets.sockets) {
     if (!s.username) continue;
     if (s.currentChannel !== channel) continue;
-    onlineEmails.add(s.userEmail);
-    users.push({
-      username: s.username,
-      email: s.userEmail,
-      color: s.cachedColor ?? null,
-      avatar: s.cachedAvatar ?? null,
-      guest: s.userEmail.endsWith("@guest"),
-      isOwner: s.userRole === "owner",
-      role: s.userRole ?? "user",
-      verified: s.cachedVerified ?? false,
-      redVerified: s.cachedRedVerified ?? false,
-      status: s.cachedStatus ?? "online",
-      online: true,
-    });
+    if (!onlineUsers.has(s.userEmail)) {
+      onlineEmails.add(s.userEmail);
+      onlineUsers.set(s.userEmail, {
+        username: s.username,
+        email: s.userEmail,
+        color: s.cachedColor ?? null,
+        avatar: s.cachedAvatar ?? null,
+        guest: s.userEmail.endsWith("@guest"),
+        isOwner: s.userRole === "owner",
+        role: s.userRole ?? "user",
+        verified: s.cachedVerified ?? false,
+        redVerified: s.cachedRedVerified ?? false,
+        status: s.cachedStatus ?? "online",
+        online: true,
+      });
+    }
   }
 
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
