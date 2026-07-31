@@ -2508,6 +2508,23 @@ body:has(#dev-banner) #version-status {
     width: 100%;
 }
 
+#modal-select {
+    width: 100%;
+    padding: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+#modal-select:focus {
+    outline: none;
+    border-color: var(--pink);
+}
+
 #modal-actions {
     display: flex;
     justify-content: flex-end;

@@ -263,24 +263,28 @@ document.querySelector('#owner-maintenance-btn').addEventListener('click', async
 });
 
 document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
-  const confirmed = await showModal({
-    message: 'clear main channel chat history?'
-  });
-  if (!confirmed) return;
+  const channel = await showModal({
+    message: 'select channel to clear:',
+    withSelect: true,
+    selectOptions: availableChannels,
+    defaultValue: 'main'
+  })
+  if (!channel) return
+
   try {
     const res = await fetch('/admin/clear', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session, channel: 'main' })
-    });
-    const data = await res.json();
+      method: "POST",
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({session, channel})
+    })
+    const data = await res.json()
     if (data.success) {
-      showToast('chat cleared', 'success');
+      showToast(`${channel} has been cleared`, 'success')
     } else {
-      showToast('failed to clear chat', 'error');
+      showToast('failed to clear channel history', 'error')
     }
   } catch (e) {
-    showToast('error: ' + e.message, 'error');
+    showToast('error: ' + e.message, 'error')
   }
 });
 
