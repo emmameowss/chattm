@@ -15,6 +15,12 @@ emojiTab.addEventListener('click', () => {
   showToast('the emoji tab has not been implemented, check back later', 'info')
 })
 
+const logsTab = document.querySelector("#logs")
+
+logsTab.addEventListener('click', () => {
+  showToast('action logs have not been implemented yet, check back later', 'info')
+})
+
 function nameHash(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {

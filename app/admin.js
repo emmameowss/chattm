@@ -12,6 +12,12 @@ emojiTab.addEventListener('click', () => {
   showToast('the emoji tab has not been implemented, check back later', 'info')
 })
 
+const logsTab = document.querySelector('#logs')
+
+logsTab.addEventListener('click', () => {
+  showToast('action logs have not yet been implemented, check back later', 'info')
+})
+
 function showModal({ message, withInput = false, defaultValue = '' }) {
   return new Promise((resolve) => {
     const overlay = document.querySelector('#modal-overlay');
