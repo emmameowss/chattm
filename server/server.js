@@ -629,30 +629,6 @@ function isBlockedColor(color) {
   return r < 55 && g < 55 && b < 55;
 }
 
-/* chat filter has been removed
-function loadFilterWordsIntoMemory() {
-  filteredwords.length = 0;
-  getFilterWords().forEach((w) => filteredwords.push(w));
-  console.log(`loaded ${filteredwords.length} filter words`);
-}
-
-const filteredwords = [];
-loadFilterWordsIntoMemory();
-
-function containsFilteredWord(text) {
-  if (!text) return null;
-  const lower = text.toLowerCase();
-  return (
-    filteredwords.find((w) =>
-      new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(
-        lower,
-      ),
-    ) || null
-  );
-}
-
-*/
-
 console.log(`loaded ${getHistory().length} messages in history`);
 
 async function getVersionStatus(forceRefresh = false) {
