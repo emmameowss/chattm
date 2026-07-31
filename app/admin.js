@@ -18,6 +18,23 @@ logsTab.addEventListener('click', () => {
   showToast('action logs have not yet been implemented, check back later', 'info')
 })
 
+let availableChannels = ['main']
+
+async function loadChannels() {
+  try {
+    const res = await('/channels')
+    const data = await res.json()
+    if (data && data.channels) {
+      availableChannels = data.channels.map(ch => ch.name)
+    }
+  } catch (e) {
+    console.error('failed to load channels:', e)
+    showModal('failed to load channels:' + e.message, 'error')
+    availableChannels = ['main']
+  }
+}
+
+loadChannels()
 
 function showModal({ message, withInput = false, withSelect = false, selectOptions = [], defaultValue = '' }) {
   return new Promise((resolve) => {
