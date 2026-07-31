@@ -2515,7 +2515,7 @@ body:has(#dev-banner) #version-status {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
-    font-family: var(--font-sans);
+    font-family: var(--font-mono);
     font-size: 13px;
     cursor: pointer;
 }
