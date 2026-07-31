@@ -17,6 +17,7 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  db,
   getHistory,
   addMessage,
   deleteMessage,
@@ -736,6 +737,17 @@ async function renderPage(file, replacements = {}) {
   return html;
 }
 
+function requireAdminPage(req, res) {
+  const user = getRequestUser(req)
+  const role = user ? getRole(user.email) : "user"
+  if (!user || !["admin", "owner"].includes(role)) {
+    res.writeHead(302, { Location: '/' })
+    res.end()
+    return null;
+  }
+  return { user, role }
+}
+
 // resolve the cookie session, mirroring the socket middleware's guest-expiry check
 function getRequestUser(req) {
   const sessionId = parseCookies(req).session;
@@ -925,11 +937,10 @@ function emitAllUserLists() {
   for (const c of listChannels()) emitUserList(c.name);
 }
 
-function emitUserList(channel = "main") {
+function buildUserList(channel = "main") {
   const onlineEmails = new Set();
   const users = [];
 
-  // online users: use data already cached on the socket - zero DB reads
   for (const [id, s] of io.sockets.sockets) {
     if (!s.username) continue;
     if (s.currentChannel !== channel) continue;
@@ -940,8 +951,8 @@ function emitUserList(channel = "main") {
       color: s.cachedColor ?? null,
       avatar: s.cachedAvatar ?? null,
       guest: s.userEmail.endsWith("@guest"),
-      isOwner: ["owner"].includes(s.userRole),
-      role: s.userRole ?? 'user',
+      isOwner: s.userRole === "owner",
+      role: s.userRole ?? "user",
       verified: s.cachedVerified ?? false,
       redVerified: s.cachedRedVerified ?? false,
       status: s.cachedStatus ?? "online",
@@ -949,7 +960,6 @@ function emitUserList(channel = "main") {
     });
   }
 
-  // offline users: single JOIN query - all fields in one SELECT
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   for (const row of getRecentUsers(cutoff)) {
     if (onlineEmails.has(row.email)) continue;
@@ -960,7 +970,7 @@ function emitUserList(channel = "main") {
       avatar: row.avatar ?? null,
       guest: false,
       isOwner: row.role === "owner",
-      role: row.role ?? 'user',
+      role: row.role ?? "user",
       verified: !!row.verified,
       redVerified: !!row.red_verified,
       status: row.status ?? "online",
@@ -968,12 +978,14 @@ function emitUserList(channel = "main") {
     });
   }
 
-  // strip emails before broadcasting to this channel's clients
-  const visibleUsers = users.filter((u) => !isHidden(u.email))
-  const publicUsers = visibleUsers.map(({ email, ...rest }) => rest)
+  return users.filter((u) => !isHidden(u.email));
+}
+
+function emitUserList(channel = "main") {
+  const users = buildUserList(channel);
+  const publicUsers = users.map(({ email, ...rest }) => rest);
   io.to(roomOf(channel)).emit("userlist", publicUsers);
 
-  // send full data (with emails) only to owners viewing this channel
   for (const [, s] of io.sockets.sockets) {
     if (
       ["admin", "owner"].includes(s.userRole) &&
@@ -981,6 +993,7 @@ function emitUserList(channel = "main") {
       s.currentChannel === channel
     ) {
       s.emit("adminUserlist", users);
+      s.emit('uRole', getRole(s.userEmail))
     }
   }
 }
@@ -1151,6 +1164,12 @@ io.on("connection", (socket) => {
     const p = String(pronouns ?? "").slice(0, 40);
     setProfilePronouns(socket.userEmail, p);
     socket.emit("savedProfile", getProfileData(socket.userEmail));
+  });
+
+  socket.on("getAdminUsers", () => {
+    if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
+    socket.emit("adminUserlist", buildUserList(socket.currentChannel));
+    socket.emit('uRole', getRole(socket.userEmail));
   });
 
   socket.on("getProfile", (reqUsername) => {
@@ -1596,7 +1615,7 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/me") {
-    const sessionId = url.searchParams.get("session");
+    const sessionId = parseCookies(req).session;
     const s = getSession(sessionId);
     if (!s) {
       res.writeHead(401);
@@ -1614,8 +1633,7 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/signout") {
-    const sessionId =
-      url.searchParams.get("session") || parseCookies(req).session;
+    const sessionId = parseCookies(req).session;
     if (sessionId) {
       deleteSession(sessionId);
     }
@@ -1662,7 +1680,7 @@ httpServer.on("request", async (req, res) => {
       return;
     }
 
-    const uploadSessionId = url.searchParams.get("session");
+    const uploadSessionId = parseCookies(req).session;
     const uploadSession = uploadSessionId ? getSession(uploadSessionId) : null;
     if (!uploadSession) {
       res.writeHead(401);
@@ -1696,25 +1714,25 @@ httpServer.on("request", async (req, res) => {
         const allowedTypes = isAvatar
           ? imageTypes
           : [
-              ...imageTypes,
-              "video/mp4",
-              "video/quicktime",
-              "audio/mpeg",
-              "audio/ogg",
-              "audio/wav",
-              "application/pdf",
-              "text/plain",
-              "text/markdown",
-              "application/zip",
-              "application/x-rar-compressed",
-              "application/x-7z-compressed",
-              "application/x-tar",
-              "application/gzip",
-              "application/json",
-              "text/csv",
-              "image/vnd.adobe.photoshop",
-              "application/figma",
-            ];
+            ...imageTypes,
+            "video/mp4",
+            "video/quicktime",
+            "audio/mpeg",
+            "audio/ogg",
+            "audio/wav",
+            "application/pdf",
+            "text/plain",
+            "text/markdown",
+            "application/zip",
+            "application/x-rar-compressed",
+            "application/x-7z-compressed",
+            "application/x-tar",
+            "application/gzip",
+            "application/json",
+            "text/csv",
+            "image/vnd.adobe.photoshop",
+            "application/figma",
+          ];
         if (!allowedTypes.includes(file.mimetype)) {
           res.writeHead(400);
           res.end(JSON.stringify({ error: "file type not allowed" }));
@@ -1885,12 +1903,18 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/suggest-emoji") {
+
+    // will reenable after full admin panel completed
+    res.writeHead(503, {'content-type': 'application/json'})
+    res.end(JSON.stringify({error: 'emoji submissions are currently disabled because the actual rewritten systems have not even been touched yet'}))
+    return
+    /*
     if (req.method !== "POST") {
       res.writeHead(405);
       res.end();
       return;
     }
-    const suggestSessionId = url.searchParams.get("session");
+    const suggestSessionId = parseCookies(req).session;
     const suggestSession = suggestSessionId
       ? getSession(suggestSessionId)
       : null;
@@ -2008,10 +2032,12 @@ httpServer.on("request", async (req, res) => {
       }
     });
     return;
+
+    */
   }
 
   if (url.pathname === "/my-pending-emojis") {
-    const mpeSessionId = url.searchParams.get("session");
+    const mpeSessionId = parseCookies(req).session;
     const mpeSession = mpeSessionId ? getSession(mpeSessionId) : null;
     if (!mpeSession) {
       res.writeHead(401, { "content-type": "application/json" });
@@ -2029,7 +2055,7 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/pending-emojis") {
-    const peSessionId = url.searchParams.get("session");
+    const peSessionId = parseCookies(req).session;
     const peSession = peSessionId ? getSession(peSessionId) : null;
     const peRole = peSession ? getRole(peSession.email) : "user"
     if (!peSession || !["admin", "owner"].includes(peRole)) {
@@ -2181,6 +2207,1214 @@ httpServer.on("request", async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/admin/mutechat" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : "user"
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { "content-type": "application/json" })
+          res.end(JSON.stringify({ error: "forbidden" }))
+          return
+        }
+
+        chatMuted = !chatMuted
+        if (chatMuted) {
+          io.emit('mutechat', 'chat has been muted')
+        } else {
+          io.emit('unmutechat')
+        }
+
+        res.writeHead(200, { "content-type": "application/json" })
+        res.end(JSON.stringify({ success: true, muted: chatMuted }))
+      } catch (e) {
+        res.writeHead(400, { "content-type": 'application/json' })
+        res.end(JSON.stringify({ error: "invalid request" }))
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/maintenance" && req.method === "POST") {
+    let body = ""
+    req.on("data", (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, reason: newReason } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': "application/json" })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+
+        const reasonText = newReason || ''
+        if (reasonText) {
+          maintenance = true
+          reason = reasonText
+          setSetting('maintenance', '1')
+          setSetting('maintenance_reason', reason)
+          io.emit('status', `maintenance mode: ${reason}`)
+        } else {
+          maintenance = false
+          reason = ""
+          setSetting('maintenance', '0')
+          setSetting('maintenance_reason', "")
+          io.emit('status', "")
+        }
+
+        res.writeHead(200, { "content-type": 'application/json' })
+        res.end(JSON.stringify({ success: true, maintenance, reason }))
+      } catch (e) {
+        res.writeHead(400, { "content-type": "application/json" })
+        res.end(JSON.stringify({ error: 'invalid request' }))
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/clear" && req.method === "POST") {
+    let body = ""
+    req.on("data", (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, channel } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+        if (!sess || !['owner', 'admin'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+
+        const targetChannel = channel || 'main'
+        clearMessages(targetChannel)
+        io.to(roomOf(targetChannel)).emit('clear')
+
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(400, { 'content-type': "application/json" })
+        res.end(JSON.stringify({ error: 'invalid request' }))
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/verify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'email required' }))
+          return
+        }
+
+        const currentRole = getRole(targetEmail)
+        if (!["mod", 'admin', 'owner'].includes(currentRole)) {
+          setRole(targetEmail, 'mod')
+        }
+        setVerified(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+  if (url.pathname === "/admin/unverify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: "email required" }));
+          return
+        }
+
+        const currentRole = getRole(targetEmail);
+        if (currentRole === "mod") {
+          setRole(targetEmail, 'user');
+        }
+        removeVerified(targetEmail);
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+  if (url.pathname === "/admin/redverify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d })
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'forbidden' }))
+          return
+        }
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'email required' }))
+          return
+        }
+
+        setRedVerified(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+  if (url.pathname === "/admin/unredverify" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: "email required" }));
+          return
+        }
+
+        removeRedVerified(targetEmail);
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return;
+  }
+
+  if (url.pathname === "/admin/hide" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || !['owner', 'admin'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        setHidden(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/unhide" && req.method === "POST") {
+    let body = ""
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : 'user';
+        if (!sess || !['owner', 'admin'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.end(JSON.stringify({ error: "forbidden" }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        removeHidden(targetEmail)
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === '/admin/user/info' && req.method === "GET") {
+    try {
+      const sessionId = parseCookies(req).session;
+      const targetEmail = url.searchParams.get('email')
+
+      const sess = sessionId ? getSession(sessionId) : null
+      const sessRole = sess ? getRole(sess.email) : 'user'
+
+      if (!sess || !["admin", 'owner'].includes(sessRole)) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return
+      }
+
+      if (!targetEmail) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return
+      }
+
+      const role = getRole(targetEmail)
+      const verified = isVerified(targetEmail)
+      const redVerified = isRedVerified(targetEmail)
+      const banned = isBanned(targetEmail)
+      const banReason = banned ? getBanReason(targetEmail) : null
+      const muteData = getMute(targetEmail)
+      const muted = !!muteData
+      const muteReason = muteData?.reason || null
+      const muteUntil = muteData?.until || null
+
+      let username = null
+      for (const [, s] of io.sockets.sockets) {
+        if (s.userEmail === targetEmail && s.username) {
+          username = s.username
+          break
+        }
+      }
+      if (!username) {
+        username = getStoredUsername(targetEmail) || 'unknown';
+      }
+
+      const online = [...io.sockets.sockets.values()].some(
+        s => s.userEmail === targetEmail && s.username
+      );
+
+      const messageCount = db.prepare(
+        "SELECT COUNT(*) as count FROM messages WHERE owner_email = ?"
+      ).get(targetEmail)?.count || 0;
+
+      const profileData = getProfileData(targetEmail)
+      let createdAt = profileData?.last_seen || Date.now()
+
+      const firstMessage = db.prepare(
+        "SELECT MIN(time) as first FROM messages WHERE owner_email = ?"
+      ).get(targetEmail)
+      if (firstMessage?.first && firstMessage.first < createdAt) {
+        createdAt = firstMessage.first
+      }
+
+      let clerkId = null
+      let lastSignInAt = null
+      let activeSessions = 0;
+
+      if (!targetEmail.endsWith("@guest")) {
+        try {
+          const sessionRow = db.prepare(
+            "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+          ).get(targetEmail)
+          clerkId = sessionRow?.clerk_id || null
+
+          if (!clerkId) {
+            const list = await clerk.users.getUserList({
+              emailAddress: [targetEmail],
+              limit: 1
+            })
+            clerkId = list.data?.[0]?.id || null
+          }
+
+          if (clerkId) {
+            const clerkUser = await clerk.users.getUser(clerkId);
+            lastSignInAt = clerkUser.lastSignInAt || null
+
+            try {
+              const sessionList = await clerk.sessions.getSessionList({
+                userId: clerkId,
+                status: 'active'
+              });
+              activeSessions = sessionList.data?.length || 0;
+            } catch (e) {
+              console.error('failed to fetch sessions:', e);
+              activeSessions = 0;
+            }
+
+            if (clerkUser.createdAt && clerkUser.createdAt < createdAt) {
+              createdAt = clerkUser.createdAt
+            }
+          }
+        } catch (e) {
+          console.error('failed to fetch clerk data: ', e)
+        }
+      }
+
+      const result = {
+        email: targetEmail,
+        username,
+        role,
+        verified,
+        redVerified,
+        guest: targetEmail.endsWith("@guest"),
+        online,
+        clerkId,
+        createdAt,
+        lastSignInAt,
+        messageCount,
+        activeSessions,
+        banned,
+        banReason,
+        muted,
+        muteReason,
+        muteUntil
+      };
+
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      console.error('Error in /admin/user/info:', e);
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'internal server error' }));
+    }
+    return
+  }
+
+  if (url.pathname === "/admin/user/sessions" && req.method === "GET") {
+    try {
+      const sessionId = parseCookies(req).session;
+      const targetEmail = url.searchParams.get('email')
+
+      const sess = sessionId ? getSession(sessionId) : null
+      const sessRole = sess ? getRole(sess.email) : 'user'
+
+      if (!sess || !['admin', 'owner'].includes(sessRole)) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return
+      }
+
+      if (!targetEmail) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return
+      }
+
+      if (targetEmail.endsWith('@guest')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ sessions: [] }));
+        return
+      }
+
+      let clerkId = null
+      const sessionRow = db.prepare(
+        "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+      ).get(targetEmail)
+      clerkId = sessionRow?.clerk_id || null
+
+      if (!clerkId) {
+        try {
+          const list = await clerk.users.getUserList({
+            emailAddress: [targetEmail],
+            limit: 1
+          })
+          clerkId = list.data?.[0]?.id || null
+        } catch (e) {
+          console.error('failed to fetch clerk id: ', e)
+         }
+      }
+
+      if (!clerkId) {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ sessions: [] }));
+        return
+      }
+
+      try {
+        const sessionList = await clerk.sessions.getSessionList({
+          userId: clerkId,
+          status: 'active'
+        });
+
+        const sessions = (sessionList.data || []).map(s => ({
+          id: s.id,
+          status: s.status,
+          lastActiveAt: s.lastActiveAt,
+          createdAt: s.createdAt,
+          clientType: s.latestActivity?.deviceType || 'unknown'
+        }))
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ sessions }));
+      } catch (e) {
+        console.error('failed to fetch sessions', e)
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'failed to fetch sessions' }));
+      }
+    } catch (e) {
+      console.error('endpoint error: ', e)
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'internal server error' }));
+    }
+    return
+  }
+
+  if (url.pathname === "/admin/user/ban" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, reason } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !["admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot ban urself' }));
+          return
+        }
+
+        const targetRole = getRole(targetEmail)
+        const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+        const sessRoleValue = roleValues[sessRole] || 0
+        const targetRoleValue = roleValues[targetRole] || 0
+
+        if (targetRoleValue >= sessRoleValue) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot ban user with equal or higher role" }));
+          return;
+        }
+
+        const banReason = reason || 'no reason given'
+
+        addBan(targetEmail, banReason)
+
+        for (const [, s] of io.sockets.sockets) {
+          if (s.userEmail === targetEmail) {
+            addIpBan(s.userIp)
+            s.emit('banned', banReason)
+            s.skipLeaveMessage = true
+            s.disconnect()
+          }
+        }
+
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userBanned', targetEmail);
+          }
+        }
+
+        emitAllUserLists()
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        console.error('ban endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/kick" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, reason } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['mod', "admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot kick urself' }));
+          return
+        }
+
+        const targetRole = getRole(targetEmail)
+        const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+        const sessRoleValue = roleValues[sessRole] || 0
+        const targetRoleValue = roleValues[targetRole] || 0
+
+        if (targetRoleValue >= sessRoleValue) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot kick user with equal or higher role" }));
+          return;
+        }
+
+        const kickReason = reason || 'no reason given'
+
+        let kicked = false
+        for (const [, s] of io.sockets.sockets) {
+          if (s.userEmail === targetEmail) {
+            s.emit('kicked', kickReason)
+            s.skipLeaveMessage = true
+            s.disconnect()
+            kicked = true;
+          }
+        }
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true, kicked }));
+      } catch (e) {
+        console.error('kick endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/mute" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, duration, reason } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['mod', "admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot mute urself' }));
+          return
+        }
+
+        const targetRole = getRole(targetEmail)
+        const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+        const sessRoleValue = roleValues[sessRole] || 0
+        const targetRoleValue = roleValues[targetRole] || 0
+
+        if (targetRoleValue >= sessRoleValue) {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot mute user with equal or higher role" }));
+          return;
+        }
+
+        const muteReason = reason || 'no reason given'
+
+        let until = null
+        if (duration !== null && duration !== undefined) {
+          const durationNum = parseInt(duration)
+          if (isNaN(durationNum) || durationNum < 0) {
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid duration' }));
+            return
+          }
+          until = Date.now() + (durationNum * 60 * 1000)
+        }
+
+        setMute(targetEmail, muteReason, until);
+
+        forEachUserSocket(targetEmail, (s) => {
+          s.emit('muted', { reason: muteReason, until });
+        });
+
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userMuted', targetEmail);
+          }
+        }
+
+        emitAllUserLists()
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true, muteReason, until }));
+      } catch (e) {
+        console.error('mute endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/unmute" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['mod', "admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return
+        }
+
+        deleteMute(targetEmail)
+
+        forEachUserSocket(targetEmail, (s) => {
+          s.emit('unmuted')
+        });
+
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userUnmuted', targetEmail);
+          }
+        }
+
+        emitAllUserLists()
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        console.error('unmute endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/role" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail, role: newRole } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !["admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ 'error': 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail || !newRole) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email and role required' }));
+          return
+        }
+
+        const validRoles = ['user', 'mod', 'admin', 'owner'];
+        if (!validRoles.includes(newRole)) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid role' }));
+          return
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: "can't change your own role" }));
+          return
+        }
+
+        if (sessRole === "admin" && !["user", "mod"].includes(newRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'admins can only promote to mod' }));
+          return
+        }
+
+        const currentRole = getRole(targetEmail)
+        if (currentRole === 'owner' && sessRole !== 'owner') {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'only owner can set/remove owner role' }));
+          return
+        }
+
+        if (targetEmail.endsWith('@guest')) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'guests cannot have roles' }));
+          return
+        }
+
+        setRole(targetEmail, newRole)
+
+        try {
+          const list = await clerk.users.getUserList({
+            emailAddress: [targetEmail],
+            limit: 1
+          })
+          const clerkUser = list.data?.[0]
+
+          if (clerkUser) {
+            await clerk.users.updateUserMetadata(clerkUser.id, {
+              publicMetadata: { role: newRole }
+            });
+          }
+        } catch (e) {
+          console.error('failed to update clerk metadata', e);
+        }
+        forEachUserSocket(targetEmail, (s) => {
+          s.userRole = newRole;
+        })
+
+        if (["mod", 'admin', 'owner'].includes(newRole)) {
+          setVerified(targetEmail)
+          forEachUserSocket(targetEmail, (s) => {
+            s.cachedVerified = true
+          });
+        } else if (newRole === 'user') {
+          if (currentRole === "mod") {
+            removeVerified(targetEmail)
+            forEachUserSocket(targetEmail, (s) => {
+              s.cachedVerified = false
+            })
+          }
+        }
+
+        // Emit to admin users for auto-refresh
+        for (const [, s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userRoleChanged', targetEmail);
+          }
+        }
+
+        emitAllUserLists()
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        console.error('role endpoint error: ', e)
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/revoke-session" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => { body += d });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, sessionId: targetSessionId } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : "user"
+
+        if (!sess || !['admin', 'owner'].includes(sessRole)) {
+          res.writeHead(403, { "content-type": 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetSessionId) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'sessionId required' }));
+          return
+        }
+
+        try {
+          await clerk.sessions.revokeSession(targetSessionId)
+
+          clerkSessionCache.set(targetSessionId, {
+            active: false,
+            checkedAt: Date.now()
+          });
+
+          for (const [, s] of io.sockets.sockets) {
+            if (s.clerkSessionId === targetSessionId) {
+              s.emit('kicked', 'session revoked by admin')
+              s.skipLeaveMessage = true
+              s.disconnect()
+            }
+          }
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          console.error('failed to revoke session: ', e);
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'failed to revoke session' }));
+        }
+      } catch (e) {
+        console.error('revoke-session error: ', e);
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/revoke-all-sessions" && req.method === "POST") {
+    let body = "";
+    req.on("data", (d) => { body += d; });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !["admin", 'owner'].includes(sessRole)) {
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'forbidden' }));
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email required' }));
+          return;
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'cannot revoke your own sessions' }));
+          return
+        }
+
+        if (targetEmail.endsWith('@guest')) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'guest users do not have clerk sessions' }));
+          return
+        }
+
+        let clerkId = null
+        const sessionRow = db.prepare(
+          "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+        ).get(targetEmail)
+        clerkId = sessionRow?.clerk_id || null
+
+        if (!clerkId) {
+          try {
+            const list = await clerk.users.getUserList({
+              emailAddress: [targetEmail],
+              limit: 1
+            })
+            clerkId = list.data?.[0]?.id || null;
+          } catch (e) {
+            console.error('failed to fetch clerk id: ', e);
+          }
+        }
+        if (!clerkId) {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true, revokedCount: 0 }));
+          return
+        }
+
+        try {
+          const clerkUser = await clerk.users.getUser(clerkId);
+          let revokedCount = 0;
+
+          for (const sess of clerkUser.sessions || []) {
+            if (sess.status === "active") {
+              try {
+                await clerk.sessions.revokeSession(sess.id);
+                clerkSessionCache.set(sess.id, {
+                  active: false,
+                  checkedAt: Date.now()
+                })
+                revokedCount++;
+              } catch (e) {
+                console.error(`failed to revoke session ${sess.id}: `, e)
+              }
+            }
+          }
+
+          forEachUserSocket(targetEmail, (s) => {
+            s.emit('kicked', 'session revoked by admin')
+            s.skipLeaveMessage = true
+            s.disconnect()
+          })
+
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true, revokedCount }));
+        } catch (e) {
+          console.error("Failed to revoke sessions:", e);
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "failed to revoke sessions" }));
+        }
+      } catch (e) {
+        console.error("/admin/user/revoke-all-sessions error:", e);
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "invalid request" }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/ban-clerk" && req.method === "POST") {
+    let body = "";
+    req.on("data", (d) => { body += d; });
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body);
+        const sess = sessionId ? getSession(sessionId) : null;
+        const sessRole = sess ? getRole(sess.email) : "user";
+
+        if (!sess || sessRole !== "owner") {
+          res.writeHead(403, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "owner only" }));
+          return;
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "email required" }));
+          return;
+        }
+
+        if (targetEmail === sess.email) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot ban yourself" }));
+          return;
+        }
+
+        if (targetEmail.endsWith("@guest")) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "cannot Clerk-ban guest users" }));
+          return;
+        }
+        let clerkId = null;
+        const sessionRow = db.prepare(
+          "SELECT clerk_id FROM sessions WHERE email = ? AND clerk_id IS NOT NULL LIMIT 1"
+        ).get(targetEmail);
+        clerkId = sessionRow?.clerk_id || null;
+
+        if (!clerkId) {
+          try {
+            const list = await clerk.users.getUserList({
+              emailAddress: [targetEmail],
+              limit: 1
+            });
+            clerkId = list.data?.[0]?.id || null;
+          } catch (e) {
+            console.error("failed to find clerk id: ", e);
+          }
+        }
+
+        if (!clerkId) {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "no clerk account found" }));
+          return;
+        }
+        try {
+          await clerk.users.banUser(clerkId)
+
+          addBan(targetEmail, 'clerk account banned')
+
+          forEachUserSocket(targetEmail, (s) => {
+            s.emit('banned', 'clerk account banned')
+            s.skipLeaveMessage = true
+            s.disconnect()
+          })
+
+          emitAllUserLists()
+
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (e) {
+          console.error('failed to clerk ban: ', e);
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'failed to ban' }));
+        }
+      } catch (e) {
+        console.error('clerk ban endpoint error: ', e);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/unban" && req.method === "POST") {
+    let body = ''
+    req.on('data', (d) => {body += d})
+    req.on('end', async () => {
+      try {
+        const { session: sessionId, email: targetEmail } = JSON.parse(body)
+        const sess = sessionId ? getSession(sessionId) : null
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sess || !['admin', 'owner'].includes(sessRole)) {
+          res.writeHead(403, {'content-type': 'application/json'})
+          res.end(JSON.stringify({error: 'forbidden'}))
+          return
+        }
+
+        if (!targetEmail) {
+          res.writeHead(400, {'content-type': 'application/json'})
+          res.end(JSON.stringify({error: 'email required'}))
+          return
+        }
+
+        removeBan(targetEmail)
+
+        for (const [,s] of io.sockets.sockets) {
+          if (s.userEmail === targetEmail && s.userIp) {
+            removeIpBan(s.userIp)
+          }
+        }
+
+        for (const [,s] of io.sockets.sockets) {
+          if (['admin', 'owner'].includes(s.userRole)) {
+            s.emit('userUnbanned', targetEmail)
+          }
+        }
+
+        emitAllUserLists()
+
+        res.writeHead(200, {'content-type': 'application/json'})
+        res.end(JSON.stringify({success: true}))
+      } catch (e) {
+        console.error('unban endpoint error:', e);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'internal server error' }));
+      }
+    })
+    return
+  }
+
+  if (url.pathname === "/admin/user/clerk-status" && req.method === "GET") {
+    try {
+      const sessionId = parseCookies(req).session;
+      const targetEmail = url.searchParams.get('email')
+
+      const sess = sessionId ? getSession(sessionId) : null
+      const sessRole = sess ? getRole(sess.email) : 'user'
+
+      if (!sess || !['admin', 'owner'].includes(sessRole)) {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return;
+      }
+
+      if (!targetEmail) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return;
+      }
+
+      if (targetEmail.endsWith('@guest')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ clerkBanned: false }));
+        return;
+      }
+
+      try {
+        const list = await clerk.users.getUserList({
+          emailAddress: [targetEmail],
+          limit: 1
+        });
+        const clerkUser = list.data?.[0];
+
+        if (!clerkUser) {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ clerkBanned: false }));
+          return;
+        }
+
+        const isBanned = clerkUser.banned || false;
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ clerkBanned: isBanned }));
+      } catch (e) {
+        console.error('failed to check clerk ban status:', e);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'failed to check clerk ban status' }));
+      }
+    } catch (e) {
+      console.error('clerk status error:', e);
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'failed to check clerk ban status' }));
+    }
+  }
+
   if (url.pathname === "/messages") {
     const messagesIp =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
@@ -2291,6 +3525,30 @@ httpServer.on("request", async (req, res) => {
       }
     });
     return;
+  }
+
+  if (url.pathname === "/admin" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("admin.html", {})
+    res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
+  }
+
+  if (url.pathname === "/admin/users" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("users.html", {})
+    res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
+  }
+
+  if (url.pathname === "/admin/emoji" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("emoji.html", {})
+    res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
   }
 
   // server-side routing for the root page: pick login / ban / maintenance / chat
