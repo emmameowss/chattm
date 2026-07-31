@@ -22,10 +22,11 @@ let availableChannels = ['main']
 
 async function loadChannels() {
   try {
-    const res = await('/channels')
+    const res = await fetch('/channels')
     const data = await res.json()
     if (data && data.channels) {
       availableChannels = data.channels.map(ch => ch.name)
+      // console.log(availableChannels)
     }
   } catch (e) {
     console.error('failed to load channels:', e)
