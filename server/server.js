@@ -335,43 +335,6 @@ const commands = {
       socket.emit("commandError", `unmuted ${targetUsername}`);
     },
   },
-  "/clear": {
-    minRole: "admin",
-    run: (socket) => {
-      clearMessages(socket.currentChannel);
-      io.to(roomOf(socket.currentChannel)).emit("clear");
-    },
-  },
-  "/mutechat": {
-    minRole: "owner",
-    run: () => {
-      chatMuted = true;
-      io.emit("mutechat", "chat has been muted");
-    },
-  },
-  "/unmutechat": {
-    minRole: "owner",
-    run: () => {
-      chatMuted = false;
-      io.emit("unmutechat", "chat has been unmuted");
-    },
-  },
-  "/status": {
-    minRole: "owner",
-    run: (socket, rest) => {
-      status = rest;
-      socket.emit("status", status);
-    },
-  },
-  /*
-  "/reloadfilter": {
-    minRole: "admin",
-    run: (socket) => {
-      loadFilterWordsIntoMemory();
-      socket.emit("commandError", `${filteredwords.length} loaded`);
-    },
-  },
-  */
   "/resetstrikes": {
     minRole: "mod",
     run: (socket, rest) => {
@@ -431,34 +394,6 @@ const commands = {
       }
     },
   },
-  /*
-  "/removefilter": {
-    minRole: "admin",
-    run: (socket, rest) => {
-      const word = rest.toLowerCase();
-      if (!filteredwords.includes(word)) {
-        socket.emit("commandError", `${word} is not in the filter`);
-        return;
-      }
-      removeFilterWord(word);
-      loadFilterWordsIntoMemory();
-      socket.emit("commandError", `removed ${word} from the filter`);
-    },
-  },
-  "/addfilter": {
-    minRole: "admin",
-    run: (socket, rest) => {
-      const word = rest.toLowerCase();
-      if (!word) {
-        socket.emit("commandError", "you need to specify a word");
-        return;
-      }
-      addFilterWord(word);
-      loadFilterWordsIntoMemory();
-      socket.emit("commandError", `added ${word} into the filter`);
-    },
-  },
-  */
   "/setcolor": {
     minRole: "admin",
     run: (socket, rest) => {
@@ -491,106 +426,6 @@ const commands = {
       forEachUserSocket(targetEmail, (s) => s.emit("colorChanged", color));
       emitAllUserLists();
       socket.emit("commandError", `set ${targetUsername}'s color to ${color}`);
-    },
-  },
-  "/maintenance": {
-    minRole: "admin",
-    run: (socket, rest) => {
-      maintenance = !maintenance;
-      reason = maintenance ? rest : "";
-      setSetting("maintenance", maintenance ? "1" : "0");
-      setSetting("maintenance_reason", reason);
-      for (const [, s] of io.sockets.sockets) {
-        if (!["mod", "admin", "owner"].includes(s.userRole)) {
-          s.emit("maintenance", maintenance, reason);
-          if (maintenance) s.disconnect();
-        }
-      }
-      socket.emit(
-        "commandError",
-        maintenance ? "maintenance enabled" : "maintenance disabled",
-      );
-    },
-  },
-  "/verify": {
-    minRole: "owner",
-    run: async (socket, rest) => {
-      setVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedVerified = true;
-      });
-
-      const currentRole = getRole(rest)
-      if (currentRole === "user") {
-        try {
-          const list = await clerk.users.getUserList({ emailAddress: [rest] })
-          const clerkUser = list.data?.[0]
-          if (clerkUser) {
-            await clerk.users.updateUserMetadata(clerkUser.id, {
-              publicMetadata: { role: "mod" }
-            })
-            setRole(rest, "mod")
-            forEachUserSocket(rest, (s) => {
-              s.userRole = "mod";
-            })
-          }
-        } catch (e) {
-          console.error('failed to promote user to mod: ', e)
-        }
-      }
-      emitAllUserLists()
-      socket.emit('commandError', `verified ${rest}`)
-    },
-  },
-  "/unverify": {
-    minRole: "owner",
-    run: async (socket, rest) => {
-      removeVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedVerified = false;
-      });
-      const currentRole = getRole(rest)
-      if (currentRole === "mod") {
-        try {
-          const list = await clerk.users.getUserList({ emailAddress: [rest] })
-          const clerkUser = list.data?.[0]
-          if (clerkUser) {
-            await clerk.users.updateUserMetadata(clerkUser.id, {
-              publicMetadata: { role: "user" }
-            })
-            setRole(rest, 'user')
-            forEachUserSocket(rest, (s) => {
-              s.userRole = 'user'
-            })
-          }
-        } catch (e) {
-          console.error('failed to demote user from mod: ', e)
-        }
-      }
-      emitAllUserLists()
-      socket.emit('commandError', `unverified ${rest}`)
-    },
-  },
-  "/redverify": {
-    minRole: "owner",
-    run: (socket, rest) => {
-      setRedVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedRedVerified = true;
-      });
-      emitAllUserLists();
-      socket.emit("commandError", `red verified ${rest}`);
-    },
-  },
-  "/unredverify": {
-    minRole: "owner",
-    run: (socket, rest) => {
-      removeRedVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedRedVerified = false;
-      });
-      emitAllUserLists();
-      socket.emit("commandError", `removed red verification from ${rest}`);
     },
   },
   "/nick": {
