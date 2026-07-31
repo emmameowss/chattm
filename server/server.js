@@ -776,7 +776,6 @@ function emitAllUserLists() {
 function buildUserList(channel = "main") {
   const onlineEmails = new Set();
   const onlineUsers = new Map();
-  const users = [];
 
   for (const [id, s] of io.sockets.sockets) {
     if (!s.username) continue;
@@ -798,6 +797,8 @@ function buildUserList(channel = "main") {
       });
     }
   }
+
+  const users = Array.from(onlineUsers.values())
 
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   for (const row of getRecentUsers(cutoff)) {
