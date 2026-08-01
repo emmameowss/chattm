@@ -5,7 +5,7 @@ import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
 import { randomBytes } from "crypto";
-import { readFile, appendFile } from "fs/promises";
+import { readFile } from "fs/promises";
 import { extname, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
 import { randomUUID } from "crypto";
@@ -224,10 +224,6 @@ const commands = {
       }
       const targetEmail = target;
       addBan(targetEmail, banReason);
-      await appendFile(
-        "bans.log",
-        `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${banReason}\n`,
-      );
       for (const [, s] of io.sockets.sockets) {
         if (s.userEmail === targetEmail) {
           addIpBan(s.userIP);
@@ -275,10 +271,6 @@ const commands = {
       target.skipLeaveMessage = true;
       target.disconnect();
       socket.emit("commandError", `kicked ${targetUsername}`, 'success');
-      await appendFile(
-        "kicks.log",
-        `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${kickReason}\n`,
-      );
     },
   },
   "/mute": {
@@ -309,10 +301,6 @@ const commands = {
         durationMs ? Date.now() + durationMs : null,
       );
       const m = getMute(targetEmail);
-      await appendFile(
-        "mutes.log",
-        `${new Date().toISOString()}: ${socket.userEmail}`,
-      );
       forEachUserSocket(targetEmail, (s) =>
         s.emit("muted", { reason: muteReason, until: m.until }),
       );
@@ -1263,10 +1251,6 @@ io.on("connection", (socket) => {
     }
 
     const timestamp = new Date().toISOString();
-    await appendFile(
-      "messages.log",
-      `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || "[image]"}\n`,
-    );
     const replyTo =
       typeof data.replyTo === "string" && getMessageById(data.replyTo)
         ? data.replyTo
@@ -1416,11 +1400,6 @@ httpServer.on("request", async (req, res) => {
         } catch (e) {
           console.error("clerk avatar sync failed:", e);
         }
-
-        await appendFile(
-          "login.log",
-          `${new Date().toISOString()}: ${email} signed in from ${ip}\n`,
-        );
         const sessionid = randomBytes(32).toString("hex");
         saveSession(sessionid, {
           email,
@@ -1586,10 +1565,6 @@ httpServer.on("request", async (req, res) => {
 
         const userEmail = uploadSession.email;
         const uUsername = fields.username?.[0] || "unknown";
-        await appendFile(
-          "uploads.log",
-          `${new Date().toISOString()}: ${userEmail} (${uUsername}): ${publicUrl}\n`,
-        );
 
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ url: publicUrl }));
@@ -1623,10 +1598,6 @@ httpServer.on("request", async (req, res) => {
     const ip =
       req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
       req.socket.remoteAddress;
-    await appendFile(
-      "login.log",
-      `${new Date().toISOString()}: guest-${guestId} signed in from ${ip}\n`,
-    );
     saveSession(sessionid, {
       email: guestEmail,
       guest: true,
