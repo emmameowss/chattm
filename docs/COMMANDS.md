@@ -33,4 +33,3 @@ written at 5am because I was bored
 
 ### Misc
 * `/reloademojis` - fetches emojis from R2 and adds new ones to the database
-min panel
