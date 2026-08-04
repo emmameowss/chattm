@@ -1,69 +1,44 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <title>chat™ admin | emoji</title>
-        <link rel="stylesheet" href="/style.css">
-    </head>
-    <body class="admin-page">
-        <h1>chat™</h1>
-        <nav class="admin-nav">
-          <div class="admin-nav-tabs">
-            <a href="/admin">home</a>
-            <a href="/admin/users">users</a>
-            <a href="/admin/emoji" class="active">emoji</a>
-            <a id='logs'>logs</a>
-          </div>
-          <a href="/" class="admin-nav-back">← back to chat™</a>
-        </nav>
-        <div id="admin-emoji-list"></div>
-        <script>
-          const session = localStorage.getItem('session')
-          if (!session) window.location.href = "/"
+  <head>
+    <meta charset="utf-8">
+    <title>chat™ admin | emoji</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  </head>
+  <body class="admin-page">
+    <h1>chat™</h1>
+    <nav class="admin-nav">
+      <div class="admin-nav-tabs">
+        <a href="/admin">home</a>
+        <a href='/admin/users'>users</a>
+        <a href="/admin/emoji" class="active">emoji</a>
+        <a id="logs" class="noselect">logs</a>
+      </div>
+      <a href="/" class="admin-nav-back">← back to chat™</a>
+    </nav>
+    <div class="admin-users-container">
+      <div class="admin-users-sidebar" id="admin-emoji-sidebar">
 
-          async function loadPending() {
-            const res = await fetch(`/pending-emojis`, {
-              credentials: 'same-origin'
-            })
-            const items = await res.json()
-            const list = document.querySelector('#admin-emoji-list')
-            list.innerHTML = ''
-            for (const item of items) {
-              const row = document.createElement('row')
-              row.innerHTML = `
-                <img src="${item.url}" class="admin-emoji-thumb">
-                <div class="admin-emoji-info">
-                  <span class="admin-emoji-shortcode">${item.shortcode}</span>
-                  <span class="admin-emoji-submitter">by ${item.submitter_username || item.submitter_email}</span>
-                </div>
-              `
-              if ((item.status || "pending") === 'pending') {
-                const actions = document.createElement("div")
-                actions.className = "admin-emoji-detail-actions"
-                const accept = document.createElement("button")
-                accept.textContent = 'accept'
-                accept.addEventListener('click', () => review(item.id, 'accept'))
-                const deny = document.createElement('button')
-                deny.textContent = 'deny'
-                deny.addEventListener('click', () => review(item.id, 'deny'))
-                actions.append(accept,deny)
-                row.appendChild(actions)
-              }
-              list.appendChild(row)
-            }
-          }
-
-          async function review(id,action) {
-            const reason = prompt('reason: (optional)') || null
-            await fetch(`/admin/emoji/${action}`, {
-              method: "POST",
-              headers: { "content-type": 'application/json' },
-              body: JSON.stringify({ id, session, reason }),
-              credentials: 'same-origin'
-            })
-            await loadPending()
-          }
-          await loadPending()
-        </script>
-    </body>
+      </div>
+      <div class="admin-users-detail" id="admin-emoji-detail">
+        <div class='admin-users-detail-empty'>
+          select an emoji to view <details></details>
+        </div>
+      </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/emoji.js"></script>
+    <div id="modal-overlay" style="display: none">
+      <div id="modal-box">
+        <p id="modal-message"></p>
+        <input type="text" id="modal-input" style="display: none;" />
+        <div id="modal-actions">
+          <button type="button" id="modal-cancel">cancel</button>
+          <button type="button" id="modal-confirm">confirm</button>
+        </div>
+      </div>
+    </div>
+    <div id="toast-container"></div>
+  </body>
 </html>
