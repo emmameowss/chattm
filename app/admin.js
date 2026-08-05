@@ -6,12 +6,6 @@ const socket = io(window.location.origin, {
   transports: ["websocket"]
 });
 
-const emojiTab = document.querySelector('#emoji')
-
-emojiTab.addEventListener('click', () => {
-  showToast('the emoji tab has not been implemented, check back later', 'info')
-})
-
 const logsTab = document.querySelector('#logs')
 
 logsTab.addEventListener('click', () => {
