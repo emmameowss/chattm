@@ -99,7 +99,7 @@ function renderEmojis(emojis) {
     sidebar.innerHTML = ''
 
     if (emojis.length === 0) {
-        const empty = documet.createElement('div')
+        const empty = document.createElement('div')
         empty.className = 'admin-users-detail-empty'
         empty.textContent = 'no custom emojis'
         empty.style.height = "100%"
@@ -217,7 +217,7 @@ function renderEmojiDetail(emoji) {
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'destructive';
     deleteBtn.innerHTML = '<i class="ti ti-trash"></i> delete emoji';
-    deleteBtn.onclick = () => deleteEmoji(emoji.shortcode);
+    deleteBtn.onclick = (e) => deleteEmoji(emoji.shortcode, e);
     actionsDiv.appendChild(deleteBtn);
 
     actionsSection.appendChild(actionsDiv);
@@ -226,7 +226,7 @@ function renderEmojiDetail(emoji) {
     detail.appendChild(content);
 }
 
-async function deleteEmoji(shortcode) {
+async function deleteEmoji(shortcode, event) {
     const confirmed = await showModal({
         message: `delete ${shortcode}?\n\nthis can't be undone`,
         withInput: false

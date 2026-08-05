@@ -4,7 +4,7 @@ import { createServer } from "http";
 import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
-import { getCipherInfo, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
 import { readFile, appendFile } from "fs/promises";
 import { extname, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
@@ -1769,7 +1769,23 @@ httpServer.on("request", async (req, res) => {
         }
 
         const url = emojis[shortcode]
-        const s3Key = url.replace(process.env.AWS_S3_PUBLIC_URL + "/", '')
+        
+        if (!process.env.AWS_S3_PUBLIC_URL) {
+          console.error('AWS_S3_PUBLIC_URL not configured')
+          res.writeHead(500, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'S3 not configured'}))
+          return
+        }
+        
+        const publicUrlPrefix = process.env.AWS_S3_PUBLIC_URL + '/'
+        if (!url.startsWith(publicUrlPrefix)) {
+          console.error('Emoji URL does not match expected S3 public URL format:', url)
+          res.writeHead(500, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'invalid emoji URL format'}))
+          return
+        }
+        
+        const s3Key = url.replace(publicUrlPrefix, '')
 
         try {
           await s3.send(new DeleteObjectCommand({
