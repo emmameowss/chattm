@@ -1346,6 +1346,103 @@ button:active {
     padding: 40px 20px;
 }
 
+/* Admin Emoji Styles */
+.admin-emoji-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+}
+
+.admin-emoji-row:hover {
+    background: var(--bg);
+    border-color: var(--border);
+}
+
+.admin-emoji-row.selected {
+    background: var(--pink-dim);
+    border-color: var(--pink);
+}
+
+.admin-emoji-thumbnail {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 6px;
+}
+
+.admin-emoji-thumbnail img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.admin-emoji-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.admin-emoji-shortcode {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-emoji-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-emoji-preview {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+}
+
+.admin-emoji-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.admin-emoji-detail-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.admin-emoji-detail-name {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text);
+}
+
 @media (max-width: 900px) {
     .admin-users-container {
         flex-direction: column;

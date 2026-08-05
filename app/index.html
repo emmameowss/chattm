@@ -73,7 +73,7 @@
                 <button type="button" id="admin-btn" style="display: none">
                     <i class="ti ti-shield-lock"></i> admin
                 </button>
-                <div id="app-version">v2.0.0</div>
+                <div id="app-version">v2.1.0</div>
             </div>
         </form>
         <div id="stats-backdrop" style="display: none"></div>
@@ -113,53 +113,6 @@
                         <div id="version-status"></div>
                     </div>
                 </div>
-            </div>
-        </div>
-        <div id="admin-backdrop" style="display: none"></div>
-        <div id="admin-panel" style="display: none">
-            <div id="admin-inner">
-                <button type="button" id="admin-close">&times;</button>
-                <h2>admin</h2>
-                <div id="admin-tabs">
-                    <button
-                        type="button"
-                        id="admin-tab-actions"
-                        class="admin-tab active"
-                    >
-                        actions
-                    </button>
-                    <button
-                        type="button"
-                        id="admin-tab-users"
-                        class="admin-tab"
-                    >
-                        users
-                    </button>
-                    <button
-                        type="button"
-                        id="admin-tab-emoji"
-                        class="admin-tab"
-                    >
-                        emoji
-                    </button>
-                </div>
-                <div id="admin-content">
-                    <button type="button" id="owner-mutechat-btn">
-                        <i class="ti ti-microphone-off"></i> toggle chat mute
-                    </button>
-                    <button type="button" id="owner-maintenance-btn">
-                        <i class="ti ti-tool"></i> toggle maintenance
-                    </button>
-                    <button type="button" id="owner-clear-btn">
-                        <i class="ti ti-trash"></i> clear chat
-                    </button>
-                    <button type="button" id="owner-refresh-version-btn">
-                        <i class="ti ti-refresh"></i> refresh version status
-                    </button>
-                </div>
-                <div id="admin-users-list" style="display: none"></div>
-                <div id="admin-emoji-list" style="display: none"></div>
-                <div id="admin-emoji-detail" style="display: none"></div>
             </div>
         </div>
         <div id="username-setup-backdrop" style="display: none"></div>
@@ -234,13 +187,6 @@
             <p id="typing-indicator"></p>
         </div>
         <div id="emoji-picker" style="display: none"></div>
-        <div id="my-emoji-panel" style="display: none">
-            <div id="my-emoji-header">your suggestions</div>
-            <div id="my-emoji-list"></div>
-            <div id="my-emoji-detail" style="display: none"></div>
-            <button type="button" id="my-emoji-add-btn">
-                + suggest an emoji
-            </button>
         </div>
         <div id="composer-wrap">
             <div id="reply-bar" style="display: none">
@@ -287,63 +233,12 @@
                 </div>
             </div>
         </div>
-        <div id="emoji-suggest-overlay" style="display: none">
-            <div id="emoji-suggest-box">
-                <div id="emoji-suggest-title">suggest an emoji</div>
-                <input
-                    id="emoji-suggest-shortcode"
-                    type="text"
-                    placeholder=":shortcode:"
-                    maxlength="30"
-                    autocomplete="off"
-                />
-                <label id="emoji-suggest-file-label">
-                    <span id="emoji-suggest-file-text">choose image</span>
-                    <input
-                        id="emoji-suggest-file"
-                        type="file"
-                        accept="image/png,image/gif,image/webp,image/jpeg,image/svg+xml"
-                        style="display: none"
-                    />
-                </label>
-                <div id="emoji-suggest-preview"></div>
-                <textarea
-                    id="emoji-suggest-notes"
-                    placeholder="notes (optional)"
-                    maxlength="200"
-                ></textarea>
-                <div id="emoji-suggest-error"></div>
-                <div id="emoji-suggest-buttons">
-                    <button type="button" id="emoji-suggest-cancel">
-                        cancel
-                    </button>
-                    <button type="button" id="emoji-suggest-submit">
-                        submit
-                    </button>
-                </div>
-            </div>
-        </div>
         <div id="message-context-menu">
             <button type="button" id="ctx-reply-btn">
                 <i class="ti ti-arrow-back-up"></i> reply
             </button>
             <button type="button" id="ctx-delete-btn">
                 <i class="ti ti-trash"></i> delete message
-            </button>
-        </div>
-        <div id="admin-user-context-menu">
-            <button type="button" id="ctx-verify-btn">
-                <i class="ti ti-rosette-discount-check"></i> verify
-            </button>
-            <button type="button" id="ctx-unverify-btn">
-                <i class="ti ti-rosette-discount-check-off"></i> unverify
-            </button>
-            <button type="button" id="ctx-redverify-btn">
-                <i class="ti ti-rosette-discount-check"></i> red verify
-            </button>
-            <button type="button" id="ctx-unredverify-btn">
-                <i class="ti ti-rosette-discount-check-off"></i> remove red
-                verify
             </button>
         </div>
         <nav id="channels">
