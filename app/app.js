@@ -861,7 +861,6 @@ if (session) {
 
   function renderEmojiPicker() {
     emojiPicker.innerHTML = "";
-    emojiPicker.appendChild(suggestBtn);
     const entries = Object.entries(customEmoji);
     for (const [shortcode, url] of entries) {
       const btn = document.createElement("button");
@@ -1488,50 +1487,12 @@ if (session) {
   document.addEventListener("click", (e) => {
     const ctxMenu = document.querySelector("#message-context-menu");
     if (!ctxMenu.contains(e.target)) ctxMenu.classList.remove("open");
-    const adminCtxMenu = document.querySelector("#admin-user-context-menu");
-    if (!adminCtxMenu.contains(e.target)) adminCtxMenu.classList.remove("open");
   });
 
   document.addEventListener("contextmenu", (e) => {
     if (!e.target.closest("li"))
       document.querySelector("#message-context-menu").classList.remove("open");
-    if (!e.target.closest(".admin-user-row"))
-      document
-        .querySelector("#admin-user-context-menu")
-        .classList.remove("open");
   });
-
-  function openAdminUserContextMenu(e, u) {
-    e.preventDefault();
-    const menu = document.querySelector("#admin-user-context-menu");
-    const verifyBtn = document.querySelector("#ctx-verify-btn");
-    const unverifyBtn = document.querySelector("#ctx-unverify-btn");
-    const redVerifyBtn = document.querySelector("#ctx-redverify-btn");
-    const unredVerifyBtn = document.querySelector("#ctx-unredverify-btn");
-    verifyBtn.style.display = u.verified ? "none" : "";
-    unverifyBtn.style.display = u.verified ? "" : "none";
-    redVerifyBtn.style.display = u.redVerified ? "none" : "";
-    unredVerifyBtn.style.display = u.redVerified ? "" : "none";
-    verifyBtn.onclick = () => {
-      socket.emit("message", { text: `/verify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    unverifyBtn.onclick = () => {
-      socket.emit("message", { text: `/unverify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    redVerifyBtn.onclick = () => {
-      socket.emit("message", { text: `/redverify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    unredVerifyBtn.onclick = () => {
-      socket.emit("message", { text: `/unredverify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    menu.style.left = `${Math.min(e.clientX, window.innerWidth - 180)}px`;
-    menu.style.top = `${Math.min(e.clientY, window.innerHeight - 80)}px`;
-    menu.classList.add("open");
-  }
 
   socket.on("messageDeleted", (messageId) => {
     const li = document.querySelector(`li[data-id="${messageId}"]`);
