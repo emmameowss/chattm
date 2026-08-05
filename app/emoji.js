@@ -170,7 +170,7 @@ function renderEmojiDetail(emoji) {
     name.className = 'admin-emoji-detail-name'
     name.textContent = emoji.shortcode
     info.appendChild(name)
-    header,appendChild(info)
+    header.appendChild(info)
     content.appendChild(header)
 
     const section = document.createElement('div')
