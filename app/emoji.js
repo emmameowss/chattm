@@ -191,7 +191,7 @@ function renderEmojiDetail(emoji) {
 
     const urlValue = document.createElement('span')
     urlValue.className = 'admin-clerk-id'
-    urlValue.textContent = emoji.url.slice(0,50)
+    urlValue.textContent = emoji.url.slice(0,70)
 
     const copyBtn = document.createElement('button')
     copyBtn.innerHTML = '<i class="ti ti-copy"></i>'
