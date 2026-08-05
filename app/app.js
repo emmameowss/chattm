@@ -2064,4 +2064,7 @@ if (session) {
       if (withInput) inputEl.addEventListener("keydown", onKey);
     });
   }
+  document.querySelector("#admin-btn").addEventListener("click", () => {
+    window.location.href = "/admin";
+  });
 }
