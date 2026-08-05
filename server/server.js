@@ -4,7 +4,7 @@ import { createServer } from "http";
 import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
-import { randomBytes } from "crypto";
+import { getCipherInfo, randomBytes } from "crypto";
 import { readFile, appendFile } from "fs/promises";
 import { extname, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
@@ -2043,6 +2043,68 @@ httpServer.on("request", async (req, res) => {
       }
     });
     return;
+  }
+
+  if (url.pathname === "/admin/emoji/list" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+
+    const emojis = getCustomEmoji()
+    const emojiList = Object.entries(emojis)
+      .map(([shortcode, url]) => ({shortcode, url}))
+      .sort((a,b) => a.shortcode.localeCompare(b.shortcode))
+
+    res.writeHead(200, {'content-type': 'application/json'})
+    res.end(JSON.stringify({emojis: emojiList}))
+    return
+  }
+
+  if (url.pathname === "/admin/emoji/delete" && req.method === "POST") {
+    let body = ''
+    req.on('data', (chunk) => (body += chunk))
+    req.on('end', async () => {
+      try {
+        const { session, shortcode } = JSON.parse(body)
+        const sess = getSession(session)
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sessRole || !['admin', 'owner'].includes(sessRole)) {
+          res.writeHead(403, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'forbidden'}))
+          return
+        }
+
+        const emojis = getCustomEmoji()
+        if (!emojis[shortcode]) {
+          res.writeHead(404, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'emoji not found'}))
+          return
+        }
+
+        const url = emojis[shortcode]
+        const s3Key = url.replace(process.env.AWS_S3_PUBLIC_URL + "/", '')
+
+        try {
+          await s3.send(new DeleteObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: s3Key
+          }));
+        } catch (e) {
+          console.error('failed to delete:', e)
+        }
+
+        removeCustomEmoji(shortcode)
+
+        io.emit('emojiUpdate', getCustomEmoji())
+
+        res.writeHead(200, {'content-type': 'application/json'})
+        res.end(JSON.stringify({success: true}))
+      } catch (e) {
+        console.error('error deleting emoji:', e)
+        res.writeHead(500, {'content-type': 'application/json'})
+        res.end(JSON.stringify({success: false, error: 'internal error'}))
+      }
+    })
+    return
   }
 
   if (url.pathname === "/admin/mutechat" && req.method === "POST") {
