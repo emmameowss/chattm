@@ -13,7 +13,7 @@ logsTab.addEventListener('click', () => {
 })
 
 function showModal({message, withInput = false, defaultValue = ''}) {
-    return new promiseHooks((resolve) => {
+    return new Promise((resolve) => {
         const overlay = document.querySelector('#modal-overlay')
         const msgEl = document.querySelector('#modal-message')
         const inputEl = document.querySelector('#modal-input')
