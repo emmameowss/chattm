@@ -367,31 +367,9 @@ if (session) {
     applyTheme();
   });
 
-  const compactbtn = document.querySelector("#compact-btn");
-  let compactMode = localStorage.getItem("compactMode") === "true";
   let renderedHistory = []; // for re-render on mode toggle
   let currentChannel = "main";
   let channelList = ["main"];
-
-  function applyCompact() {
-    document.documentElement.classList.toggle("compact", compactMode);
-    compactbtn.innerHTML = compactMode
-      ? '<i class="ti ti-layout-list"></i> modern mode'
-      : '<i class="ti ti-layout-list"></i> compact mode';
-  }
-
-  applyCompact();
-  compactbtn.addEventListener("click", () => {
-    compactMode = !compactMode;
-    localStorage.setItem("compactMode", compactMode);
-    applyCompact();
-    // re-render so grouping applies (or is removed) immediately
-    const ul = document.querySelector("ul");
-    ul.innerHTML = "";
-    lastMsgMeta = null;
-    renderedHistory.forEach((data) => renderMessage(data));
-    ul.scrollTop = ul.scrollHeight;
-  });
 
   const tooltipsbtn = document.querySelector("#tooltips-btn");
   let tooltipsHidden = localStorage.getItem("tooltipsHidden") === "true";
@@ -1347,7 +1325,6 @@ if (session) {
     const color = data.color || getNameColor(ausername);
 
     const isContinuation =
-      !document.documentElement.classList.contains("compact") &&
       lastMsgMeta &&
       lastMsgMeta.username === ausername &&
       data.time - lastMsgMeta.time < 5 * 60 * 1000 &&
