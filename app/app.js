@@ -1288,7 +1288,7 @@ if (session) {
 
   function makeRedCheckBadge(
     size,
-    tooltip = "this checkmark is only held by my girlfriend and z. you cannot get it.",
+    tooltip = "this checkmark is only held by my wife and z. you cannot get it.",
   ) {
     return makeBadge("https://cdn.chattm.app/verified_red.png", size, tooltip);
   }
