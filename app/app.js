@@ -1483,6 +1483,20 @@ if (session) {
   socket.on("messageDeleted", (messageId) => {
     const li = document.querySelector(`li[data-id="${messageId}"]`);
     if (li) li.remove();
+
+    const allMessages = document.querySelectorAll("ul li[data-id")
+    if (allMessages.length > 0) {
+      const lastLi = allMessages[allMessages.length - 1];
+      const lastId = lastLi.dataset.id
+      const lastMsg = renderedHistory.find(m => m.id === parseInt(lastId))
+      if (lastMsg) {
+        lastMsgMeta = { username: lastMsg.username, time: lastMsg.time }
+      } else {
+        lastMsgMeta = null
+      }
+    } else {
+      lastMsgMeta = null
+    }
   });
   // user renamed status
   socket.on("userRenamed", ({ from, to }, guest) => {
