@@ -1480,22 +1480,149 @@ if (session) {
       document.querySelector("#message-context-menu").classList.remove("open");
   });
 
-  socket.on("messageDeleted", (messageId) => {
+socket.on("messageDeleted", (messageId) => {
     const li = document.querySelector(`li[data-id="${messageId}"]`);
-    if (li) li.remove();
-
-    const allMessages = document.querySelectorAll("ul li[data-id")
-    if (allMessages.length > 0) {
-      const lastLi = allMessages[allMessages.length - 1];
-      const lastId = lastLi.dataset.id
-      const lastMsg = renderedHistory.find(m => m.id === parseInt(lastId))
-      if (lastMsg) {
-        lastMsgMeta = { username: lastMsg.username, time: lastMsg.time }
+    if (!li) return;
+    
+    const nextLi = li.nextElementSibling;
+    
+    li.remove();
+    
+    const deletedIndex = renderedHistory.findIndex(m => m.id === messageId);
+    if (deletedIndex !== -1) {
+      renderedHistory.splice(deletedIndex, 1);
+    }
+    
+    const allVisibleMessages = document.querySelectorAll("ul li[data-id]");
+    if (allVisibleMessages.length > 0) {
+      const lastVisibleLi = allVisibleMessages[allVisibleMessages.length - 1];
+      const lastVisibleId = lastVisibleLi.dataset.id;
+      const lastVisibleMsg = renderedHistory.find(m => m.id === lastVisibleId);
+      if (lastVisibleMsg) {
+        lastMsgMeta = { username: lastVisibleMsg.username, time: lastVisibleMsg.time };
       } else {
-        lastMsgMeta = null
+        lastMsgMeta = null;
       }
     } else {
-      lastMsgMeta = null
+      lastMsgMeta = null;
+    }
+    
+    let currentLi = nextLi;
+    while (currentLi && currentLi.classList.contains("msg-cont")) {
+      const currentId = currentLi.dataset.id;
+      const currentMsg = renderedHistory.find(m => m.id === currentId);
+      
+      if (currentMsg) {
+        let prevLi = currentLi.previousElementSibling;
+        let prevMsg = null;
+        
+        if (prevLi) {
+          const prevId = prevLi.dataset.id;
+          prevMsg = renderedHistory.find(m => m.id === prevId);
+        }
+        
+        const shouldStillBeContinuation = prevLi && prevMsg &&
+          prevMsg.username === currentMsg.username &&
+          currentMsg.time - prevMsg.time < 5 * 60 * 1000 &&
+          !currentMsg.replyTo;
+        
+        if (!shouldStillBeContinuation) {
+          const nextSibling = currentLi.nextElementSibling;
+          const color = currentMsg.color || getNameColor(currentMsg.username);
+          
+          const newLi = document.createElement("li");
+          newLi.className = "msg";
+          newLi.dataset.id = currentMsg.id;
+          
+          const avatarCol = document.createElement("div");
+          avatarCol.className = "msg-avatar";
+          if (currentMsg.avatar) {
+            const av = document.createElement("img");
+            av.src = currentMsg.avatar;
+            av.className = "avatar";
+            avatarCol.appendChild(av);
+          } else {
+            const placeholder = document.createElement("div");
+            placeholder.className = "avatar-placeholder";
+            placeholder.textContent = (currentMsg.username || "?")[0];
+            placeholder.style.backgroundColor = `hsl(${nameHash(currentMsg.username) % 360}, 55%, 38%)`;
+            avatarCol.appendChild(placeholder);
+          }
+          avatarCol.style.cursor = "pointer";
+          avatarCol.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openProfile(currentMsg.username);
+          });
+          newLi.appendChild(avatarCol);
+          
+          // Body
+          const body = document.createElement("div");
+          body.className = "msg-body";
+          
+          const replyRef = buildReplyRef(currentMsg);
+          if (replyRef) body.appendChild(replyRef);
+          
+          // Header
+          const header = document.createElement("div");
+          header.className = "msg-header";
+          
+          const namespan = document.createElement("span");
+          namespan.className = "msg-username";
+          const nametext = document.createElement("span");
+          if (currentMsg.redVerified) applyRedVerifiedColor(nametext);
+          else applyFlagColor(nametext, color);
+          nametext.textContent = currentMsg.username;
+          namespan.appendChild(nametext);
+          if (currentMsg.isToken)
+            namespan.appendChild(
+              makeBadge(
+                "https://cdn.chattm.app/verified_owner.png",
+                14,
+                "this user is verified to be the owner of chat™",
+              ),
+            );
+          else if (currentMsg.redVerified) namespan.appendChild(makeRedCheckBadge(14));
+          else if (currentMsg.verified)
+            namespan.appendChild(
+              makeBadge(
+                "https://cdn.chattm.app/verified.png",
+                14,
+                "this user has been verified",
+              ),
+            );
+          namespan.style.cursor = "pointer";
+          namespan.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openProfile(currentMsg.username);
+          });
+          header.appendChild(namespan);
+          
+          const timespan = document.createElement("span");
+          timespan.className = "msg-time";
+          timespan.textContent = new Date(Number(currentMsg.time)).toLocaleString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          header.appendChild(timespan);
+          if (!currentMsg.system) header.appendChild(makeReplyButton(currentMsg));
+          body.appendChild(header);
+          
+          body.appendChild(buildMsgContent(currentMsg, color));
+          newLi.appendChild(body);
+          
+          newLi.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            openMessageContextMenu(newLi, currentMsg.id, currentMsg.username === username || isOwner);
+          });
+          
+          currentLi.replaceWith(newLi);
+          currentLi = nextSibling;
+        } else {
+          currentLi = currentLi.nextElementSibling;
+        }
+      } else {
+        currentLi = currentLi.nextElementSibling;
+      }
     }
   });
   // user renamed status
