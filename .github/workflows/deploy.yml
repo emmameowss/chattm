@@ -2,15 +2,25 @@
 name: Deploy chat™
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: appleboy/ssh-action@v1.0.3
+        if: github.ref == 'refs/heads/main'
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          script: |
+            ./deploy.sh
+      
+      - uses: appleboy/ssh-action@v1.0.3
+        if: github.ref == 'refs/heads/dev'
+        with:
+          host: ${{ secrets.SSH_HOST_BETA }}
+          username: ${{ secrets.SSH_USER_BETA }}
+          key: ${{ secrets.SSH_KEY_BETA }}
           script: |
             ./deploy.sh
