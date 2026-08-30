@@ -107,25 +107,34 @@ document.addEventListener("click", (e) => {
   }
 });
 
-function devInstanceBanner() {
-  const devHosts = ["beta.chattm.app", "localhost", "127.0.0.1"];
+function devInstanceBadge() {
 
-  if (!devHosts.includes(window.location.hostname)) return;
-  if (document.querySelector("#dev-banner")) return;
+  const devHosts = ["beta.chattm.app", "localhost", "127.0.0.1"]
+
+  if (!devHosts.includes(window.location.hostname)) return
+  
+  const h1 = document.querySelector("h1")
+  if (!h1) {
+    // If h1 doesn't exist yet, wait for DOM to load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', devInstanceBadge)
+    }
+    return
+  }
+  
+  if (h1.querySelector(".dev-badge")) return // Already added
+
+  const badge = document.createElement('span')
+  badge.className = 'dev-badge'
 
   if (window.location.hostname === "beta.chattm.app") {
-    const banner = document.createElement("div");
-    banner.id = "dev-banner";
-    banner.textContent =
-      "this is a beta instance of chat™ - things may not be very stable";
-    document.body.appendChild(banner);
+    badge.textContent = "beta"
+    badge.title = "this is a beta instance of chat™, updates are done on every push to dev"
   } else {
-    const banner = document.createElement("div");
-    banner.id = "dev-banner";
-    banner.textContent =
-      "this is a dev instance of chat™ - things may not be stable and may break often";
-    document.body.appendChild(banner);
+    badge.textContent = 'dev'
+    badge.title = 'this is a dev instance of chat™'
   }
+  h1.appendChild(badge)
 }
 
 
@@ -148,6 +157,7 @@ function loadVersionStatus(forceRefresh = false) {
     .catch(() => {});
 }
 loadVersionStatus();
+devInstanceBadge();
 
 // lightbox
 function lightbox(src) {
@@ -163,7 +173,6 @@ function lightbox(src) {
   document.body.appendChild(overlay);
 }
 
-devInstanceBanner();
 
 let customEmoji = {};
 

@@ -294,3 +294,25 @@ document.querySelector('#owner-refresh-version-btn').addEventListener('click', a
 });
 
 socket.on('commandError', (msg) => showToast(msg, 'error'));
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', addDevBadge);
+} else {
+  addDevBadge();
+}
+
+function addDevBadge() {
+  const h = location.hostname;
+  if (["beta.chattm.app", "localhost", "127.0.0.1"].includes(h)) {
+    const h1 = document.querySelector("h1");
+    if (h1 && !h1.querySelector(".dev-badge")) {
+      const badge = document.createElement("span");
+      badge.className = "dev-badge";
+      badge.textContent = h === "beta.chattm.app" ? "beta" : "dev";
+      badge.title =
+        h === "beta.chattm.app"
+          ? "this is a beta instance of chat™, updates are done on every push to dev"
+          : "this is a dev instance of chat™";
+      h1.appendChild(badge);
+    }
+  }
+}
