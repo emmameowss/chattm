@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 # Install build dependencies for better-sqlite3
 RUN apt-get update && apt-get install -y \
@@ -9,15 +9,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install dependencies
-COPY server/package*.json ./
-RUN npm install --production
-
-# Copy server code
-COPY server/ ./
-
-# Copy frontend files
+# Copy frontend files first
 COPY app/ ./app/
+
+# Copy server files and install dependencies
+COPY server/ ./server/
+WORKDIR /app/server
+RUN npm install --production
 
 EXPOSE 3000
 
