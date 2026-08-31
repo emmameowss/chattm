@@ -1261,7 +1261,8 @@ io.on("connection", (socket) => {
     }
 
     if (containsBlockedLink(data.text)) {
-      socket.emit('commandError', "media links from unapproved sites aren't allowed, please use the direct upload function or an approved site")
+      socket.emit('commandError', "media links from unapproved sites aren't allowed, please use the direct upload function or an approved site", "error")
+      return;
     }
 
     const now = Date.now();
