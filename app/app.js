@@ -1658,16 +1658,42 @@ socket.on("messageDeleted", (messageId) => {
     const parts = text.split(tokenRegex).filter((p) => p !== undefined);
     const fragment = document.createDocumentFragment();
 
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
+
     for (const part of parts) {
       if (!part) continue;
       if (/^https?:\/\//.test(part)) {
-        const a = document.createElement("a");
-        a.href = part;
-        a.textContent = part;
-        a.target = "_blank";
-        a.rel = "noopener noreferer";
-        a.style.color = color;
-        fragment.appendChild(a);
+        if (imageExtensions.test(part)) {
+          const a = document.createElement("a");
+          a.href = part;
+          a.textContent = part;
+          a.target = "_blank";
+          a.rel = "noopener noreferer";
+          a.style.color = color;
+          fragment.appendChild(a);
+          
+          const img = document.createElement('img')
+          img.src = part
+          img.className = 'embedded-image'
+          img.alt = 'image'
+          img.style.maxWidth = '400px'
+          img.style.maxHeight = "300px"
+          img.style.display = 'block'
+          img.style.marginTop = '8px'
+          img.style.marginBottom = '8px'
+          img.style.borderRadius = '8px'
+          img.style.cursor = 'pointer'
+          img.addEventListener('click', () => lightbox(part))
+          fragment.appendChild(img)
+        } else {
+          const a = document.createElement("a");
+          a.href = part;
+          a.textContent = part;
+          a.target = "_blank";
+          a.rel = "noopener noreferer";
+          a.style.color = color;
+          fragment.appendChild(a);
+        }
       } else if (/^@[a-zA-Z0-9_]+$/.test(part)) {
         const span = document.createElement("span");
         span.className = "mention";
