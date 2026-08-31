@@ -6,7 +6,7 @@ import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
 import { randomBytes } from "crypto";
 import { readFile, appendFile } from "fs/promises";
-import { extname, normalize, resolve, sep } from "path";
+import { extname, isAbsolute, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
 import { randomUUID } from "crypto";
 import {
@@ -176,6 +176,53 @@ await syncEmojisFromS3();
 const msgcooldown = 1000;
 const lastmessage = {};
 const MAX_MESSAGE_LENGTH = 2000
+
+function containsBlockedLink(text) {
+  const regex = /(https?:\/\/[^\s]+)/gi
+  const urls = text.match(regex) || []
+
+  const allowedMediaDomains = [
+    'cdn.chattm.app',
+    'chattm.app',
+    'imgur.com', 'i.imgur.com',
+    'youtube.com', 'youtu.be',
+    'vimeo.com',
+    'giphy.com', 'media.giphy.com',
+    'tenor.com', 'media.tenor.com',
+    'streamable.com',
+    'gfycat.com',
+    'twitch.tv',
+    'spotify.com'
+  ];
+
+
+  const mediaExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i;
+
+  for (const url of urls) {
+    try {
+      const urlObj = new URL(url)
+      const hostname = urlObj.hostname.toLowerCase()
+      
+      const hasMediaExtension = mediaExtensions.test(url)
+
+      const isMediaDomain = mediaDomains.some(domain =>
+        hostname === domain || hostname.endsWith('.' + domain)
+      )
+
+      if (hasMediaExtension || isMediaDomain) {
+        const isAllowed = allowedDomains.some(domain =>
+          hostname === domain | hostname.endsWith('.' + domain)
+        )
+        if (!isAllowed) {
+          return true
+        }
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+  return false
+}
 
 const rateLimits = new Map();
 function checkRateLimit(ip, key, max, windowMs) {
