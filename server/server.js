@@ -1263,6 +1263,10 @@ io.on("connection", (socket) => {
       return
     }
 
+    if (containsBlockedLink(data.text)) {
+      socket.emit('commandError', "media links from unapproved sites aren't allowed, please use the direct upload function or an approved site")
+    }
+
     const now = Date.now();
     // verified users (and the owner) bypass the message cooldown
     const bypassCooldown =
