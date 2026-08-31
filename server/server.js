@@ -205,14 +205,11 @@ function containsBlockedLink(text) {
       
       const hasMediaExtension = mediaExtensions.test(url)
 
-      const isMediaDomain = mediaDomains.some(domain =>
-        hostname === domain || hostname.endsWith('.' + domain)
-      )
-
-      if (hasMediaExtension || isMediaDomain) {
-        const isAllowed = allowedDomains.some(domain =>
-          hostname === domain | hostname.endsWith('.' + domain)
+      if (hasMediaExtension) {
+        const isAllowed = allowedMediaDomains.some(domain =>
+          hostname === domain || hostname.endsWith('.' + domain)
         )
+
         if (!isAllowed) {
           return true
         }
