@@ -1036,16 +1036,17 @@ if (session) {
         return;
       }
       const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/")
       showStatus("uploading...");
       const url = await uploadFile(file);
       showStatus("uploaded!", "pink");
       setTimeout(hideStatus, 3000);
       socket.emit("message", {
         username,
-        text: isImage
+        text: (isImage || isVideo)
           ? textInput.value || null
           : `${textInput.value ? textInput.value + " " : ""}${file.name}: ${url}`,
-        image: isImage ? url : null,
+        image: (isImage || isVideo) ? url : null,
         replyTo,
       });
       textInput.value = "";
@@ -1321,10 +1322,24 @@ if (session) {
         functioninglinks(data.text, flags[color] ? null : color),
       );
     if (data.image) {
-      const img = document.createElement("img");
-      img.src = data.image;
-      img.addEventListener("click", () => lightbox(data.image));
-      content.appendChild(img);
+
+      const videoExtensions = /\.(mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i
+      if (videoExtensions.test(data.image)) {
+        const video = document.createElement('video')
+        video.src = data.image
+        video.controls = true
+        video.style.display = 'block'
+        video.style.marginTop = '8px'
+        video.style.maxWidth = '500px'
+        video.style.maxHeight = '400px'
+        video.style.borderRadius = "8px"
+        content.appendChild(video)
+      } else {
+        const img = document.createElement("img");
+        img.src = data.image;
+        img.addEventListener("click", () => lightbox(data.image));
+        content.appendChild(img);
+      }
     }
     return content;
   }
@@ -1671,7 +1686,7 @@ socket.on("messageDeleted", (messageId) => {
           a.rel = "noopener noreferer";
           a.style.color = color;
           fragment.appendChild(a);
-          
+
           const img = document.createElement('img')
           img.src = part
           img.className = 'embedded-image'
