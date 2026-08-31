@@ -1674,11 +1674,33 @@ socket.on("messageDeleted", (messageId) => {
     const fragment = document.createDocumentFragment();
 
     const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
+    const videoExtensions = /\.(mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i;
+
 
     for (const part of parts) {
       if (!part) continue;
       if (/^https?:\/\//.test(part)) {
-        if (imageExtensions.test(part)) {
+        if (videoExtensions.test(part)) {
+          const a = document.createElement("a");
+          a.href = part;
+          a.textContent = part;
+          a.target = "_blank";
+          a.rel = "noopener noreferer";
+          a.style.color = color;
+          fragment.appendChild(a);
+
+          const video = document.createElement('video');
+          video.src = part;
+          video.controls = true;
+          video.style.display = 'block';
+          video.style.maxWidth = '500px';
+          video.style.maxHeight = '400px';
+          video.style.marginTop = '8px';
+          video.style.marginBottom = '8px';
+          video.style.borderRadius = '8px';
+          fragment.appendChild(video);
+        }
+        else if (imageExtensions.test(part)) {
           const a = document.createElement("a");
           a.href = part;
           a.textContent = part;
