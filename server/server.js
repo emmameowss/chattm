@@ -178,6 +178,7 @@ const lastmessage = {};
 const MAX_MESSAGE_LENGTH = 2000
 
 function containsBlockedLink(text) {
+  if (!text) return false
   const regex = /(https?:\/\/[^\s]+)/gi
   const urls = text.match(regex) || []
 
