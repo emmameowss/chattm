@@ -6,25 +6,55 @@ const socket = io(window.location.origin, {
   transports: ["websocket"]
 });
 
-const emojiTab = document.querySelector('#emoji')
+const logsTab = document.querySelector('#logs')
 
-emojiTab.addEventListener('click', () => {
-  showToast('the emoji tab has not been implemented, check back later', 'info')
+logsTab.addEventListener('click', () => {
+  showToast('action logs have not yet been implemented, check back later', 'info')
 })
 
-function showModal({ message, withInput = false, defaultValue = '' }) {
+let availableChannels = ['main']
+
+async function loadChannels() {
+  try {
+    const res = await fetch('/channels')
+    const data = await res.json()
+    if (data && data.channels) {
+      availableChannels = data.channels.map(ch => ch.name)
+      // console.log(availableChannels)
+    }
+  } catch (e) {
+    console.error('failed to load channels:', e)
+    showModal('failed to load channels:' + e.message, 'error')
+    availableChannels = ['main']
+  }
+}
+
+loadChannels()
+
+function showModal({ message, withInput = false, withSelect = false, selectOptions = [], defaultValue = '' }) {
   return new Promise((resolve) => {
     const overlay = document.querySelector('#modal-overlay');
     const msgEl = document.querySelector('#modal-message');
     const inputEl = document.querySelector('#modal-input');
+    const selectEl = document.querySelector('#modal-select')
     const confirmBtn = document.querySelector('#modal-confirm');
     const cancelBtn = document.querySelector('#modal-cancel');
 
     msgEl.textContent = message;
     inputEl.style.display = withInput ? "block" : "none";
     inputEl.value = defaultValue;
+    selectEl.style.display = withSelect ? 'block' : "none";
+
+    if (withSelect && selectOptions.length > 0) {
+      selectEl.innerHTML = selectOptions.map(opt => 
+        `<option value="${opt}">${opt}</option>`
+      ).join('');
+      selectEl.value = defaultValue || selectOptions[0];
+    }
+
     overlay.style.display = "flex";
     if (withInput) inputEl.focus();
+    if (withSelect) selectEl.focus();
 
     function cleanUp(result) {
       overlay.style.display = "none";
@@ -34,10 +64,16 @@ function showModal({ message, withInput = false, defaultValue = '' }) {
       resolve(result);
     }
     function onConfirm() {
-      cleanUp(withInput ? inputEl.value : true);
+      if (withInput) {
+        cleanUp(inputEl.value)
+      } else if (withSelect) {
+        cleanUp(selectEl.value)
+      } else {
+        cleanUp(true)
+      }
     }
     function onCancel() {
-      cleanUp(withInput ? null : false);
+      cleanUp(withInput || withSelect ? null : false);
     }
     function onKey(e) {
       if (e.key === "Enter") {
@@ -222,24 +258,28 @@ document.querySelector('#owner-maintenance-btn').addEventListener('click', async
 });
 
 document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
-  const confirmed = await showModal({
-    message: 'clear main channel chat history?'
-  });
-  if (!confirmed) return;
+  const channel = await showModal({
+    message: 'select channel to clear:',
+    withSelect: true,
+    selectOptions: availableChannels,
+    defaultValue: 'main'
+  })
+  if (!channel) return
+
   try {
     const res = await fetch('/admin/clear', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session, channel: 'main' })
-    });
-    const data = await res.json();
+      method: "POST",
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({session, channel})
+    })
+    const data = await res.json()
     if (data.success) {
-      showToast('chat cleared', 'success');
+      showToast(`${channel} has been cleared`, 'success')
     } else {
-      showToast('failed to clear chat', 'error');
+      showToast('failed to clear channel history', 'error')
     }
   } catch (e) {
-    showToast('error: ' + e.message, 'error');
+    showToast('error: ' + e.message, 'error')
   }
 });
 
@@ -254,3 +294,25 @@ document.querySelector('#owner-refresh-version-btn').addEventListener('click', a
 });
 
 socket.on('commandError', (msg) => showToast(msg, 'error'));
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', addDevBadge);
+} else {
+  addDevBadge();
+}
+
+function addDevBadge() {
+  const h = location.hostname;
+  if (["beta.chattm.app", "localhost", "127.0.0.1"].includes(h)) {
+    const h1 = document.querySelector("h1");
+    if (h1 && !h1.querySelector(".dev-badge")) {
+      const badge = document.createElement("span");
+      badge.className = "dev-badge";
+      badge.textContent = h === "beta.chattm.app" ? "beta" : "dev";
+      badge.title =
+        h === "beta.chattm.app"
+          ? "this is a beta instance of chat™, updates are done on every push to dev"
+          : "this is a dev instance of chat™";
+      h1.appendChild(badge);
+    }
+  }
+}

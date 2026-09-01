@@ -2,7 +2,8 @@ import Database from "better-sqlite3";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 
-const db = new Database("chat.db");
+const dbPath = process.env.DB_PATH || "./chat.db"
+const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 
 export { db };
@@ -219,7 +220,7 @@ const stmts = {
 
   // Channels
   listChannels: db.prepare(
-    `SELECT name, created_at, created_by FROM channels ORDER BY created_at ASC`,
+    `SELECT name, created_at FROM channels ORDER BY created_at ASC`,
   ),
   getChannel: db.prepare(`SELECT name FROM channels WHERE name = ?`),
   insertChannel: db.prepare(
@@ -313,24 +314,6 @@ const stmts = {
     `INSERT OR REPLACE INTO custom_emoji (shortcode, url) VALUES (?, ?)`,
   ),
   removeCustomEmoji: db.prepare(`DELETE FROM custom_emoji WHERE shortcode = ?`),
-
-  // Pending emoji suggestions
-  addPendingEmoji: db.prepare(
-    `INSERT INTO pending_emojis (id, shortcode, s3_key, url, submitter_email, submitter_username, notes, submitted_at, status, review_reason) VALUES (@id, @shortcode, @s3_key, @url, @submitter_email, @submitter_username, @notes, @submitted_at, @status, @review_reason)`,
-  ),
-  getPendingEmojis: db.prepare(
-    `SELECT * FROM pending_emojis ORDER BY submitted_at ASC`,
-  ),
-  getPendingEmojisByEmail: db.prepare(
-    `SELECT * FROM pending_emojis WHERE submitter_email = ? ORDER BY submitted_at ASC`,
-  ),
-  getPendingEmojiById: db.prepare(`SELECT * FROM pending_emojis WHERE id = ?`),
-  getPendingEmojiByShortcode: db.prepare(
-    `SELECT id FROM pending_emojis WHERE shortcode = ? AND status = 'pending' LIMIT 1`,
-  ),
-  updatePendingEmoji: db.prepare(
-    `UPDATE pending_emojis SET status = @status, s3_key = @s3_key, url = @url, review_reason = @review_reason WHERE id = @id`,
-  ),
 
   // Verified users
   isVerified: db.prepare(`SELECT 1 FROM verified_users WHERE email = ?`),

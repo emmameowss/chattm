@@ -1,15 +1,18 @@
-// persistent userid generation stuff
-let userId = localStorage.getItem("userId");
-if (!userId || userId == null) {
-  userId = crypto.randomUUID();
-  localStorage.setItem("userId", userId);
-}
-
 let unread = 0;
 let activity = false;
-let username = localStorage.getItem("username") || userId.slice(0, 5);
+let username = localStorage.getItem("username") || 'pending'
 let audioctx = null;
 let isOwner = false;
+
+// nuke the old userids forever
+function checkForUserId() {
+  if (localStorage.getItem('userId') && localStorage.getItem('uIdGone') !== true) {
+    localStorage.removeItem('userId')
+    localStorage.setItem('uIdGone', true)
+  }
+}
+
+checkForUserId()
 
 // colors
 function nameHash(name) {
@@ -104,25 +107,34 @@ document.addEventListener("click", (e) => {
   }
 });
 
-function devInstanceBanner() {
-  const devHosts = ["beta.chattm.app", "localhost", "127.0.0.1"];
+function devInstanceBadge() {
 
-  if (!devHosts.includes(window.location.hostname)) return;
-  if (document.querySelector("#dev-banner")) return;
+  const devHosts = ["beta.chattm.app", "localhost", "127.0.0.1"]
+
+  if (!devHosts.includes(window.location.hostname)) return
+  
+  const h1 = document.querySelector("h1")
+  if (!h1) {
+    // If h1 doesn't exist yet, wait for DOM to load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', devInstanceBadge)
+    }
+    return
+  }
+  
+  if (h1.querySelector(".dev-badge")) return // Already added
+
+  const badge = document.createElement('span')
+  badge.className = 'dev-badge'
 
   if (window.location.hostname === "beta.chattm.app") {
-    const banner = document.createElement("div");
-    banner.id = "dev-banner";
-    banner.textContent =
-      "this is a beta instance of chat™ - things may not be very stable";
-    document.body.appendChild(banner);
+    badge.textContent = "beta"
+    badge.title = "this is a beta instance of chat™, updates are done on every push to dev"
   } else {
-    const banner = document.createElement("div");
-    banner.id = "dev-banner";
-    banner.textContent =
-      "this is a dev instance of chat™ - things may not be stable and may break often";
-    document.body.appendChild(banner);
+    badge.textContent = 'dev'
+    badge.title = 'this is a dev instance of chat™'
   }
+  h1.appendChild(badge)
 }
 
 
@@ -145,6 +157,7 @@ function loadVersionStatus(forceRefresh = false) {
     .catch(() => {});
 }
 loadVersionStatus();
+devInstanceBadge();
 
 // lightbox
 function lightbox(src) {
@@ -160,7 +173,6 @@ function lightbox(src) {
   document.body.appendChild(overlay);
 }
 
-devInstanceBanner();
 
 let customEmoji = {};
 
@@ -364,31 +376,9 @@ if (session) {
     applyTheme();
   });
 
-  const compactbtn = document.querySelector("#compact-btn");
-  let compactMode = localStorage.getItem("compactMode") === "true";
   let renderedHistory = []; // for re-render on mode toggle
   let currentChannel = "main";
   let channelList = ["main"];
-
-  function applyCompact() {
-    document.documentElement.classList.toggle("compact", compactMode);
-    compactbtn.innerHTML = compactMode
-      ? '<i class="ti ti-layout-list"></i> modern mode'
-      : '<i class="ti ti-layout-list"></i> compact mode';
-  }
-
-  applyCompact();
-  compactbtn.addEventListener("click", () => {
-    compactMode = !compactMode;
-    localStorage.setItem("compactMode", compactMode);
-    applyCompact();
-    // re-render so grouping applies (or is removed) immediately
-    const ul = document.querySelector("ul");
-    ul.innerHTML = "";
-    lastMsgMeta = null;
-    renderedHistory.forEach((data) => renderMessage(data));
-    ul.scrollTop = ul.scrollHeight;
-  });
 
   const tooltipsbtn = document.querySelector("#tooltips-btn");
   let tooltipsHidden = localStorage.getItem("tooltipsHidden") === "true";
@@ -434,6 +424,21 @@ if (session) {
     localStorage.setItem('showCharCounter', showCharCounter)
     applyCharCounter()
   })
+
+  function showToast(message, type = 'info') {
+    const container = document.querySelector('#toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      toast.style.transition = 'opacity 0.2s, transform 0.2s';
+      setTimeout(() => toast.remove(), 200);
+    }, 3000);
+  }
 
   // avatar
   const avatarInput = document.querySelector("#avatar-input");
@@ -783,7 +788,7 @@ if (session) {
           });
           socket.emit("refreshAvatar");
         } catch (e) {
-          showError("couldn't update profile picture");
+          showToast("couldn't update profile picture", 'error');
           renderProfileAvatarWrap(myAvatar, false);
         }
       }
@@ -843,17 +848,6 @@ if (session) {
 
   function renderEmojiPicker() {
     emojiPicker.innerHTML = "";
-    const suggestBtn = document.createElement("button");
-    suggestBtn.type = "button";
-    suggestBtn.title = "suggest an emoji";
-    suggestBtn.textContent = "+";
-    suggestBtn.id = "emoji-suggest-open-btn";
-    suggestBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      emojiPicker.style.display = "none";
-      openMyEmojiPanel();
-    });
-    emojiPicker.appendChild(suggestBtn);
     const entries = Object.entries(customEmoji);
     for (const [shortcode, url] of entries) {
       const btn = document.createElement("button");
@@ -901,239 +895,6 @@ if (session) {
   document.addEventListener("click", (e) => {
     if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
       emojiPicker.style.display = "none";
-    }
-  });
-
-  // emoji suggestion modal
-  const emojiSuggestOverlay = document.querySelector("#emoji-suggest-overlay");
-  const emojiSuggestShortcode = document.querySelector(
-    "#emoji-suggest-shortcode",
-  );
-  const emojiSuggestFile = document.querySelector("#emoji-suggest-file");
-  const emojiSuggestFileText = document.querySelector(
-    "#emoji-suggest-file-text",
-  );
-  const emojiSuggestPreview = document.querySelector("#emoji-suggest-preview");
-  const emojiSuggestNotes = document.querySelector("#emoji-suggest-notes");
-  const emojiSuggestError = document.querySelector("#emoji-suggest-error");
-
-  function openEmojiSuggest() {
-    emojiSuggestOverlay.style.display = "flex";
-    emojiSuggestShortcode.focus();
-  }
-
-  function closeEmojiSuggest() {
-    emojiSuggestOverlay.style.display = "none";
-    emojiSuggestShortcode.value = "";
-    emojiSuggestFile.value = "";
-    emojiSuggestFileText.textContent = "choose image";
-    emojiSuggestPreview.innerHTML = "";
-    emojiSuggestNotes.value = "";
-    emojiSuggestError.textContent = "";
-  }
-
-  let emojiSuggestBlobUrl = null;
-  emojiSuggestFile.addEventListener("change", () => {
-    const file = emojiSuggestFile.files[0];
-    if (!file) return;
-    emojiSuggestFileText.textContent = file.name;
-    if (emojiSuggestBlobUrl) URL.revokeObjectURL(emojiSuggestBlobUrl);
-    emojiSuggestBlobUrl = URL.createObjectURL(file);
-    const img = document.createElement("img");
-    img.src = emojiSuggestBlobUrl;
-    emojiSuggestPreview.innerHTML = "";
-    emojiSuggestPreview.appendChild(img);
-  });
-
-  document
-    .querySelector("#emoji-suggest-cancel")
-    .addEventListener("click", closeEmojiSuggest);
-
-  document
-    .querySelector("#emoji-suggest-submit")
-    .addEventListener("click", async () => {
-      emojiSuggestError.textContent = "";
-      const shortcode = emojiSuggestShortcode.value.trim();
-      if (!/^:[a-z0-9_-]+:$/.test(shortcode)) {
-        emojiSuggestError.textContent =
-          "shortcode must be in format :name: (lowercase, numbers, - or _)";
-        return;
-      }
-      if (!emojiSuggestFile.files[0]) {
-        emojiSuggestError.textContent = "please choose an image file";
-        return;
-      }
-      const btn = document.querySelector("#emoji-suggest-submit");
-      btn.disabled = true;
-      btn.textContent = "submitting...";
-      try {
-        const formData = new FormData();
-        formData.append("file", emojiSuggestFile.files[0]);
-        formData.append("shortcode", shortcode);
-        formData.append("notes", emojiSuggestNotes.value.trim());
-        formData.append("username", username || "");
-        const res = await fetch(
-          `/suggest-emoji`,
-          {
-            method: "POST",
-            body: formData,
-            credentials: 'same-origin'
-          },
-        );
-        const json = await res.json();
-        if (!res.ok) {
-          emojiSuggestError.textContent = json.error || "submission failed";
-          return;
-        }
-        closeEmojiSuggest();
-        showStatus(
-          json.autoApproved ? "emoji added!" : "emoji suggestion submitted",
-          "pink",
-        );
-        setTimeout(hideStatus, 2000);
-        if (document.querySelector("#my-emoji-panel").style.display !== "none")
-          loadMyPendingEmojis();
-      } catch (e) {
-        emojiSuggestError.textContent = "network error - please try again";
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "submit";
-      }
-    });
-
-  // my emoji panel
-  const myEmojiPanel = document.querySelector("#my-emoji-panel");
-  const myEmojiList = document.querySelector("#my-emoji-list");
-  const myEmojiDetail = document.querySelector("#my-emoji-detail");
-
-  function openMyEmojiPanel() {
-    myEmojiDetail.style.display = "none";
-    myEmojiList.style.display = "flex";
-    myEmojiPanel.style.display = "flex";
-    loadMyPendingEmojis();
-  }
-
-  function closeMyEmojiPanel() {
-    myEmojiPanel.style.display = "none";
-    myEmojiDetail.style.display = "none";
-    myEmojiList.style.display = "flex";
-  }
-
-  async function loadMyPendingEmojis() {
-    myEmojiList.innerHTML = '<div class="my-emoji-empty">loading...</div>';
-    try {
-      const res = await fetch(
-        `/my-pending-emojis`,
-        {
-          credentials: 'same-origin'
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      const items = await res.json();
-      myEmojiList.innerHTML = "";
-      if (!items.length) {
-        myEmojiList.innerHTML =
-          '<div class="my-emoji-empty">no suggestions yet</div>';
-        return;
-      }
-      for (const item of items) {
-        const status = item.status || "pending";
-        const row = document.createElement("div");
-        row.className = "my-emoji-row";
-        const img = document.createElement("img");
-        img.src = item.url;
-        img.className = "my-emoji-thumb";
-        row.appendChild(img);
-        const info = document.createElement("div");
-        info.className = "my-emoji-info";
-        const sc = document.createElement("span");
-        sc.className = "my-emoji-shortcode";
-        sc.textContent = item.shortcode;
-        info.appendChild(sc);
-        const ts = document.createElement("span");
-        ts.className = "my-emoji-date";
-        ts.textContent = new Date(item.submitted_at).toLocaleDateString();
-        info.appendChild(ts);
-        row.appendChild(info);
-        const badge = document.createElement("span");
-        badge.className = `my-emoji-status my-emoji-status-${status}`;
-        badge.textContent = status;
-        row.appendChild(badge);
-        row.addEventListener("click", () => showMyEmojiDetail(item));
-        myEmojiList.appendChild(row);
-      }
-    } catch {
-      myEmojiList.innerHTML =
-        '<div class="my-emoji-empty">failed to load</div>';
-    }
-  }
-
-  function showMyEmojiDetail(item) {
-    myEmojiList.style.display = "none";
-    myEmojiDetail.style.display = "flex";
-    myEmojiDetail.innerHTML = "";
-
-    const backBtn = document.createElement("button");
-    backBtn.type = "button";
-    backBtn.className = "my-emoji-back";
-    backBtn.textContent = "← back";
-    backBtn.addEventListener("click", () => {
-      myEmojiDetail.style.display = "none";
-      myEmojiList.style.display = "flex";
-    });
-    myEmojiDetail.appendChild(backBtn);
-
-    const img = document.createElement("img");
-    img.src = item.url;
-    img.className = "my-emoji-detail-img";
-    myEmojiDetail.appendChild(img);
-
-    const sc = document.createElement("div");
-    sc.className = "my-emoji-detail-shortcode";
-    sc.textContent = item.shortcode;
-    myEmojiDetail.appendChild(sc);
-
-    const ts = document.createElement("div");
-    ts.className = "my-emoji-detail-meta";
-    ts.textContent = `submitted ${new Date(item.submitted_at).toLocaleString()}`;
-    myEmojiDetail.appendChild(ts);
-
-    if (item.notes) {
-      const notes = document.createElement("div");
-      notes.className = "my-emoji-detail-notes";
-      notes.textContent = item.notes;
-      myEmojiDetail.appendChild(notes);
-    }
-
-    const status = item.status || "pending";
-    const statusLabels = {
-      pending: "pending review",
-      accepted: "accepted ✓",
-      denied: "denied",
-    };
-    const statusEl = document.createElement("div");
-    statusEl.className = `my-emoji-detail-status my-emoji-detail-status-${status}`;
-    statusEl.textContent = `status: ${statusLabels[status] ?? status}`;
-    myEmojiDetail.appendChild(statusEl);
-    if (item.review_reason) {
-      const reasonEl = document.createElement("div");
-      reasonEl.className = "my-emoji-detail-reason";
-      reasonEl.textContent = `reason: ${item.review_reason}`;
-      myEmojiDetail.appendChild(reasonEl);
-    }
-  }
-
-  document.querySelector("#my-emoji-add-btn").addEventListener("click", () => {
-    closeMyEmojiPanel();
-    openEmojiSuggest();
-  });
-
-  document.addEventListener("click", (e) => {
-    if (
-      !myEmojiPanel.contains(e.target) &&
-      e.target.id !== "emoji-suggest-open-btn"
-    ) {
-      closeMyEmojiPanel();
     }
   });
 
@@ -1268,23 +1029,24 @@ if (session) {
 
     if (file) {
       if (file.size > MAX_SIZE) {
-        showError("file too big (max is 50mb)");
+        showToast("file too big (max is 50mb)", 'error');
         fileInput.value = "";
         document.querySelector("#attach-btn").style.borderColor = "";
         document.querySelector("#attach-btn").style.color = "";
         return;
       }
       const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/")
       showStatus("uploading...");
       const url = await uploadFile(file);
       showStatus("uploaded!", "pink");
       setTimeout(hideStatus, 3000);
       socket.emit("message", {
         username,
-        text: isImage
+        text: (isImage || isVideo)
           ? textInput.value || null
           : `${textInput.value ? textInput.value + " " : ""}${file.name}: ${url}`,
-        image: isImage ? url : null,
+        image: (isImage || isVideo) ? url : null,
         replyTo,
       });
       textInput.value = "";
@@ -1536,7 +1298,7 @@ if (session) {
 
   function makeRedCheckBadge(
     size,
-    tooltip = "this checkmark is only held by my girlfriend and z. you cannot get it.",
+    tooltip = "this checkmark is only held by my wife and z. you cannot get it.",
   ) {
     return makeBadge("https://cdn.chattm.app/verified_red.png", size, tooltip);
   }
@@ -1560,10 +1322,24 @@ if (session) {
         functioninglinks(data.text, flags[color] ? null : color),
       );
     if (data.image) {
-      const img = document.createElement("img");
-      img.src = data.image;
-      img.addEventListener("click", () => lightbox(data.image));
-      content.appendChild(img);
+
+      const videoExtensions = /\.(mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i
+      if (videoExtensions.test(data.image)) {
+        const video = document.createElement('video')
+        video.src = data.image
+        video.controls = true
+        video.style.display = 'block'
+        video.style.marginTop = '8px'
+        video.style.maxWidth = '500px'
+        video.style.maxHeight = '400px'
+        video.style.borderRadius = "8px"
+        content.appendChild(video)
+      } else {
+        const img = document.createElement("img");
+        img.src = data.image;
+        img.addEventListener("click", () => lightbox(data.image));
+        content.appendChild(img);
+      }
     }
     return content;
   }
@@ -1573,7 +1349,6 @@ if (session) {
     const color = data.color || getNameColor(ausername);
 
     const isContinuation =
-      !document.documentElement.classList.contains("compact") &&
       lastMsgMeta &&
       lastMsgMeta.username === ausername &&
       data.time - lastMsgMeta.time < 5 * 60 * 1000 &&
@@ -1713,54 +1488,157 @@ if (session) {
   document.addEventListener("click", (e) => {
     const ctxMenu = document.querySelector("#message-context-menu");
     if (!ctxMenu.contains(e.target)) ctxMenu.classList.remove("open");
-    const adminCtxMenu = document.querySelector("#admin-user-context-menu");
-    if (!adminCtxMenu.contains(e.target)) adminCtxMenu.classList.remove("open");
   });
 
   document.addEventListener("contextmenu", (e) => {
     if (!e.target.closest("li"))
       document.querySelector("#message-context-menu").classList.remove("open");
-    if (!e.target.closest(".admin-user-row"))
-      document
-        .querySelector("#admin-user-context-menu")
-        .classList.remove("open");
   });
 
-  function openAdminUserContextMenu(e, u) {
-    e.preventDefault();
-    const menu = document.querySelector("#admin-user-context-menu");
-    const verifyBtn = document.querySelector("#ctx-verify-btn");
-    const unverifyBtn = document.querySelector("#ctx-unverify-btn");
-    const redVerifyBtn = document.querySelector("#ctx-redverify-btn");
-    const unredVerifyBtn = document.querySelector("#ctx-unredverify-btn");
-    verifyBtn.style.display = u.verified ? "none" : "";
-    unverifyBtn.style.display = u.verified ? "" : "none";
-    redVerifyBtn.style.display = u.redVerified ? "none" : "";
-    unredVerifyBtn.style.display = u.redVerified ? "" : "none";
-    verifyBtn.onclick = () => {
-      socket.emit("message", { text: `/verify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    unverifyBtn.onclick = () => {
-      socket.emit("message", { text: `/unverify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    redVerifyBtn.onclick = () => {
-      socket.emit("message", { text: `/redverify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    unredVerifyBtn.onclick = () => {
-      socket.emit("message", { text: `/unredverify ${u.email}` });
-      menu.classList.remove("open");
-    };
-    menu.style.left = `${Math.min(e.clientX, window.innerWidth - 180)}px`;
-    menu.style.top = `${Math.min(e.clientY, window.innerHeight - 80)}px`;
-    menu.classList.add("open");
-  }
-
-  socket.on("messageDeleted", (messageId) => {
+socket.on("messageDeleted", (messageId) => {
     const li = document.querySelector(`li[data-id="${messageId}"]`);
-    if (li) li.remove();
+    if (!li) return;
+    
+    const nextLi = li.nextElementSibling;
+    
+    li.remove();
+    
+    const deletedIndex = renderedHistory.findIndex(m => m.id === messageId);
+    if (deletedIndex !== -1) {
+      renderedHistory.splice(deletedIndex, 1);
+    }
+    
+    const allVisibleMessages = document.querySelectorAll("ul li[data-id]");
+    if (allVisibleMessages.length > 0) {
+      const lastVisibleLi = allVisibleMessages[allVisibleMessages.length - 1];
+      const lastVisibleId = lastVisibleLi.dataset.id;
+      const lastVisibleMsg = renderedHistory.find(m => m.id === lastVisibleId);
+      if (lastVisibleMsg) {
+        lastMsgMeta = { username: lastVisibleMsg.username, time: lastVisibleMsg.time };
+      } else {
+        lastMsgMeta = null;
+      }
+    } else {
+      lastMsgMeta = null;
+    }
+    
+    let currentLi = nextLi;
+    while (currentLi && currentLi.classList.contains("msg-cont")) {
+      const currentId = currentLi.dataset.id;
+      const currentMsg = renderedHistory.find(m => m.id === currentId);
+      
+      if (currentMsg) {
+        let prevLi = currentLi.previousElementSibling;
+        let prevMsg = null;
+        
+        if (prevLi) {
+          const prevId = prevLi.dataset.id;
+          prevMsg = renderedHistory.find(m => m.id === prevId);
+        }
+        
+        const shouldStillBeContinuation = prevLi && prevMsg &&
+          prevMsg.username === currentMsg.username &&
+          currentMsg.time - prevMsg.time < 5 * 60 * 1000 &&
+          !currentMsg.replyTo;
+        
+        if (!shouldStillBeContinuation) {
+          const nextSibling = currentLi.nextElementSibling;
+          const color = currentMsg.color || getNameColor(currentMsg.username);
+          
+          const newLi = document.createElement("li");
+          newLi.className = "msg";
+          newLi.dataset.id = currentMsg.id;
+          
+          const avatarCol = document.createElement("div");
+          avatarCol.className = "msg-avatar";
+          if (currentMsg.avatar) {
+            const av = document.createElement("img");
+            av.src = currentMsg.avatar;
+            av.className = "avatar";
+            avatarCol.appendChild(av);
+          } else {
+            const placeholder = document.createElement("div");
+            placeholder.className = "avatar-placeholder";
+            placeholder.textContent = (currentMsg.username || "?")[0];
+            placeholder.style.backgroundColor = `hsl(${nameHash(currentMsg.username) % 360}, 55%, 38%)`;
+            avatarCol.appendChild(placeholder);
+          }
+          avatarCol.style.cursor = "pointer";
+          avatarCol.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openProfile(currentMsg.username);
+          });
+          newLi.appendChild(avatarCol);
+          
+          // Body
+          const body = document.createElement("div");
+          body.className = "msg-body";
+          
+          const replyRef = buildReplyRef(currentMsg);
+          if (replyRef) body.appendChild(replyRef);
+          
+          // Header
+          const header = document.createElement("div");
+          header.className = "msg-header";
+          
+          const namespan = document.createElement("span");
+          namespan.className = "msg-username";
+          const nametext = document.createElement("span");
+          if (currentMsg.redVerified) applyRedVerifiedColor(nametext);
+          else applyFlagColor(nametext, color);
+          nametext.textContent = currentMsg.username;
+          namespan.appendChild(nametext);
+          if (currentMsg.isToken)
+            namespan.appendChild(
+              makeBadge(
+                "https://cdn.chattm.app/verified_owner.png",
+                14,
+                "this user is verified to be the owner of chat™",
+              ),
+            );
+          else if (currentMsg.redVerified) namespan.appendChild(makeRedCheckBadge(14));
+          else if (currentMsg.verified)
+            namespan.appendChild(
+              makeBadge(
+                "https://cdn.chattm.app/verified.png",
+                14,
+                "this user has been verified",
+              ),
+            );
+          namespan.style.cursor = "pointer";
+          namespan.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openProfile(currentMsg.username);
+          });
+          header.appendChild(namespan);
+          
+          const timespan = document.createElement("span");
+          timespan.className = "msg-time";
+          timespan.textContent = new Date(Number(currentMsg.time)).toLocaleString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          header.appendChild(timespan);
+          if (!currentMsg.system) header.appendChild(makeReplyButton(currentMsg));
+          body.appendChild(header);
+          
+          body.appendChild(buildMsgContent(currentMsg, color));
+          newLi.appendChild(body);
+          
+          newLi.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            openMessageContextMenu(newLi, currentMsg.id, currentMsg.username === username || isOwner);
+          });
+          
+          currentLi.replaceWith(newLi);
+          currentLi = nextSibling;
+        } else {
+          currentLi = currentLi.nextElementSibling;
+        }
+      } else {
+        currentLi = currentLi.nextElementSibling;
+      }
+    }
   });
   // user renamed status
   socket.on("userRenamed", ({ from, to }, guest) => {
@@ -1795,16 +1673,64 @@ if (session) {
     const parts = text.split(tokenRegex).filter((p) => p !== undefined);
     const fragment = document.createDocumentFragment();
 
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
+    const videoExtensions = /\.(mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i;
+
+
     for (const part of parts) {
       if (!part) continue;
       if (/^https?:\/\//.test(part)) {
-        const a = document.createElement("a");
-        a.href = part;
-        a.textContent = part;
-        a.target = "_blank";
-        a.rel = "noopener noreferer";
-        a.style.color = color;
-        fragment.appendChild(a);
+        if (videoExtensions.test(part)) {
+          const a = document.createElement("a");
+          a.href = part;
+          a.textContent = part;
+          a.target = "_blank";
+          a.rel = "noopener noreferer";
+          a.style.color = color;
+          fragment.appendChild(a);
+
+          const video = document.createElement('video');
+          video.src = part;
+          video.controls = true;
+          video.style.display = 'block';
+          video.style.maxWidth = '500px';
+          video.style.maxHeight = '400px';
+          video.style.marginTop = '8px';
+          video.style.marginBottom = '8px';
+          video.style.borderRadius = '8px';
+          fragment.appendChild(video);
+        }
+        else if (imageExtensions.test(part)) {
+          const a = document.createElement("a");
+          a.href = part;
+          a.textContent = part;
+          a.target = "_blank";
+          a.rel = "noopener noreferer";
+          a.style.color = color;
+          fragment.appendChild(a);
+
+          const img = document.createElement('img')
+          img.src = part
+          img.className = 'embedded-image'
+          img.alt = 'image'
+          img.style.maxWidth = '400px'
+          img.style.maxHeight = "300px"
+          img.style.display = 'block'
+          img.style.marginTop = '8px'
+          img.style.marginBottom = '8px'
+          img.style.borderRadius = '8px'
+          img.style.cursor = 'pointer'
+          img.addEventListener('click', () => lightbox(part))
+          fragment.appendChild(img)
+        } else {
+          const a = document.createElement("a");
+          a.href = part;
+          a.textContent = part;
+          a.target = "_blank";
+          a.rel = "noopener noreferer";
+          a.style.color = color;
+          fragment.appendChild(a);
+        }
       } else if (/^@[a-zA-Z0-9_]+$/.test(part)) {
         const span = document.createElement("span");
         span.className = "mention";
@@ -2101,19 +2027,10 @@ if (session) {
     "/noguests",
     "/setnick [oldname] [newname]",
     "/allowguests",
-    "/removefilter [word]",
-    "/addfilter [word]",
-    "/reloadfilter",
     "/kick [username] [reason]",
     "/setcolor [username] [color]",
-    "/resetstrikes [username]",
-    "/clear",
-    "/announce [text]",
     "/mute [username] [time] [reason]",
     "/unmute [username]",
-    "/mutechat",
-    "/status [text]",
-    "/unmutechat",
     "/color [color|pride|trans|bi|lesbian|nb|gay]",
     "/colour [colour|pride|trans|bi|lesbian|nb|gay]",
     "/nick [name]",
@@ -2123,10 +2040,6 @@ if (session) {
     "/addemoji [:shortcode:] [url]",
     "/removeemoji [:shortcode:]",
     "/reloademojis",
-    "/verify [email]",
-    "/unverify [email]",
-    "/redverify [email]",
-    "/unredverify [email]",
     "/hide [username]",
     "/unhide [username]",
   ];
@@ -2241,9 +2154,15 @@ if (session) {
     }
   });
 
-  socket.on("commandError", (msg) => {
-    showError(msg);
+  socket.on("commandError", (msg, type) => {
+    showToast(msg, type);
   });
+
+  socket.on('showE', (msg) => {
+    const e = document.querySelector("#upload-error");
+    e.textContent = msg;
+    e.style.display = "block";
+  })
 
   let chatMutedb = false;
 
@@ -2292,416 +2211,6 @@ if (session) {
     },
   );
 
-  const adminPanel = document.querySelector("#admin-panel");
-  const adminBackdrop = document.querySelector("#admin-backdrop");
-  const adminContent = document.querySelector("#admin-content");
-  const adminUsersList = document.querySelector("#admin-users-list");
-  const adminEmojiList = document.querySelector("#admin-emoji-list");
-  const adminEmojiDetail = document.querySelector("#admin-emoji-detail");
-  const adminTabActions = document.querySelector("#admin-tab-actions");
-  const adminTabUsers = document.querySelector("#admin-tab-users");
-  const adminTabEmoji = document.querySelector("#admin-tab-emoji");
-
-  function renderAdminUsers() {
-    adminUsersList.innerHTML = "";
-    const hca = cachedAdminUsersWithEmails.filter((u) => !u.guest);
-    const guests = cachedAdminUsersWithEmails.filter((u) => u.guest);
-    function makeSection(label, arr) {
-      if (!arr.length) return;
-      const header = document.createElement("div");
-      header.className = "admin-user-section";
-      header.textContent = `${label} - ${arr.length}`;
-      adminUsersList.appendChild(header);
-      for (const u of arr) {
-        const row = document.createElement("div");
-        row.className = "admin-user-row";
-        const avWrap = document.createElement("div");
-        avWrap.className = "ul-avatar-wrap";
-        if (u.avatar) {
-          const img = document.createElement("img");
-          img.src = u.avatar;
-          img.className = "ul-avatar";
-          avWrap.appendChild(img);
-        } else {
-          const pl = document.createElement("div");
-          pl.className = "ul-avatar ul-avatar-placeholder";
-          pl.textContent = (u.username || "?")[0];
-          pl.style.backgroundColor = `hsl(${nameHash(u.username) % 360}, 55%, 38%)`;
-          avWrap.appendChild(pl);
-        }
-        const dot = document.createElement("span");
-        dot.className = `ul-status-dot ${u.online ? u.status || "online" : "offline"}`;
-        avWrap.appendChild(dot);
-        row.appendChild(avWrap);
-        const info = document.createElement("div");
-        info.className = "admin-user-info";
-        const nameEl = document.createElement("span");
-        nameEl.className = "admin-user-name";
-        if (u.redVerified) applyRedVerifiedColor(nameEl);
-        else applyFlagColor(nameEl, u.color || getNameColor(u.username));
-        nameEl.textContent = u.username;
-        info.appendChild(nameEl);
-        const emailEl = document.createElement("span");
-        emailEl.className = "admin-user-email";
-        emailEl.textContent = u.email;
-        info.appendChild(emailEl);
-        row.appendChild(info);
-        row.addEventListener("click", () => {
-          closeAdmin();
-          openProfile(u.username);
-        });
-        row.addEventListener("contextmenu", (e) =>
-          openAdminUserContextMenu(e, u),
-        );
-        adminUsersList.appendChild(row);
-      }
-    }
-    makeSection("accounts", hca);
-    makeSection("guests", guests);
-  }
-
-  function setAdminTab(tab) {
-    adminContent.style.display = "none";
-    adminUsersList.style.display = "none";
-    adminEmojiList.style.display = "none";
-    adminEmojiDetail.style.display = "none";
-    adminTabActions.classList.remove("active");
-    adminTabUsers.classList.remove("active");
-    adminTabEmoji.classList.remove("active");
-    if (tab === "actions") {
-      adminContent.style.display = "flex";
-      adminTabActions.classList.add("active");
-    } else if (tab === "users") {
-      adminUsersList.style.display = "flex";
-      adminTabUsers.classList.add("active");
-      renderAdminUsers();
-    } else if (tab === "emoji") {
-      adminEmojiList.style.display = "flex";
-      adminTabEmoji.classList.add("active");
-      pendingEmojisDirty = true;
-      renderPendingEmojis();
-    }
-  }
-
-  function makeAdminEmojiRow(item) {
-    const status = item.status || "pending";
-    const row = document.createElement("div");
-    row.className = "admin-emoji-row";
-    const img = document.createElement("img");
-    img.src = item.url;
-    img.className = "admin-emoji-thumb";
-    row.appendChild(img);
-    const info = document.createElement("div");
-    info.className = "admin-emoji-info";
-    const sc = document.createElement("span");
-    sc.className = "admin-emoji-shortcode";
-    sc.textContent = item.shortcode;
-    info.appendChild(sc);
-    const sub = document.createElement("span");
-    sub.className = "admin-emoji-submitter";
-    sub.textContent = `by ${item.submitter_username || item.submitter_email}`;
-    info.appendChild(sub);
-    row.appendChild(info);
-    if (status !== "pending") {
-      const badge = document.createElement("span");
-      badge.className = `my-emoji-status my-emoji-status-${status}`;
-      badge.textContent = status;
-      row.appendChild(badge);
-    }
-    row.addEventListener("click", () => showPendingEmojiDetail(item));
-    return row;
-  }
-
-  let pendingEmojisDirty = true;
-
-  async function renderPendingEmojis() {
-    if (!pendingEmojisDirty) return;
-    pendingEmojisDirty = false;
-    adminEmojiList.innerHTML =
-      '<div class="admin-emoji-loading">loading...</div>';
-    try {
-      const res = await fetch(
-        `/pending-emojis`,
-        {
-          credentials: 'same-origin'
-        }
-      );
-      const items = await res.json();
-      adminEmojiList.innerHTML = "";
-      const pending = items.filter(
-        (i) => (i.status || "pending") === "pending",
-      );
-      const reviewed = items.filter(
-        (i) => (i.status || "pending") !== "pending",
-      );
-      if (!items.length) {
-        adminEmojiList.innerHTML =
-          '<div class="admin-emoji-empty">no emoji suggestions</div>';
-        return;
-      }
-      if (!pending.length) {
-        adminEmojiList.innerHTML =
-          '<div class="admin-emoji-empty">no pending suggestions</div>';
-      }
-      for (const item of pending)
-        adminEmojiList.appendChild(makeAdminEmojiRow(item));
-      if (reviewed.length) {
-        const details = document.createElement("details");
-        details.className = "admin-emoji-reviewed";
-        const summary = document.createElement("summary");
-        summary.textContent = `reviewed (${reviewed.length})`;
-        details.appendChild(summary);
-        for (const item of reviewed)
-          details.appendChild(makeAdminEmojiRow(item));
-        adminEmojiList.appendChild(details);
-      }
-    } catch (e) {
-      adminEmojiList.innerHTML =
-        '<div class="admin-emoji-empty">failed to load</div>';
-    }
-  }
-
-  function showPendingEmojiDetail(item) {
-    adminEmojiList.style.display = "none";
-    adminEmojiDetail.style.display = "flex";
-    adminEmojiDetail.innerHTML = "";
-
-    const backBtn = document.createElement("button");
-    backBtn.type = "button";
-    backBtn.className = "admin-emoji-back";
-    backBtn.textContent = "← back";
-    backBtn.addEventListener("click", () => {
-      adminEmojiDetail.style.display = "none";
-      adminEmojiList.style.display = "flex";
-      if (pendingEmojisDirty) renderPendingEmojis();
-    });
-    adminEmojiDetail.appendChild(backBtn);
-
-    const img = document.createElement("img");
-    img.src = item.url;
-    img.className = "admin-emoji-detail-img";
-    adminEmojiDetail.appendChild(img);
-
-    const sc = document.createElement("div");
-    sc.className = "admin-emoji-detail-shortcode";
-    sc.textContent = item.shortcode;
-    adminEmojiDetail.appendChild(sc);
-
-    const sub = document.createElement("div");
-    sub.className = "admin-emoji-detail-meta";
-    sub.textContent = `submitted by ${item.submitter_username || item.submitter_email}`;
-    adminEmojiDetail.appendChild(sub);
-
-    const ts = document.createElement("div");
-    ts.className = "admin-emoji-detail-meta";
-    ts.textContent = new Date(item.submitted_at).toLocaleString();
-    adminEmojiDetail.appendChild(ts);
-
-    if (item.notes) {
-      const notes = document.createElement("div");
-      notes.className = "admin-emoji-detail-notes";
-      notes.textContent = item.notes;
-      adminEmojiDetail.appendChild(notes);
-    }
-
-    const status = item.status || "pending";
-    if (status !== "pending") {
-      const statusLabels = { accepted: "accepted ✓", denied: "denied" };
-      const statusEl = document.createElement("div");
-      statusEl.className = `admin-emoji-detail-status my-emoji-status-${status}`;
-      statusEl.textContent = statusLabels[status] ?? status;
-      adminEmojiDetail.appendChild(statusEl);
-      if (item.review_reason) {
-        const reasonEl = document.createElement("div");
-        reasonEl.className = "admin-emoji-detail-reason";
-        reasonEl.textContent = `reason: ${item.review_reason}`;
-        adminEmojiDetail.appendChild(reasonEl);
-      }
-    } else {
-      const reasonInput = document.createElement("textarea");
-      reasonInput.className = "admin-emoji-reason-input";
-      reasonInput.placeholder = "reason (optional)";
-      reasonInput.maxLength = 300;
-      adminEmojiDetail.appendChild(reasonInput);
-
-      const actions = document.createElement("div");
-      actions.className = "admin-emoji-detail-actions";
-
-      const denyBtn = document.createElement("button");
-      denyBtn.type = "button";
-      denyBtn.className = "admin-emoji-deny-btn";
-      denyBtn.textContent = "deny";
-      denyBtn.addEventListener("click", async () => {
-        denyBtn.disabled = true;
-        acceptBtn.disabled = true;
-        try {
-          const res = await fetch("/admin/emoji/deny", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              id: item.id,
-              session,
-              reason: reasonInput.value.trim() || null,
-            }),
-          });
-          if (res.ok) {
-            pendingEmojisDirty = true;
-            adminEmojiDetail.style.display = "none";
-            adminEmojiList.style.display = "flex";
-            renderPendingEmojis();
-          }
-        } catch (e) {
-          denyBtn.disabled = false;
-          acceptBtn.disabled = false;
-        }
-      });
-
-      const acceptBtn = document.createElement("button");
-      acceptBtn.type = "button";
-      acceptBtn.className = "admin-emoji-accept-btn";
-      acceptBtn.textContent = "accept";
-      acceptBtn.addEventListener("click", async () => {
-        acceptBtn.disabled = true;
-        denyBtn.disabled = true;
-        try {
-          const res = await fetch("/admin/emoji/accept", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              id: item.id,
-              session,
-              reason: reasonInput.value.trim() || null,
-            }),
-          });
-          if (res.ok) {
-            pendingEmojisDirty = true;
-            adminEmojiDetail.style.display = "none";
-            adminEmojiList.style.display = "flex";
-            renderPendingEmojis();
-          }
-        } catch (e) {
-          acceptBtn.disabled = false;
-          denyBtn.disabled = false;
-        }
-      });
-
-      actions.appendChild(denyBtn);
-      actions.appendChild(acceptBtn);
-      adminEmojiDetail.appendChild(actions);
-    }
-  }
-
-  function openAdmin() {
-    adminPanel.style.display = "block";
-    adminBackdrop.style.display = "block";
-    moreMenu.classList.remove("open");
-    userlist.style.top = "";
-  }
-  function closeAdmin() {
-    adminPanel.style.display = "none";
-    adminBackdrop.style.display = "none";
-    setAdminTab("actions");
-  }
-  document.querySelector("#admin-btn").addEventListener("click", () => {
-    window.location.href = "/admin";
-  });
-  document.querySelector("#admin-close").addEventListener("click", closeAdmin);
-  adminBackdrop.addEventListener("click", closeAdmin);
-  adminTabActions.addEventListener("click", () => setAdminTab("actions"));
-  adminTabUsers.addEventListener("click", () => setAdminTab("users"));
-  adminTabEmoji.addEventListener("click", () => setAdminTab("emoji"));
-
-  document
-    .querySelector("#owner-mutechat-btn")
-    .addEventListener("click", () => {
-      socket.emit("message", {
-        text: chatMutedb ? "/unmutechat" : "/mutechat",
-      });
-      closeAdmin();
-    });
-  document
-    .querySelector("#owner-maintenance-btn")
-    .addEventListener("click", async () => {
-      closeAdmin();
-      const reason = await showModal({
-        message: "maintenance reason (leave blank to turn off):",
-        withInput: true,
-      });
-      if (reason === null) return;
-      socket.emit("message", { text: `/maintenance ${reason}` });
-    });
-  document
-    .querySelector("#owner-clear-btn")
-    .addEventListener("click", async () => {
-      closeAdmin();
-      const confirmed = await showModal({
-        message: "clear all chat history? this can't be reversed",
-      });
-      if (confirmed) {
-        socket.emit("message", { text: "/clear" });
-      }
-    });
-  document
-    .querySelector("#owner-refresh-version-btn")
-    .addEventListener("click", () => {
-      loadVersionStatus(true);
-      showStatus("refreshing version status...", "pink");
-      setTimeout(hideStatus, 1500);
-      closeAdmin();
-    });
-
-  // mute chat
-  socket.on("mutechat", (ann) => {
-    if (!isOwner) {
-      document.querySelector("#message-input").disabled = true;
-      document.querySelector('#message-form button[type="submit"]').disabled =
-        true;
-      document.querySelector("#attach-btn").disabled = false;
-    }
-    chatMutedb = true;
-    showStatus(ann, "pink");
-  });
-
-  // unmute chat
-  socket.on("unmutechat", (ann) => {
-    hideStatus();
-    document.querySelector("#message-input").disabled = false;
-    document.querySelector('#message-form button[type="submit"]').disabled =
-      false;
-    document.querySelector("#attach-btn").disabled = false;
-    chatMutedb = false;
-  });
-
-  // status
-  socket.on("status", (status) => {
-    showStatus(status, "pink");
-  });
-
-  // color status
-  socket.on("colorChanged", (color) => {
-    myColor = color;
-    updateProfileBtn();
-    const display = color.startsWith("flag:") ? color.slice(5) : color;
-    showStatus(`name color changed to ${display}`, "pink");
-    setTimeout(hideStatus, 3000);
-  });
-
-  // muteded stuff
-  socket.on("muted", ({ reason, until }) => {
-    document.querySelector("#message-input").disabled = true;
-    document.querySelector('#message-form button[type="submit"]').disabled =
-      true;
-    showStatus(
-      `you are muted${until ? " until " + new Date(until).toLocaleString() : ""} - reason: ${reason}`,
-      "pink",
-    );
-  });
-  socket.on("unmuted", () => {
-    document.querySelector("#message-input").disabled = false;
-    document.querySelector('#message-form button[type="submit"]').disabled =
-      false;
-    hideStatus();
-  });
 
   // modal
   function showModal({ message, withInput = false, defaultValue = "" }) {
@@ -2745,4 +2254,7 @@ if (session) {
       if (withInput) inputEl.addEventListener("keydown", onKey);
     });
   }
+  document.querySelector("#admin-btn").addEventListener("click", () => {
+    window.location.href = "/admin";
+  });
 }

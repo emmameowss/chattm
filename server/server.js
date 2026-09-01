@@ -6,7 +6,7 @@ import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
 import { randomBytes } from "crypto";
 import { readFile, appendFile } from "fs/promises";
-import { extname, normalize, resolve, sep } from "path";
+import { extname, isAbsolute, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
 import { randomUUID } from "crypto";
 import {
@@ -72,12 +72,6 @@ import {
   getRecentUsers,
   getDbStats,
   getAllHistory,
-  addPendingEmoji,
-  getPendingEmojis,
-  getPendingEmojisByEmail,
-  getPendingEmojiById,
-  getPendingEmojiByShortcode,
-  updatePendingEmoji,
   setRole,
   getRole,
   isHidden,
@@ -182,6 +176,50 @@ const msgcooldown = 1000;
 const lastmessage = {};
 const MAX_MESSAGE_LENGTH = 2000
 
+function containsBlockedLink(text) {
+  const regex = /(https?:\/\/[^\s]+)/gi
+  const urls = text.match(regex) || []
+
+  const allowedMediaDomains = [
+    'cdn.chattm.app',
+    'chattm.app',
+    'imgur.com', 'i.imgur.com',
+    'youtube.com', 'youtu.be',
+    'vimeo.com',
+    'giphy.com', 'media.giphy.com',
+    'tenor.com', 'media.tenor.com',
+    'streamable.com',
+    'gfycat.com',
+    'twitch.tv',
+    'spotify.com'
+  ];
+
+
+  const mediaExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i;
+
+  for (const url of urls) {
+    try {
+      const urlObj = new URL(url)
+      const hostname = urlObj.hostname.toLowerCase()
+      
+      const hasMediaExtension = mediaExtensions.test(url)
+
+      if (hasMediaExtension) {
+        const isAllowed = allowedMediaDomains.some(domain =>
+          hostname === domain || hostname.endsWith('.' + domain)
+        )
+
+        if (!isAllowed) {
+          return true
+        }
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+  return false
+}
+
 const rateLimits = new Map();
 function checkRateLimit(ip, key, max, windowMs) {
   const now = Date.now();
@@ -217,7 +255,7 @@ const commands = {
         target =
           findSocketByUsername(target)?.userEmail ?? getEmailByUsername(target);
         if (!target) {
-          socket.emit("commandError", `no user found with username ${args[0]}`);
+          socket.emit("commandError", `no user found with username ${args[0]}`, 'error');
           return;
         }
       }
@@ -235,21 +273,21 @@ const commands = {
           s.disconnect();
         }
       }
-      socket.emit("commandError", `banned ${targetEmail}`);
+      socket.emit("commandError", `banned ${targetEmail}`, 'success');
     },
   },
   "/unban": {
     minRole: "admin",
     run: (socket, rest) => {
       removeBan(rest);
-      socket.emit("commandError", `unbanned ${rest}`);
+      socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
   "/unbanip": {
     minRole: "admin",
     run: (socket, rest) => {
       removeIpBan(rest);
-      socket.emit("commandError", `unbanned ${rest}`);
+      socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
   "/kick": {
@@ -258,7 +296,7 @@ const commands = {
       const [targetUsername, ...reasonParts] = rest.split(" ");
       const kickReason = reasonParts.join(" ") || "kicked by server";
       if (!targetUsername) {
-        socket.emit("commandError", "usage: /kick <username> [reason]");
+        socket.emit("commandError", "usage: /kick <username> [reason]", 'error');
         return;
       }
       const target = findSocketByUsername(targetUsername);
@@ -266,13 +304,14 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
       target.emit("kicked", kickReason);
       target.skipLeaveMessage = true;
       target.disconnect();
-      socket.emit("commandError", `kicked ${targetUsername}`);
+      socket.emit("commandError", `kicked ${targetUsername}`, 'success');
       await appendFile(
         "kicks.log",
         `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) kicked ${targetUsername} - reason: ${kickReason}\n`,
@@ -292,12 +331,13 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
       const durationMs = durationStr ? parseDuration(durationStr) : null;
       if (durationStr && !durationMs) {
-        socket.emit("commandError", "invalid duration format");
+        socket.emit("commandError", "invalid duration format", 'error');
         return;
       }
       setMute(
@@ -316,6 +356,7 @@ const commands = {
       socket.emit(
         "commandError",
         `muted ${targetUsername}${durationStr ? " for " + durationStr : ""}`,
+        'success',
       );
     },
   },
@@ -326,51 +367,14 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail || !getMute(targetEmail)) {
-        socket.emit("commandError", `${targetUsername} is not muted`);
+        socket.emit("commandError", `${targetUsername} is not muted`, 'info');
         return;
       }
       deleteMute(targetEmail);
       forEachUserSocket(targetEmail, (s) => s.emit("unmuted"));
-      socket.emit("commandError", `unmuted ${targetUsername}`);
+      socket.emit("commandError", `unmuted ${targetUsername}`, 'success');
     },
   },
-  "/clear": {
-    minRole: "admin",
-    run: (socket) => {
-      clearMessages(socket.currentChannel);
-      io.to(roomOf(socket.currentChannel)).emit("clear");
-    },
-  },
-  "/mutechat": {
-    minRole: "owner",
-    run: () => {
-      chatMuted = true;
-      io.emit("mutechat", "chat has been muted");
-    },
-  },
-  "/unmutechat": {
-    minRole: "owner",
-    run: () => {
-      chatMuted = false;
-      io.emit("unmutechat", "chat has been unmuted");
-    },
-  },
-  "/status": {
-    minRole: "owner",
-    run: (socket, rest) => {
-      status = rest;
-      socket.emit("status", status);
-    },
-  },
-  /*
-  "/reloadfilter": {
-    minRole: "admin",
-    run: (socket) => {
-      loadFilterWordsIntoMemory();
-      socket.emit("commandError", `${filteredwords.length} loaded`);
-    },
-  },
-  */
   "/resetstrikes": {
     minRole: "mod",
     run: (socket, rest) => {
@@ -381,11 +385,12 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
       deleteStrikes(targetEmail);
-      socket.emit("commandError", `reset strikes for ${targetUsername}`);
+      socket.emit("commandError", `reset strikes for ${targetUsername}`, 'success');
     },
   },
   "/noguests": {
@@ -401,7 +406,7 @@ const commands = {
           s.disconnect();
         }
       }
-      socket.emit("commandError", "guest logins have been disabled");
+      socket.emit("commandError", "guest logins have been disabled", 'success');
     },
   },
   "/allowguests": {
@@ -409,14 +414,14 @@ const commands = {
     run: (socket) => {
       guestsDisabled = false;
       setSetting("guests_disabled", "0");
-      socket.emit("commandError", "guest logins have been reenabled");
+      socket.emit("commandError", "guest logins have been reenabled", 'success');
     },
   },
   "/reloademojis": {
     minRole: "admin",
     run: async (socket) => {
       await syncEmojisFromS3();
-      socket.emit("commandError", "emoji sync complete");
+      socket.emit("commandError", "emoji sync complete", 'success');
     },
   },
   "/whois": {
@@ -424,40 +429,12 @@ const commands = {
     run: (socket, rest) => {
       const found = findSocketByUsername(rest);
       if (found) {
-        socket.emit("commandError", `${rest}: ${found.userEmail}`);
+        socket.emit("commandError", `${rest}: ${found.userEmail}`, 'success');
       } else {
-        socket.emit("commandError", `no user found with username "${rest}"`);
+        socket.emit("commandError", `no user found with username "${rest}"`, 'error');
       }
     },
   },
-  /*
-  "/removefilter": {
-    minRole: "admin",
-    run: (socket, rest) => {
-      const word = rest.toLowerCase();
-      if (!filteredwords.includes(word)) {
-        socket.emit("commandError", `${word} is not in the filter`);
-        return;
-      }
-      removeFilterWord(word);
-      loadFilterWordsIntoMemory();
-      socket.emit("commandError", `removed ${word} from the filter`);
-    },
-  },
-  "/addfilter": {
-    minRole: "admin",
-    run: (socket, rest) => {
-      const word = rest.toLowerCase();
-      if (!word) {
-        socket.emit("commandError", "you need to specify a word");
-        return;
-      }
-      addFilterWord(word);
-      loadFilterWordsIntoMemory();
-      socket.emit("commandError", `added ${word} into the filter`);
-    },
-  },
-  */
   "/setcolor": {
     minRole: "admin",
     run: (socket, rest) => {
@@ -470,6 +447,7 @@ const commands = {
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
+          'error',
         );
         return;
       }
@@ -483,113 +461,13 @@ const commands = {
       };
       const color = flagColors[colorInput] ?? colorInput;
       if (isBlockedColor(color)) {
-        socket.emit("commandError", "please choose another color");
+        socket.emit("commandError", "please choose another color", 'error');
         return;
       }
       setColor(targetEmail, color);
       forEachUserSocket(targetEmail, (s) => s.emit("colorChanged", color));
       emitAllUserLists();
-      socket.emit("commandError", `set ${targetUsername}'s color to ${color}`);
-    },
-  },
-  "/maintenance": {
-    minRole: "admin",
-    run: (socket, rest) => {
-      maintenance = !maintenance;
-      reason = maintenance ? rest : "";
-      setSetting("maintenance", maintenance ? "1" : "0");
-      setSetting("maintenance_reason", reason);
-      for (const [, s] of io.sockets.sockets) {
-        if (!["mod", "admin", "owner"].includes(s.userRole)) {
-          s.emit("maintenance", maintenance, reason);
-          if (maintenance) s.disconnect();
-        }
-      }
-      socket.emit(
-        "commandError",
-        maintenance ? "maintenance enabled" : "maintenance disabled",
-      );
-    },
-  },
-  "/verify": {
-    minRole: "owner",
-    run: async (socket, rest) => {
-      setVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedVerified = true;
-      });
-
-      const currentRole = getRole(rest)
-      if (currentRole === "user") {
-        try {
-          const list = await clerk.users.getUserList({ emailAddress: [rest] })
-          const clerkUser = list.data?.[0]
-          if (clerkUser) {
-            await clerk.users.updateUserMetadata(clerkUser.id, {
-              publicMetadata: { role: "mod" }
-            })
-            setRole(rest, "mod")
-            forEachUserSocket(rest, (s) => {
-              s.userRole = "mod";
-            })
-          }
-        } catch (e) {
-          console.error('failed to promote user to mod: ', e)
-        }
-      }
-      emitAllUserLists()
-      socket.emit('commandError', `verified ${rest}`)
-    },
-  },
-  "/unverify": {
-    minRole: "owner",
-    run: async (socket, rest) => {
-      removeVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedVerified = false;
-      });
-      const currentRole = getRole(rest)
-      if (currentRole === "mod") {
-        try {
-          const list = await clerk.users.getUserList({ emailAddress: [rest] })
-          const clerkUser = list.data?.[0]
-          if (clerkUser) {
-            await clerk.users.updateUserMetadata(clerkUser.id, {
-              publicMetadata: { role: "user" }
-            })
-            setRole(rest, 'user')
-            forEachUserSocket(rest, (s) => {
-              s.userRole = 'user'
-            })
-          }
-        } catch (e) {
-          console.error('failed to demote user from mod: ', e)
-        }
-      }
-      emitAllUserLists()
-      socket.emit('commandError', `unverified ${rest}`)
-    },
-  },
-  "/redverify": {
-    minRole: "owner",
-    run: (socket, rest) => {
-      setRedVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedRedVerified = true;
-      });
-      emitAllUserLists();
-      socket.emit("commandError", `red verified ${rest}`);
-    },
-  },
-  "/unredverify": {
-    minRole: "owner",
-    run: (socket, rest) => {
-      removeRedVerified(rest);
-      forEachUserSocket(rest, (s) => {
-        s.cachedRedVerified = false;
-      });
-      emitAllUserLists();
-      socket.emit("commandError", `removed red verification from ${rest}`);
+      socket.emit("commandError", `set ${targetUsername}'s color to ${color}`, 'success');
     },
   },
   "/nick": {
@@ -597,11 +475,11 @@ const commands = {
     run: (socket, rest) => {
       const nick = rest;
       if (!isValidUsername(nick)) {
-        socket.emit("commandError", "invalid username");
+        socket.emit("commandError", "invalid username", 'error');
         return;
       }
       if (socket.userEmail.endsWith("@guest")) {
-        socket.emit("commandError", "guests cannot change their username");
+        socket.emit("commandError", "guests cannot change their username", 'error');
         return;
       }
       const prevUser = socket.username;
@@ -632,7 +510,7 @@ const commands = {
       };
       const color = prideFlags[colorinput] ?? colorinput;
       if (isBlockedColor(color)) {
-        socket.emit("commandError", "please choose a different color");
+        socket.emit("commandError", "please choose a different color", 'error');
         return;
       }
       setColor(socket.userEmail, color);
@@ -646,12 +524,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
-        socket.emit('commandError', `no user found with username ${rest}`)
+        socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       setHidden(targetEmail)
       emitAllUserLists()
-      socket.emit('commandError', `hid ${rest} from user list`)
+      socket.emit('commandError', `hid ${rest} from user list`, 'success')
     },
   },
   "/unhide": {
@@ -659,12 +537,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
-        socket.emit('commandError', `no user found with username ${rest}`)
+        socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       removeHidden(targetEmail)
       emitAllUserLists()
-      socket.emit('commandError', `unhid ${rest} on user list`)
+      socket.emit('commandError', `unhid ${rest} on user list`, 'success')
     },
   },
 };
@@ -793,30 +671,6 @@ function isBlockedColor(color) {
   return r < 55 && g < 55 && b < 55;
 }
 
-/* chat filter has been removed
-function loadFilterWordsIntoMemory() {
-  filteredwords.length = 0;
-  getFilterWords().forEach((w) => filteredwords.push(w));
-  console.log(`loaded ${filteredwords.length} filter words`);
-}
-
-const filteredwords = [];
-loadFilterWordsIntoMemory();
-
-function containsFilteredWord(text) {
-  if (!text) return null;
-  const lower = text.toLowerCase();
-  return (
-    filteredwords.find((w) =>
-      new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(
-        lower,
-      ),
-    ) || null
-  );
-}
-
-*/
-
 console.log(`loaded ${getHistory().length} messages in history`);
 
 async function getVersionStatus(forceRefresh = false) {
@@ -909,7 +763,7 @@ function parseDuration(str) {
 }
 
 function isValidUsername(name) {
-  return /^[a-zA-Z0-9- ]{1,20}$/.test(name) && name.trim() === name && !name.includes("  ");
+  return /^[a-zA-Z0-9- ]{1,20}$/.test(name) && name.trim() === name && !name.includes("  ") && name !== "pending";
 }
 // Clerk accounts use the raw (normalized) email as their in-app identity, so
 // every command / lookup treats them identically
@@ -939,26 +793,30 @@ function emitAllUserLists() {
 
 function buildUserList(channel = "main") {
   const onlineEmails = new Set();
-  const users = [];
+  const onlineUsers = new Map();
 
   for (const [id, s] of io.sockets.sockets) {
     if (!s.username) continue;
     if (s.currentChannel !== channel) continue;
-    onlineEmails.add(s.userEmail);
-    users.push({
-      username: s.username,
-      email: s.userEmail,
-      color: s.cachedColor ?? null,
-      avatar: s.cachedAvatar ?? null,
-      guest: s.userEmail.endsWith("@guest"),
-      isOwner: s.userRole === "owner",
-      role: s.userRole ?? "user",
-      verified: s.cachedVerified ?? false,
-      redVerified: s.cachedRedVerified ?? false,
-      status: s.cachedStatus ?? "online",
-      online: true,
-    });
+    if (!onlineUsers.has(s.userEmail)) {
+      onlineEmails.add(s.userEmail);
+      onlineUsers.set(s.userEmail, {
+        username: s.username,
+        email: s.userEmail,
+        color: s.cachedColor ?? null,
+        avatar: s.cachedAvatar ?? null,
+        guest: s.userEmail.endsWith("@guest"),
+        isOwner: s.userRole === "owner",
+        role: s.userRole ?? "user",
+        verified: s.cachedVerified ?? false,
+        redVerified: s.cachedRedVerified ?? false,
+        status: s.cachedStatus ?? "online",
+        online: true,
+      });
+    }
   }
+
+  const users = Array.from(onlineUsers.values())
 
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   for (const row of getRecentUsers(cutoff)) {
@@ -1252,10 +1110,15 @@ io.on("connection", (socket) => {
 
   socket.on("setUsername", (name) => {
     if (!isValidUsername(name)) {
-      socket.emit(
-        "commandError",
-        "invalid username, make sure it's within the character limit and uses only letters and numbers",
-      );
+      if (name === 'pending') {
+        socket.emit('commandError', 'you cannot set your username to "pending"', 'error')
+      } else {
+        socket.emit(
+          "commandError",
+          "invalid username, make sure it's within the character limit and uses only letters and numbers",
+          'error',
+        );
+      }
       return;
     }
     const prevUser = socket.username;
@@ -1302,7 +1165,7 @@ io.on("connection", (socket) => {
     const isAdmin = ['mod', 'admin', 'owner'].includes(socket.userRole);
 
     if (!isOwnerOfMsg && !isAdmin) {
-      socket.emit("commandError", "you can only delete your own messages");
+      socket.emit("commandError", "you can only delete your own messages", 'error');
       return;
     }
     deleteMessage(messageId);
@@ -1337,9 +1200,10 @@ io.on("connection", (socket) => {
       return socket.emit(
         "commandError",
         "invalid channel name (use a-z, 0-9, - ; max 24)",
+        'error'
       );
     if (channelExists(name))
-      return socket.emit("commandError", "channel already exists");
+      return socket.emit("commandError", "channel already exists", 'error');
     createChannel(name, socket.userEmail);
     io.emit(
       "channels",
@@ -1353,7 +1217,7 @@ io.on("connection", (socket) => {
       .trim()
       .toLowerCase();
     if (name === "main")
-      return socket.emit("commandError", "the main channel cannot be deleted");
+      return socket.emit("commandError", "the main channel cannot be deleted", 'error');
     if (!channelExists(name)) return;
     deleteChannel(name);
     // move anyone viewing the deleted channel back to main
@@ -1385,13 +1249,19 @@ io.on("connection", (socket) => {
       socket.emit(
         "commandError",
         `you are muted${m.until ? " until " + new Date(m.until).toLocaleString() : ""} - reason: ${m.reason}`,
+        'error',
       );
       return;
     }
 
     if (typeof data.text === "string" && data.text.length > MAX_MESSAGE_LENGTH) {
-      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters)`)
+      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters)`, 'error')
       return
+    }
+
+    if (containsBlockedLink(data.text)) {
+      socket.emit('commandError', "media links from unapproved sites aren't allowed, please use the direct upload function or an approved site", "error")
+      return;
     }
 
     const now = Date.now();
@@ -1406,13 +1276,13 @@ io.on("connection", (socket) => {
       lastmessage[socket.userEmail] &&
       now - lastmessage[socket.userEmail] < msgcooldown
     ) {
-      socket.emit("commandError", "slow down");
+      socket.emit("commandError", "slow down", 'error');
       return;
     }
     lastmessage[socket.userEmail] = now;
 
     if (chatMuted && !["mod", "admin", "owner"].includes(socket.userRole)) {
-      socket.emit("commandError", "chat is currently muted");
+      socket.emit("showE", "chat is currently muted");
       return;
     }
 
@@ -1426,7 +1296,7 @@ io.on("connection", (socket) => {
       if (cmd) {
         const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
         if (cmd.minRole && (roleValues[socket.userRole] ?? 0) < roleValues[cmd.minRole]) {
-          socket.emit('commandError', "you don't have permission to use this command");
+          socket.emit('commandError', "you don't have permission to use this command", 'error');
           return;
         }
         await cmd.run(socket, rest, data);
@@ -1902,309 +1772,91 @@ httpServer.on("request", async (req, res) => {
     return;
   }
 
-  if (url.pathname === "/suggest-emoji") {
+  if (url.pathname === "/channels") {
+    res.writeHead(200, {
+      'content-type': 'application/json',
+      'cache-control': 'no-store'
+    });
+    const channels = listChannels()
+    res.end(JSON.stringify({channels}))
+    return;
+  }
+  if (url.pathname === "/admin/emoji/list" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
 
-    // will reenable after full admin panel completed
-    res.writeHead(503, {'content-type': 'application/json'})
-    res.end(JSON.stringify({error: 'emoji submissions are currently disabled because the actual rewritten systems have not even been touched yet'}))
+    const emojis = getCustomEmoji()
+    const emojiList = Object.entries(emojis)
+      .map(([shortcode, url]) => ({shortcode, url}))
+      .sort((a,b) => a.shortcode.localeCompare(b.shortcode))
+
+    res.writeHead(200, {'content-type': 'application/json'})
+    res.end(JSON.stringify({emojis: emojiList}))
     return
-    /*
-    if (req.method !== "POST") {
-      res.writeHead(405);
-      res.end();
-      return;
-    }
-    const suggestSessionId = parseCookies(req).session;
-    const suggestSession = suggestSessionId
-      ? getSession(suggestSessionId)
-      : null;
-    if (!suggestSession || suggestSession.guest) {
-      res.writeHead(401, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "must be logged in to suggest emojis" }));
-      return;
-    }
-    const suggestIp =
-      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-      req.socket.remoteAddress;
-    if (!checkRateLimit(suggestIp, "suggest-emoji", 5, 60 * 60 * 1000)) {
-      res.writeHead(429, { "content-type": "application/json" });
-      res.end(
-        JSON.stringify({ error: "rate limited - max 5 suggestions per hour" }),
-      );
-      return;
-    }
-    const form = formidable({ maxFileSize: 2 * 1024 * 1024 });
-    form.parse(req, async (err, fields, files) => {
-      if (err) {
-        res.writeHead(400, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: err.message }));
-        return;
-      }
+  }
+
+  if (url.pathname === "/admin/emoji/delete" && req.method === "POST") {
+    let body = ''
+    req.on('data', (chunk) => (body += chunk))
+    req.on('end', async () => {
       try {
-        const shortcode = (fields.shortcode?.[0] ?? "").trim();
-        const notes = (fields.notes?.[0] ?? "").trim().slice(0, 200);
-        const submitterUsername = (fields.username?.[0] ?? "").trim();
-        if (!/^:[a-z0-9_-]+:$/.test(shortcode)) {
-          res.writeHead(400, { "content-type": "application/json" });
-          res.end(
-            JSON.stringify({
-              error:
-                "invalid shortcode - use format :name: with lowercase letters, numbers, - or _",
-            }),
-          );
-          return;
+        const { session, shortcode } = JSON.parse(body)
+        const sess = getSession(session)
+        const sessRole = sess ? getRole(sess.email) : 'user'
+
+        if (!sessRole || !['admin', 'owner'].includes(sessRole)) {
+          res.writeHead(403, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'forbidden'}))
+          return
         }
-        const existing = getCustomEmoji();
-        if (existing[shortcode] || getPendingEmojiByShortcode(shortcode)) {
-          res.writeHead(409, { "content-type": "application/json" });
-          res.end(
-            JSON.stringify({ error: "that shortcode is already in use" }),
-          );
-          return;
+
+        const emojis = getCustomEmoji()
+        if (!emojis[shortcode]) {
+          res.writeHead(404, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'emoji not found'}))
+          return
         }
-        if (!files.file?.[0]) {
-          res.writeHead(400, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "no file uploaded" }));
-          return;
+
+        const url = emojis[shortcode]
+        
+        if (!process.env.AWS_S3_PUBLIC_URL) {
+          console.error('AWS_S3_PUBLIC_URL not configured')
+          res.writeHead(500, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'S3 not configured'}))
+          return
         }
-        const file = files.file[0];
-        const imageTypes = [
-          "image/png",
-          "image/gif",
-          "image/webp",
-          "image/jpeg",
-          "image/svg+xml",
-        ];
-        if (!imageTypes.includes(file.mimetype)) {
-          res.writeHead(400, { "content-type": "application/json" });
-          res.end(
-            JSON.stringify({
-              error: "only image files are allowed (PNG, GIF, WebP, JPEG, SVG)",
-            }),
-          );
-          return;
+        
+        const publicUrlPrefix = process.env.AWS_S3_PUBLIC_URL + '/'
+        if (!url.startsWith(publicUrlPrefix)) {
+          console.error('Emoji URL does not match expected S3 public URL format:', url)
+          res.writeHead(500, {'content-type': 'application/json'})
+          res.end(JSON.stringify({success: false, error: 'invalid emoji URL format'}))
+          return
         }
-        const fileBuffer = await readFile(file.filepath);
-        const ext = extname(file.originalFilename || "") || ".png";
-        const isOwnerSubmit = getRole(suggestSession.email) === "owner"
-        const s3Key = isOwnerSubmit
-          ? `emojis/${shortcode.replace(/:/g, "")}${ext}`
-          : `pending_emojis/${Date.now()}-${randomBytes(6).toString("hex")}${ext}`;
-        await s3.send(
-          new PutObjectCommand({
+        
+        const s3Key = url.replace(publicUrlPrefix, '')
+
+        try {
+          await s3.send(new DeleteObjectCommand({
             Bucket: process.env.AWS_S3_BUCKET,
-            Key: s3Key,
-            Body: fileBuffer,
-            ContentType: file.mimetype,
-            ACL: "public-read",
-          }),
-        );
-        const publicUrl = `${process.env.AWS_S3_PUBLIC_URL}/${s3Key}`;
-        const id = randomUUID();
-        const now = Date.now();
-        const pendingRow = {
-          id,
-          shortcode,
-          s3_key: s3Key,
-          url: publicUrl,
-          submitter_email: suggestSession.email,
-          submitter_username: submitterUsername || null,
-          notes: notes || null,
-          submitted_at: now,
-        };
-        if (isOwnerSubmit) {
-          addCustomEmoji(shortcode, publicUrl);
-          addPendingEmoji({
-            ...pendingRow,
-            status: "accepted",
-            review_reason: "auto-approved",
-          });
-          io.emit("emojiUpdate", getCustomEmoji());
-        } else {
-          addPendingEmoji(pendingRow);
+            Key: s3Key
+          }));
+        } catch (e) {
+          console.error('failed to delete:', e)
         }
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true, autoApproved: isOwnerSubmit }));
+
+        removeCustomEmoji(shortcode)
+
+        io.emit('emojiUpdate', getCustomEmoji())
+
+        res.writeHead(200, {'content-type': 'application/json'})
+        res.end(JSON.stringify({success: true}))
       } catch (e) {
-        console.error("suggest-emoji error:", e);
-        res.writeHead(500, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: e.message }));
+        console.error('error deleting emoji:', e)
+        res.writeHead(500, {'content-type': 'application/json'})
+        res.end(JSON.stringify({success: false, error: 'internal error'}))
       }
-    });
-    return;
-
-    */
-  }
-
-  if (url.pathname === "/my-pending-emojis") {
-    const mpeSessionId = parseCookies(req).session;
-    const mpeSession = mpeSessionId ? getSession(mpeSessionId) : null;
-    if (!mpeSession) {
-      res.writeHead(401, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "unauthorized" }));
-      return;
-    }
-    const base = process.env.AWS_S3_PUBLIC_URL;
-    const mpeItems = getPendingEmojisByEmail(mpeSession.email).map((r) => ({
-      ...r,
-      url: base ? `${base}/${r.s3_key}` : r.url,
-    }));
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify(mpeItems));
-    return;
-  }
-
-  if (url.pathname === "/pending-emojis") {
-    const peSessionId = parseCookies(req).session;
-    const peSession = peSessionId ? getSession(peSessionId) : null;
-    const peRole = peSession ? getRole(peSession.email) : "user"
-    if (!peSession || !["admin", "owner"].includes(peRole)) {
-      res.writeHead(403, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "forbidden" }));
-      return;
-    }
-    const base = process.env.AWS_S3_PUBLIC_URL;
-    const peItems = getPendingEmojis().map((r) => ({
-      ...r,
-      url: base ? `${base}/${r.s3_key}` : r.url,
-    }));
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify(peItems));
-    return;
-  }
-
-  if (url.pathname === "/admin/emoji/accept") {
-    if (req.method !== "POST") {
-      res.writeHead(405);
-      res.end();
-      return;
-    }
-    let body = "";
-    req.on("data", (d) => {
-      body += d;
-    });
-    req.on("end", async () => {
-      try {
-        const {
-          id,
-          session: bodySession,
-          reason: acceptReason,
-        } = JSON.parse(body);
-        const sessionId = bodySession || url.searchParams.get("session");
-        const sess = sessionId ? getSession(sessionId) : null;
-        const sessRole = sess ? getRole(sess.email) : "user"
-        if (!sess || !["admin", "owner"].includes(sessRole)) {
-          res.writeHead(403, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "forbidden" }));
-          return;
-        }
-        const pending = getPendingEmojiById(id);
-        if (!pending) {
-          res.writeHead(404, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "not found" }));
-          return;
-        }
-        const ext = extname(pending.s3_key);
-        const destKey = `emojis/${pending.shortcode.replace(/:/g, "")}${ext}`;
-        await s3.send(
-          new CopyObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            CopySource: `${process.env.AWS_S3_BUCKET}/${pending.s3_key}`,
-            Key: destKey,
-            ACL: "public-read",
-          }),
-        );
-        await s3.send(
-          new DeleteObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: pending.s3_key,
-          }),
-        );
-        const newUrl = `${process.env.AWS_S3_PUBLIC_URL}/${destKey}`;
-        addCustomEmoji(pending.shortcode, newUrl);
-        updatePendingEmoji(
-          id,
-          "accepted",
-          destKey,
-          newUrl,
-          acceptReason || null,
-        );
-        io.emit("emojiUpdate", getCustomEmoji());
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true }));
-      } catch (e) {
-        console.error("emoji accept error:", e);
-        res.writeHead(500, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: e.message }));
-      }
-    });
-    return;
-  }
-
-  if (url.pathname === "/admin/emoji/deny") {
-    if (req.method !== "POST") {
-      res.writeHead(405);
-      res.end();
-      return;
-    }
-    let body = "";
-    req.on("data", (d) => {
-      body += d;
-    });
-    req.on("end", async () => {
-      try {
-        const {
-          id,
-          session: bodySession,
-          reason: denyReason,
-        } = JSON.parse(body);
-        const sessionId = bodySession || url.searchParams.get("session");
-        const sess = sessionId ? getSession(sessionId) : null;
-        const sessRole = sess ? getRole(sess.email) : "user"
-        if (!sess || !['owner', "admin"].includes(sessRole)) {
-          res.writeHead(403, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "forbidden" }));
-          return;
-        }
-        const pending = getPendingEmojiById(id);
-        if (!pending) {
-          res.writeHead(404, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "not found" }));
-          return;
-        }
-        const filename = pending.s3_key.split("/").pop();
-        const deniedKey = `denied_emojis/${filename}`;
-        await s3.send(
-          new CopyObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            CopySource: `${process.env.AWS_S3_BUCKET}/${pending.s3_key}`,
-            Key: deniedKey,
-            ACL: "public-read",
-          }),
-        );
-        await s3.send(
-          new DeleteObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: pending.s3_key,
-          }),
-        );
-        const deniedUrl = `${process.env.AWS_S3_PUBLIC_URL}/${deniedKey}`;
-        updatePendingEmoji(
-          id,
-          "denied",
-          deniedKey,
-          deniedUrl,
-          denyReason || null,
-        );
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true }));
-      } catch (e) {
-        console.error("emoji deny error:", e);
-        res.writeHead(500, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: e.message }));
-      }
-    });
-    return;
+    })
+    return
   }
 
   if (url.pathname === "/admin/mutechat" && req.method === "POST") {
