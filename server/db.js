@@ -56,10 +56,6 @@ db.exec(`
     ip TEXT PRIMARY KEY
   );
 
-  CREATE TABLE IF NOT EXISTS filter_words (
-    word TEXT PRIMARY KEY
-  );
-
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -78,17 +74,6 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS custom_emoji (
     shortcode TEXT PRIMARY KEY,
     url TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS pending_emojis (
-    id TEXT PRIMARY KEY,
-    shortcode TEXT NOT NULL,
-    s3_key TEXT NOT NULL,
-    url TEXT NOT NULL,
-    submitter_email TEXT,
-    submitter_username TEXT,
-    notes TEXT,
-    submitted_at INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS verified_users (
@@ -153,6 +138,9 @@ try {
 try {
   db.exec("ALTER TABLE sessions ADD COLUMN role TEXT DEFAULT 'user'");
 } catch {}
+try {
+  db.exec("ALTER TABLE bans ADD COLUMN ip TEXT");
+} catch {}
 
 // profiles column migrations
 try {
@@ -160,16 +148,6 @@ try {
 } catch {}
 try {
   db.exec("ALTER TABLE profiles ADD COLUMN last_seen INTEGER");
-} catch {}
-
-// pending_emojis column migrations
-try {
-  db.exec(
-    "ALTER TABLE pending_emojis ADD COLUMN status TEXT DEFAULT 'pending'",
-  );
-} catch {}
-try {
-  db.exec("ALTER TABLE pending_emojis ADD COLUMN review_reason TEXT");
 } catch {}
 
 // ─── Messages ────────────────────────────────────────────────────────────────
@@ -236,6 +214,9 @@ const stmts = {
   ),
   deleteSession: db.prepare(`DELETE FROM sessions WHERE id = ?`),
   deleteAllGuestSessions: db.prepare(`DELETE FROM sessions WHERE guest = 1`),
+  getLastIpByEmail: db.prepare(
+    `SELECT ip FROM sessions WHERE email = ? AND ip IS NOT NULL ORDER BY rowid DESC LIMIT 1`,
+  ),
 
   // Colors
   getColor: db.prepare(`SELECT color FROM colors WHERE email = ?`),
@@ -261,9 +242,9 @@ const stmts = {
   deleteStrikes: db.prepare(`DELETE FROM strikes WHERE email = ?`),
 
   // Bans
-  getBan: db.prepare(`SELECT reason FROM bans WHERE email = ?`),
+  getBan: db.prepare(`SELECT reason, ip FROM bans WHERE email = ?`),
   addBan: db.prepare(
-    `INSERT OR REPLACE INTO bans (email, reason) VALUES (?, ?)`,
+    `INSERT OR REPLACE INTO bans (email, reason, ip) VALUES (?, ?, ?)`,
   ),
   removeBan: db.prepare(`DELETE FROM bans WHERE email = ?`),
   getAllBans: db.prepare(`SELECT email FROM bans`),
@@ -273,14 +254,6 @@ const stmts = {
   addIpBan: db.prepare(`INSERT OR IGNORE INTO ip_bans (ip) VALUES (?)`),
   removeIpBan: db.prepare(`DELETE FROM ip_bans WHERE ip = ?`),
   getAllIpBans: db.prepare(`SELECT ip FROM ip_bans`),
-
-  // Filter words
-  getFilterWords: db.prepare(`SELECT word FROM filter_words ORDER BY word`),
-  addFilterWord: db.prepare(
-    `INSERT OR IGNORE INTO filter_words (word) VALUES (?)`,
-  ),
-  removeFilterWord: db.prepare(`DELETE FROM filter_words WHERE word = ?`),
-  clearFilterWords: db.prepare(`DELETE FROM filter_words`),
 
   // Settings
   getSetting: db.prepare(`SELECT value FROM settings WHERE key = ?`),
@@ -294,6 +267,9 @@ const stmts = {
   ),
   getEmailByUsername: db.prepare(
     `SELECT email FROM usernames WHERE username = ?`,
+  ),
+  usernameTakenBy: db.prepare(
+    `SELECT email FROM usernames WHERE username = ? COLLATE NOCASE AND email != ? LIMIT 1`,
   ),
   saveUsername: db.prepare(
     `INSERT OR REPLACE INTO usernames (email, username) VALUES (?, ?)`,
@@ -532,6 +508,10 @@ export function deleteAllGuestSessions() {
   stmts.deleteAllGuestSessions.run();
 }
 
+export function getLastIpByEmail(email) {
+  return stmts.getLastIpByEmail.get(email)?.ip ?? null;
+}
+
 // ─── Color API ───────────────────────────────────────────────────────────────
 
 export function getColor(email) {
@@ -582,8 +562,12 @@ export function getBanReason(email) {
   return stmts.getBan.get(email)?.reason ?? null;
 }
 
-export function addBan(email, reason) {
-  stmts.addBan.run(email, reason ?? null);
+export function getBanIp(email) {
+  return stmts.getBan.get(email)?.ip ?? null;
+}
+
+export function addBan(email, reason, ip = null) {
+  stmts.addBan.run(email, reason ?? null, ip ?? null);
 }
 
 export function removeBan(email) {
@@ -597,33 +581,13 @@ export function isIpBanned(ip) {
 }
 
 export function addIpBan(ip) {
+  if (!ip) return;
   stmts.addIpBan.run(ip);
 }
 
 export function removeIpBan(ip) {
+  if (!ip) return;
   stmts.removeIpBan.run(ip);
-}
-
-// ─── Filter Word API ─────────────────────────────────────────────────────────
-
-export function getFilterWords() {
-  return stmts.getFilterWords.all().map((r) => r.word);
-}
-
-export function addFilterWord(word) {
-  stmts.addFilterWord.run(word);
-}
-
-export function removeFilterWord(word) {
-  stmts.removeFilterWord.run(word);
-}
-
-export function replaceFilterWords(words) {
-  const replace = db.transaction((ws) => {
-    stmts.clearFilterWords.run();
-    for (const w of ws) stmts.addFilterWord.run(w);
-  });
-  replace(words);
 }
 
 // ─── Settings API ────────────────────────────────────────────────────────────
@@ -644,6 +608,10 @@ export function getStoredUsername(email) {
 
 export function getEmailByUsername(username) {
   return stmts.getEmailByUsername.get(username)?.email ?? null;
+}
+
+export function isUsernameTaken(username, exceptEmail) {
+  return !!stmts.usernameTakenBy.get(username, exceptEmail ?? "");
 }
 
 export function saveUsername(email, username) {
@@ -681,42 +649,6 @@ export function removeCustomEmoji(shortcode) {
   stmts.removeCustomEmoji.run(shortcode);
 }
 
-// ─── Pending Emoji API ───────────────────────────────────────────────────────
-
-export function getPendingEmojiByShortcode(shortcode) {
-  return stmts.getPendingEmojiByShortcode.get(shortcode) ?? null;
-}
-
-export function addPendingEmoji(data) {
-  stmts.addPendingEmoji.run({
-    status: "pending",
-    review_reason: null,
-    ...data,
-  });
-}
-
-export function getPendingEmojis() {
-  return stmts.getPendingEmojis.all();
-}
-
-export function getPendingEmojisByEmail(email) {
-  return stmts.getPendingEmojisByEmail.all(email);
-}
-
-export function getPendingEmojiById(id) {
-  return stmts.getPendingEmojiById.get(id) ?? null;
-}
-
-export function updatePendingEmoji(id, status, s3Key, url, reviewReason) {
-  stmts.updatePendingEmoji.run({
-    id,
-    status,
-    s3_key: s3Key,
-    url,
-    review_reason: reviewReason ?? null,
-  });
-}
-
 // ─── Verified Users API ──────────────────────────────────────────────────────
 
 export function isVerified(email) {
@@ -752,7 +684,6 @@ export function getProfileData(email) {
     status: row?.status ?? null,
     pronouns: row?.pronouns ?? null,
     lastSeen: row?.last_seen ?? null,
-    role: row?.role ?? 'user',
   };
 }
 
@@ -956,18 +887,6 @@ export async function migrateFromFiles() {
       });
       insert();
       migrated.push("ipbans.txt");
-    }
-  }
-
-  if (existsSync("filter.txt")) {
-    const data = await tryText("filter.txt");
-    if (data) {
-      const words = data
-        .split("\n")
-        .map((w) => w.trim().toLowerCase())
-        .filter(Boolean);
-      replaceFilterWords(words);
-      migrated.push("filter.txt");
     }
   }
 

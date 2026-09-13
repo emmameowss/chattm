@@ -40,6 +40,7 @@ import {
   deleteStrikes,
   isBanned,
   getBanReason,
+  getBanIp,
   addBan,
   removeBan,
   isIpBanned,
@@ -49,9 +50,11 @@ import {
   setSetting,
   migrateFromFiles,
   deleteAllGuestSessions,
+  getLastIpByEmail,
   getStoredUsername,
   saveUsername,
   getEmailByUsername,
+  isUsernameTaken,
   getAvatar,
   setAvatar,
   deleteAvatar,
@@ -177,49 +180,62 @@ const msgcooldown = 1000;
 const lastmessage = {};
 const MAX_MESSAGE_LENGTH = 2000
 
+const allowedMediaDomains = [
+  'cdn.chattm.app',
+  'chattm.app',
+  'imgur.com', 'i.imgur.com',
+  'youtube.com', 'youtu.be',
+  'vimeo.com',
+  'giphy.com', 'media.giphy.com',
+  'tenor.com', 'media.tenor.com',
+  'streamable.com',
+  'gfycat.com',
+  'twitch.tv',
+  'spotify.com'
+];
+try {
+  if (process.env.AWS_S3_PUBLIC_URL) {
+    const host = new URL(process.env.AWS_S3_PUBLIC_URL).hostname.toLowerCase();
+    if (host && !allowedMediaDomains.includes(host)) allowedMediaDomains.push(host);
+  }
+} catch (e) {
+  console.log("couldn't parse AWS_S3_PUBLIC_URL for the media allowlist");
+}
+
+const mediaExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i;
+
+function isAllowedMediaHost(hostname) {
+  return allowedMediaDomains.some(
+    (domain) => hostname === domain || hostname.endsWith('.' + domain),
+  );
+}
+
 function containsBlockedLink(text) {
   if (!text) return false
-  const regex = /(https?:\/\/[^\s]+)/gi
-  const urls = text.match(regex) || []
-
-  const allowedMediaDomains = [
-    'cdn.chattm.app',
-    'chattm.app',
-    'imgur.com', 'i.imgur.com',
-    'youtube.com', 'youtu.be',
-    'vimeo.com',
-    'giphy.com', 'media.giphy.com',
-    'tenor.com', 'media.tenor.com',
-    'streamable.com',
-    'gfycat.com',
-    'twitch.tv',
-    'spotify.com'
-  ];
-
-
-  const mediaExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|mov|avi|webm|mkv|flv|wmv|m4v)(\?.*)?$/i;
+  const urls = text.match(/(https?:\/\/[^\s]+)/gi) || []
 
   for (const url of urls) {
     try {
       const urlObj = new URL(url)
-      const hostname = urlObj.hostname.toLowerCase()
-      
-      const hasMediaExtension = mediaExtensions.test(url)
-
-      if (hasMediaExtension) {
-        const isAllowed = allowedMediaDomains.some(domain =>
-          hostname === domain || hostname.endsWith('.' + domain)
-        )
-
-        if (!isAllowed) {
-          return true
-        }
-      }
+      if (!mediaExtensions.test(url)) continue
+      if (!isAllowedMediaHost(urlObj.hostname.toLowerCase())) return true
     } catch (e) {
       continue;
     }
   }
   return false
+}
+
+function isBlockedImageUrl(image) {
+  if (image === undefined || image === null || image === "") return false;
+  if (typeof image !== "string") return true;
+  try {
+    const urlObj = new URL(image);
+    if (!["http:", "https:"].includes(urlObj.protocol)) return true;
+    return !isAllowedMediaHost(urlObj.hostname.toLowerCase());
+  } catch (e) {
+    return true;
+  }
 }
 
 const rateLimits = new Map();
@@ -242,6 +258,12 @@ setInterval(
       if (fresh.length === 0) rateLimits.delete(k);
       else rateLimits.set(k, fresh);
     }
+    for (const [email, t] of Object.entries(lastmessage)) {
+      if (now - t > 60 * 60 * 1000) delete lastmessage[email];
+    }
+    for (const [sid, entry] of clerkSessionCache) {
+      if (now - entry.checkedAt > CLERK_SESSION_TTL) clerkSessionCache.delete(sid);
+    }
   },
   10 * 60 * 1000,
 );
@@ -262,14 +284,15 @@ const commands = {
         }
       }
       const targetEmail = target;
-      addBan(targetEmail, banReason);
+      const bannedIp = banIpFor(targetEmail);
+      addBan(targetEmail, banReason, bannedIp);
+      addIpBan(bannedIp);
       await appendFile(
         "bans.log",
-        `${new Date().toISOString()}: ${socket.userEmail} (${data.username}) banned ${targetEmail} - reason: ${banReason}\n`,
+        `${new Date().toISOString()}: ${socket.userEmail} (${socket.username}) banned ${targetEmail} - reason: ${banReason}\n`,
       );
       for (const [, s] of io.sockets.sockets) {
         if (s.userEmail === targetEmail) {
-          addIpBan(s.userIP);
           s.emit("banned", banReason);
           s.skipLeaveMessage = true;
           s.disconnect();
@@ -281,6 +304,7 @@ const commands = {
   "/unban": {
     minRole: "admin",
     run: (socket, rest) => {
+      removeIpBan(getBanIp(rest));
       removeBan(rest);
       socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
@@ -484,6 +508,10 @@ const commands = {
         socket.emit("commandError", "guests cannot change their username", 'error');
         return;
       }
+      if (usernameTaken(nick, socket.userEmail)) {
+        socket.emit("commandError", `the username "${nick}" is already taken`, 'error');
+        return;
+      }
       const prevUser = socket.username;
       socket.username = nick;
       saveUsername(socket.userEmail, nick);
@@ -551,7 +579,7 @@ const commands = {
 
 commands["/colour"] = commands["/color"];
 
-let chatMuted = false;
+let chatMuted = getSetting("chat_muted") === "1";
 let guestsDisabled = getSetting("guests_disabled") === "1";
 let status = "";
 let maintenance = getSetting("maintenance") === "1";
@@ -647,9 +675,10 @@ function isDevRequest(req) {
 }
 
 function getClerkKey(req) {
-  return isDevRequest(req)
-    ? process.env.CLERK_PUBLISHABLE_KEY_DEV
-    : process.env.CLERK_PUBLISHABLE_KEY
+  return (
+    (isDevRequest(req) ? process.env.CLERK_PUBLISHABLE_KEY_DEV : null) ||
+    process.env.CLERK_PUBLISHABLE_KEY
+  )
 }
 
 function isBlockedColor(color) {
@@ -922,13 +951,28 @@ io.use(async (socket, next) => {
   socket.userEmail = user.email;
   socket.clerkId = user.clerkId ?? null;
   socket.clerkSessionId = user.clerkSessionId ?? null;
-  socket.userRole = user.role ?? 'user';
+  socket.userRole = getRole(user.email);
   socket.username = null;
   if (maintenance && !["mod", "admin", "owner"].includes(socket.userRole)) {
     return next(new Error("maintenance"));
   }
   next();
 });
+
+function usernameTaken(name, email) {
+  const lower = name.toLowerCase();
+  for (const [, s] of io.sockets.sockets) {
+    if (s.userEmail !== email && s.username?.toLowerCase() === lower) return true;
+  }
+  return isUsernameTaken(name, email);
+}
+
+function banIpFor(email) {
+  for (const [, s] of io.sockets.sockets) {
+    if (s.userEmail === email && s.userIP) return s.userIP;
+  }
+  return getLastIpByEmail(email);
+}
 
 function findSocketByUsername(name) {
   for (const [, s] of io.sockets.sockets) {
@@ -1123,6 +1167,11 @@ io.on("connection", (socket) => {
       }
       return;
     }
+    if (usernameTaken(name, socket.userEmail)) {
+      socket.emit("commandError", `the username "${name}" is already taken`, 'error');
+      socket.emit("usernameTaken", name);
+      return;
+    }
     const prevUser = socket.username;
     socket.username = name;
     if (!socket.userEmail.endsWith("@guest")) {
@@ -1261,7 +1310,7 @@ io.on("connection", (socket) => {
       return
     }
 
-    if (containsBlockedLink(data.text)) {
+    if (containsBlockedLink(data.text) || isBlockedImageUrl(data.image)) {
       socket.emit('commandError', "media links from unapproved sites aren't allowed, please use the direct upload function or an approved site", "error")
       return;
     }
@@ -1307,16 +1356,18 @@ io.on("connection", (socket) => {
     }
 
     const timestamp = new Date().toISOString();
+    const logText = String(data.text || "[image]").replace(/[\r\n]+/g, " ");
     await appendFile(
       "messages.log",
-      `${timestamp}: ${socket.userEmail} (${data.username}): ${data.text || "[image]"}\n`,
+      `${timestamp}: ${socket.userEmail} (${socket.username}): ${logText}\n`,
     );
     const replyTo =
       typeof data.replyTo === "string" && getMessageById(data.replyTo)
         ? data.replyTo
         : null;
     const message = {
-      ...data,
+      text: typeof data.text === "string" ? data.text : null,
+      image: typeof data.image === "string" ? data.image : null,
       id: randomUUID(),
       ownerEmail: socket.userEmail,
       username: socket.username,
@@ -1559,6 +1610,19 @@ httpServer.on("request", async (req, res) => {
       res.end(JSON.stringify({ error: "Unauthorized" }));
       return;
     }
+    if (isBanned(uploadSession.email)) {
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: "banned" }));
+      return;
+    }
+    if (
+      url.searchParams.get("avatar") !== "1" &&
+      isMuted(uploadSession.email)
+    ) {
+      res.writeHead(403);
+      res.end(JSON.stringify({ error: "you are muted" }));
+      return;
+    }
 
     const form = formidable({ maxFileSize: 50 * 1024 * 1024 });
     form.parse(req, async (err, fields, files) => {
@@ -1581,7 +1645,6 @@ httpServer.on("request", async (req, res) => {
           "image/png",
           "image/gif",
           "image/webp",
-          "image/svg+xml",
         ];
         const allowedTypes = isAvatar
           ? imageTypes
@@ -1612,7 +1675,10 @@ httpServer.on("request", async (req, res) => {
         }
 
         const fileBuffer = await readFile(file.filepath);
-        const ext = extname(file.originalFilename || "");
+        const ext = extname(file.originalFilename || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9.]/g, "")
+          .slice(0, 10);
         const folder = isAvatar ? "avatars" : "uploads";
         const key = `${folder}/${Date.now()}-${randomBytes(6).toString("hex")}${ext}`;
 
@@ -1678,7 +1744,11 @@ httpServer.on("request", async (req, res) => {
       ip,
     });
     const rawUsername = url.searchParams.get("username");
-    if (rawUsername && isValidUsername(rawUsername))
+    if (
+      rawUsername &&
+      isValidUsername(rawUsername) &&
+      !usernameTaken(rawUsername, guestEmail)
+    )
       saveUsername(guestEmail, rawUsername);
     const redirectUrl = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}/#session=${sessionid}`;
     res.writeHead(302, {
@@ -1764,7 +1834,19 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/version") {
-    const forceRefresh = url.searchParams.get("refresh") === "1";
+    const versionIp =
+      req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+      req.socket.remoteAddress;
+    if (!checkRateLimit(versionIp, "version", 30, 60 * 1000)) {
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "rate limited" }));
+      return;
+    }
+    const versionUser = getRequestUser(req);
+    const versionRole = versionUser ? getRole(versionUser.email) : "user";
+    const forceRefresh =
+      url.searchParams.get("refresh") === "1" &&
+      ["admin", "owner"].includes(versionRole);
     const vStatus = await getVersionStatus(forceRefresh);
     res.writeHead(200, {
       "content-type": "application/json",
@@ -1876,6 +1958,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         chatMuted = !chatMuted
+        setSetting("chat_muted", chatMuted ? "1" : "0")
         if (chatMuted) {
           io.emit('mutechat', 'chat has been muted')
         } else {
@@ -2072,7 +2155,7 @@ httpServer.on("request", async (req, res) => {
         const sess = sessionId ? getSession(sessionId) : null;
         const sessRole = sess ? getRole(sess.email) : 'user';
         if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.writeHead(403, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: "forbidden" }));
           return
         }
@@ -2104,7 +2187,7 @@ httpServer.on("request", async (req, res) => {
         const sess = sessionId ? getSession(sessionId) : null;
         const sessRole = sess ? getRole(sess.email) : 'user';
         if (!sess || !['owner', 'admin'].includes(sessRole)) {
-          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.writeHead(403, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: "forbidden" }));
           return
         }
@@ -2136,7 +2219,7 @@ httpServer.on("request", async (req, res) => {
         const sess = sessionId ? getSession(sessionId) : null;
         const sessRole = sess ? getRole(sess.email) : 'user';
         if (!sess || !['owner', 'admin'].includes(sessRole)) {
-          res.writeHead(403, { 'content-type': 'appliction/json' });
+          res.writeHead(403, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: "forbidden" }));
           return
         }
@@ -2209,7 +2292,7 @@ httpServer.on("request", async (req, res) => {
       ).get(targetEmail)?.count || 0;
 
       const profileData = getProfileData(targetEmail)
-      let createdAt = profileData?.last_seen || Date.now()
+      let createdAt = profileData?.lastSeen || Date.now()
 
       const firstMessage = db.prepare(
         "SELECT MIN(time) as first FROM messages WHERE owner_email = ?"
@@ -2410,11 +2493,12 @@ httpServer.on("request", async (req, res) => {
 
         const banReason = reason || 'no reason given'
 
-        addBan(targetEmail, banReason)
+        const bannedIp = banIpFor(targetEmail)
+        addBan(targetEmail, banReason, bannedIp)
+        addIpBan(bannedIp)
 
         for (const [, s] of io.sockets.sockets) {
           if (s.userEmail === targetEmail) {
-            addIpBan(s.userIp)
             s.emit('banned', banReason)
             s.skipLeaveMessage = true
             s.disconnect()
@@ -2987,13 +3071,8 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
+        removeIpBan(getBanIp(targetEmail))
         removeBan(targetEmail)
-
-        for (const [,s] of io.sockets.sockets) {
-          if (s.userEmail === targetEmail && s.userIp) {
-            removeIpBan(s.userIp)
-          }
-        }
 
         for (const [,s] of io.sockets.sockets) {
           if (['admin', 'owner'].includes(s.userRole)) {
@@ -3053,10 +3132,10 @@ httpServer.on("request", async (req, res) => {
           return;
         }
 
-        const isBanned = clerkUser.banned || false;
+        const clerkBanned = clerkUser.banned || false;
 
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ clerkBanned: isBanned }));
+        res.end(JSON.stringify({ clerkBanned }));
       } catch (e) {
         console.error('failed to check clerk ban status:', e);
         res.writeHead(500, { 'content-type': 'application/json' });
@@ -3067,6 +3146,7 @@ httpServer.on("request", async (req, res) => {
       res.writeHead(500, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: 'failed to check clerk ban status' }));
     }
+    return
   }
 
   if (url.pathname === "/messages") {
@@ -3209,7 +3289,7 @@ httpServer.on("request", async (req, res) => {
   // based on the cookie session, mirroring the socket auth middleware
   if (req.method === "GET" && url.pathname === "/") {
     const user = getRequestUser(req);
-    const isOwner = user && user.role === "owner";
+    const isOwner = user && getRole(user.email) === "owner";
 
     if (maintenance && !isOwner) {
       const html = await renderPage("maintenance.html", {

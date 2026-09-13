@@ -231,15 +231,21 @@ if (!session) {
   throw new Error("not authenticated");
 }
 
-function showUsernameSetupPanel() {
+function showUsernameSetupPanel(initialError = "") {
   return new Promise((resolve) => {
     const backdrop = document.querySelector("#username-setup-backdrop");
     const panel = document.querySelector("#username-setup-panel");
     const input = document.querySelector("#username-setup-input");
     const error = document.querySelector("#username-setup-error");
+    const submit = document.querySelector("#username-setup-submit");
     backdrop.style.display = "block";
     panel.style.display = "flex";
+    error.textContent = initialError;
+    error.style.display = initialError ? "block" : "none";
     input.focus();
+    function onKey(e) {
+      if (e.key === "Enter") trySubmit();
+    }
     function trySubmit() {
       const name = input.value.trim();
       if (!name || !/^[a-zA-Z0-9-]{1,20}$/.test(name)) {
@@ -252,20 +258,19 @@ function showUsernameSetupPanel() {
       }
       backdrop.style.display = "none";
       panel.style.display = "none";
+      submit.removeEventListener("click", trySubmit);
+      input.removeEventListener("keydown", onKey);
       resolve(name);
     }
-    document
-      .querySelector("#username-setup-submit")
-      .addEventListener("click", trySubmit);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") trySubmit();
-    });
+    submit.addEventListener("click", trySubmit);
+    input.addEventListener("keydown", onKey);
   });
 }
 
 if (session) {
   sessionStorage.removeItem("newlogin");
 
+  let hasServerUsername = false;
   let chosenUsername = null;
   try {
     const me = await fetch(`/me`, {
@@ -1126,8 +1131,18 @@ if (session) {
     hideStatus();
   });
 
+  socket.on("usernameTaken", async (name) => {
+    if (hasServerUsername) return;
+    const next = await showUsernameSetupPanel(
+      `"${name}" is already taken, pick another`,
+    );
+    username = next;
+    socket.emit("setUsername", next);
+  });
+
   socket.on("savedUsername", (name) => {
     const nameToUse = name || username;
+    hasServerUsername = !!name;
     username = nameToUse;
     socket.emit("setUsername", nameToUse);
     // guests: avatar upload is hidden inside the edit profile view
@@ -1685,7 +1700,7 @@ socket.on("messageDeleted", (messageId) => {
           a.href = part;
           a.textContent = part;
           a.target = "_blank";
-          a.rel = "noopener noreferer";
+          a.rel = "noopener noreferrer";
           a.style.color = color;
           fragment.appendChild(a);
 
@@ -1705,7 +1720,7 @@ socket.on("messageDeleted", (messageId) => {
           a.href = part;
           a.textContent = part;
           a.target = "_blank";
-          a.rel = "noopener noreferer";
+          a.rel = "noopener noreferrer";
           a.style.color = color;
           fragment.appendChild(a);
 
@@ -1727,7 +1742,7 @@ socket.on("messageDeleted", (messageId) => {
           a.href = part;
           a.textContent = part;
           a.target = "_blank";
-          a.rel = "noopener noreferer";
+          a.rel = "noopener noreferrer";
           a.style.color = color;
           fragment.appendChild(a);
         }
