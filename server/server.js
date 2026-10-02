@@ -2364,7 +2364,7 @@ httpServer.on("request", async (req, res) => {
         }
       }
       if (!username) {
-        username = getStoredUsername(targetEmail) || 'unknown';
+        username = getStoredUsername(targetEmail) || null;
       }
 
       const online = [...io.sockets.sockets.values()].some(
@@ -2388,6 +2388,7 @@ httpServer.on("request", async (req, res) => {
       let clerkId = null
       let lastSignInAt = null
       let activeSessions = 0;
+      let clerkUsername = null;
 
       if (!targetEmail.endsWith("@guest")) {
         try {
@@ -2406,6 +2407,10 @@ httpServer.on("request", async (req, res) => {
 
           if (clerkId) {
             const clerkUser = await clerk.users.getUser(clerkId);
+            clerkUsername =
+              clerkUser.username ||
+              [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+              null;
             lastSignInAt = clerkUser.lastSignInAt || null
 
             try {
@@ -2427,6 +2432,8 @@ httpServer.on("request", async (req, res) => {
           console.error('failed to fetch clerk data: ', e)
         }
       }
+
+      username = username || clerkUsername || targetEmail.split("@")[0];
 
       const result = {
         email: targetEmail,
