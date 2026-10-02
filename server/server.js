@@ -918,6 +918,10 @@ async function buildAdminUserList(channel = "main") {
     const email = normalizeEmail(primaryEmail);
     const role = getRole(email);
     const current = usersByEmail.get(email);
+    const clerkAvatar = clerkUser.hasImage ? clerkUser.imageUrl : null;
+    if (clerkAvatar && getAvatar(email) !== clerkAvatar) {
+      setAvatar(email, clerkAvatar);
+    }
     usersByEmail.set(email, {
       username:
         current?.username ??
@@ -926,7 +930,7 @@ async function buildAdminUserList(channel = "main") {
         email.split("@")[0],
       email,
       color: current?.color ?? getColor(email) ?? null,
-      avatar: current?.avatar ?? getAvatar(email) ?? null,
+      avatar: clerkAvatar ?? current?.avatar ?? getAvatar(email) ?? null,
       guest: false,
       isOwner: role === "owner",
       role,
