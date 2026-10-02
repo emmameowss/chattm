@@ -870,6 +870,76 @@ function buildUserList(channel = "main") {
   return users.filter((u) => !isHidden(u.email));
 }
 
+let adminClerkUsersCache = { expiresAt: 0, users: null, promise: null };
+
+async function getAllClerkUsers() {
+  if (adminClerkUsersCache.users && adminClerkUsersCache.expiresAt > Date.now()) {
+    return adminClerkUsersCache.users;
+  }
+  if (adminClerkUsersCache.promise) return adminClerkUsersCache.promise;
+
+  adminClerkUsersCache.promise = (async () => {
+    const users = [];
+    let offset = 0;
+    const limit = 500;
+
+    while (true) {
+      const page = await clerk.users.getUserList({ limit, offset });
+      users.push(...(page.data ?? []));
+      offset += page.data?.length ?? 0;
+      if (!page.data?.length || offset >= page.totalCount) break;
+    }
+
+    adminClerkUsersCache = {
+      users,
+      expiresAt: Date.now() + 60_000,
+      promise: null,
+    };
+    return users;
+  })().catch((e) => {
+    adminClerkUsersCache.promise = null;
+    throw e;
+  });
+
+  return adminClerkUsersCache.promise;
+}
+
+async function buildAdminUserList(channel = "main") {
+  const usersByEmail = new Map(
+    buildUserList(channel).map((user) => [user.email, user]),
+  );
+
+  for (const clerkUser of await getAllClerkUsers()) {
+    const primaryEmail = clerkUser.emailAddresses.find(
+      (address) => address.id === clerkUser.primaryEmailAddressId,
+    )?.emailAddress;
+    if (!primaryEmail) continue;
+
+    const email = normalizeEmail(primaryEmail);
+    const role = getRole(email);
+    const current = usersByEmail.get(email);
+    usersByEmail.set(email, {
+      username:
+        current?.username ??
+        getStoredUsername(email) ??
+        clerkUser.username ??
+        email.split("@")[0],
+      email,
+      color: current?.color ?? getColor(email) ?? null,
+      avatar: current?.avatar ?? getAvatar(email) ?? null,
+      guest: false,
+      isOwner: role === "owner",
+      role,
+      verified: current?.verified ?? isVerified(email),
+      redVerified: current?.redVerified ?? isRedVerified(email),
+      status: current?.status ?? getProfileData(email).status ?? "offline",
+      online: current?.online ?? false,
+    });
+  }
+
+  return [...usersByEmail.values()];
+}
+
 function emitUserList(channel = "main") {
   const users = buildUserList(channel);
   const publicUsers = users.map(({ email, ...rest }) => rest);
@@ -881,7 +951,12 @@ function emitUserList(channel = "main") {
       s.username &&
       s.currentChannel === channel
     ) {
-      s.emit("adminUserlist", users);
+      buildAdminUserList(channel)
+        .then((adminUsers) => s.emit("adminUserlist", adminUsers))
+        .catch((e) => {
+          console.error("failed to load admin user list:", e);
+          s.emit("adminUserlist", users);
+        });
       s.emit('uRole', getRole(s.userEmail))
     }
   }
@@ -1070,9 +1145,14 @@ io.on("connection", (socket) => {
     socket.emit("savedProfile", getProfileData(socket.userEmail));
   });
 
-  socket.on("getAdminUsers", () => {
+  socket.on("getAdminUsers", async () => {
     if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
-    socket.emit("adminUserlist", buildUserList(socket.currentChannel));
+    try {
+      socket.emit("adminUserlist", await buildAdminUserList(socket.currentChannel));
+    } catch (e) {
+      console.error("failed to load admin user list:", e);
+      socket.emit("adminUserlist", buildUserList(socket.currentChannel));
+    }
     socket.emit('uRole', getRole(socket.userEmail));
   });
 
