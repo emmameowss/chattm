@@ -153,6 +153,64 @@ function detailSection(title, description = '') {
   return section;
 }
 
+function reportedMediaUrl(value, inferType = true) {
+  try {
+    const url = new URL(value);
+    if (!['https:', 'http:'].includes(url.protocol)) return null;
+
+    const path = url.pathname;
+    if (/\.(mp4|mov|avi|webm|mkv|flv|wmv|m4v)$/i.test(path)) {
+      return { url: url.href, type: 'video' };
+    }
+    if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)$/i.test(path)) {
+      return { url: url.href, type: 'image' };
+    }
+    return inferType ? { url: url.href, type: 'image' } : null;
+  } catch {
+    return null;
+  }
+}
+
+function reportedMediaElement(media) {
+  if (media.type === 'video') {
+    const video = element('video', 'admin-report-media admin-report-video');
+    video.src = media.url;
+    video.controls = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.setAttribute('aria-label', 'reported message video');
+    return video;
+  }
+
+  const image = element('img', 'admin-report-media admin-report-image');
+  image.src = media.url;
+  image.alt = 'reported message image';
+  image.loading = 'lazy';
+  return image;
+}
+
+function renderReportedMessage(evidence, snapshot) {
+  const media = [];
+  const seenUrls = new Set();
+  const addMedia = item => {
+    if (!item || seenUrls.has(item.url)) return;
+    seenUrls.add(item.url);
+    media.push(item);
+  };
+
+  // `image` stores uploads in current messages. Older messages can instead
+  // contain a filename and media URL in their text, so extract those too.
+  addMedia(snapshot.image ? reportedMediaUrl(snapshot.image) : null);
+  const text = String(snapshot.text || '').replace(/https?:\/\/[^\s<>"']+/gi, rawUrl => {
+    const cleanUrl = rawUrl.replace(/[),.!?;:]+$/g, '');
+    addMedia(reportedMediaUrl(cleanUrl, false));
+    return rawUrl.slice(cleanUrl.length) ? rawUrl.slice(cleanUrl.length) : ' ';
+  }).replace(/[ \t]+/g, ' ').replace(/\s*:\s*$/, '').trim();
+
+  if (text) evidence.append(element('blockquote', 'admin-report-message-text', text));
+  for (const item of media) evidence.append(reportedMediaElement(item));
+}
+
 function renderReportDetails(report) {
   activeReport = report;
   reportDrawer.dataset.reportId = report.id;
@@ -192,19 +250,7 @@ function renderReportDetails(report) {
     detailField(evidence, 'author', snapshot.authorUsername || report.targetUsername || 'unknown');
     detailField(evidence, 'channel', snapshot.channel || 'main');
     detailField(evidence, 'sent', formatDate(snapshot.time, true));
-    if (snapshot.text) evidence.append(element('blockquote', 'admin-report-message-text', snapshot.text));
-    if (snapshot.image) {
-      try {
-        const imageUrl = new URL(snapshot.image);
-        if (['https:', 'http:'].includes(imageUrl.protocol)) {
-          const image = element('img', 'admin-report-image');
-          image.src = imageUrl.href;
-          image.alt = 'reported message image';
-          image.loading = 'lazy';
-          evidence.append(image);
-        }
-      } catch {}
-    }
+    renderReportedMessage(evidence, snapshot);
     sections.push(evidence);
   }
 

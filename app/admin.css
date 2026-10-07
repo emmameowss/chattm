@@ -273,7 +273,7 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-reports-page .admin-report-help { margin: -4px 0 8px; color: var(--muted); font-size: 12px; }
 .admin-reports-page .admin-report-submitted-note { margin: 10px 0 0; padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: #0c0c0c; white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin-reports-page .admin-report-message-text { margin: 10px 0 0; padding: 14px; border-left: 2px solid var(--pink); border-radius: 0 7px 7px 0; background: #0c0c0c; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
-.admin-reports-page .admin-report-image { display: block; max-width: min(100%, 420px); max-height: 360px; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; object-fit: contain; background: #080808; }
+.admin-reports-page .admin-report-media { display: block; width: auto; max-width: min(100%, 420px); max-height: 360px; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; object-fit: contain; background: #080808; }
 .admin-reports-page .admin-report-notes { display: flex; flex-direction: column; gap: 8px; }
 .admin-reports-page .admin-report-note { padding: 12px; border: 1px solid var(--border); border-radius: 7px; background: #0d0d0d; }
 .admin-reports-page .admin-report-note-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
