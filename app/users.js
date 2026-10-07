@@ -283,7 +283,10 @@ async function loadUser(user, showLoading = false) {
     detail.replaceChildren(element('div', 'admin-loading', 'loading user details…'));
   }
   try {
-    const info = await readJson(`/admin/user/info?email=${encodeURIComponent(user.email)}`, { credentials: 'same-origin' });
+    const info = await readJson(`/admin/user/info?email=${encodeURIComponent(user.email)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
     if (request !== detailRequest || !drawer.open || selectedUser?.email !== user.email) return;
     selectedUser = { ...user, ...info };
     renderDetail(selectedUser);
@@ -605,6 +608,7 @@ async function performAction(url, payload, btn, successMessage, user) {
   try {
     const data = await readJson(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ session, ...payload }) });
     if (!data.success) throw new Error('action failed');
+    applyActionStateToOpenUser(url, payload, data, user);
     showToast(url.endsWith('/kick') && !data.kicked ? 'user was offline' : successMessage, 'success');
     requestUsers();
     if (drawer.open && selectedUser?.email === user.email) await loadUser(selectedUser);
@@ -621,6 +625,40 @@ async function performAction(url, payload, btn, successMessage, user) {
       btn.innerHTML = originalContent;
     }
   }
+}
+
+function applyActionStateToOpenUser(url, payload, data, user) {
+  if (!drawer.open || selectedUser?.email !== user.email) return;
+  const updates = {};
+  for (const field of ['role', 'verified', 'redVerified', 'hidden', 'banned', 'muted', 'muteUntil', 'muteReason', 'clerkBanned']) {
+    if (Object.hasOwn(data, field)) updates[field] = data[field];
+  }
+  if (url === '/admin/hide') updates.hidden = true;
+  if (url === '/admin/unhide') updates.hidden = false;
+  if (url === '/admin/user/ban') {
+    updates.banned = true;
+    updates.banReason = payload.reason;
+  }
+  if (url === '/admin/user/unban') {
+    updates.banned = false;
+    updates.banReason = null;
+  }
+  if (url === '/admin/user/mute') {
+    updates.muted = true;
+    updates.muteUntil = data.until;
+    updates.muteReason = data.muteReason;
+  }
+  if (url === '/admin/user/unmute') {
+    updates.muted = false;
+    updates.muteUntil = null;
+    updates.muteReason = null;
+  }
+  if (url === '/admin/user/ban-clerk') updates.clerkBanned = true;
+  if (!Object.keys(updates).length) return;
+  selectedUser = { ...selectedUser, ...updates };
+  // Ignore detail requests started before this action while the fresh record loads.
+  detailRequest++;
+  renderDetail(selectedUser);
 }
 
 async function viewUserSessions(user) {

@@ -2657,7 +2657,10 @@ httpServer.on("request", async (req, res) => {
         muteUntil
       };
 
-      res.writeHead(200, { 'content-type': 'application/json' });
+      res.writeHead(200, {
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      });
       res.end(JSON.stringify(result));
     } catch (e) {
       console.error('Error in /admin/user/info:', e);
