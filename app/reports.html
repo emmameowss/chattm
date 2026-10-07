@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>chat™ admin | reports</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="/admin.css">
+    <script src="/admin-ui.js" defer></script>
+  </head>
+  <body class="admin-page admin-users-page admin-reports-page" data-staff-role="<!--STAFF_ROLE-->">
+    <a class="admin-skip-link" href="#admin-main">skip to content</a>
+    <aside class="admin-shell-sidebar">
+      <div class="admin-brand"><h1>chat™</h1></div>
+      <nav class="admin-nav" aria-label="Staff navigation">
+        <div class="admin-nav-tabs"><!--ADMIN_NAV_LINKS--></div>
+        <a href="/" class="admin-nav-back"><i class="ti ti-arrow-left" aria-hidden="true"></i>back to chat™</a>
+      </nav>
+    </aside>
+    <main id="admin-main" class="admin-main" tabindex="-1">
+      <header class="admin-page-header admin-users-page-header">
+        <div><h2>reports</h2><p>review reports from chat users and guests.</p></div>
+        <button type="button" id="admin-reports-refresh"><i class="ti ti-refresh" aria-hidden="true"></i> refresh</button>
+      </header>
+      <section class="admin-section admin-users-directory" aria-label="Report inbox">
+        <div class="admin-users-toolbar admin-reports-toolbar">
+          <label class="admin-users-search" for="admin-reports-search"><span class="admin-visually-hidden">search reports</span><i class="ti ti-search" aria-hidden="true"></i><input id="admin-reports-search" type="search" placeholder="search reporter, target, or reason" autocomplete="off"></label>
+          <label class="admin-users-filter" for="admin-reports-status"><span>status</span><select id="admin-reports-status"><option value="open">open</option><option value="resolved">resolved</option><option value="dismissed">dismissed</option><option value="all">all reports</option></select></label>
+          <button type="button" id="admin-reports-reset" hidden>clear filters</button>
+        </div>
+        <div id="admin-reports-state" class="admin-users-state" role="status" aria-live="polite">loading reports…</div>
+        <div id="admin-reports-table-wrap" class="admin-users-table-wrap" hidden>
+          <table class="admin-users-table admin-reports-table">
+            <thead><tr><th scope="col">time</th><th scope="col">report</th><th scope="col">reporter</th><th scope="col">target</th><th scope="col">status</th></tr></thead>
+            <tbody id="admin-reports-list"></tbody>
+          </table>
+        </div>
+        <footer class="admin-users-directory-footer">
+          <p id="admin-reports-results" role="status" aria-live="polite"></p>
+          <nav id="admin-reports-pagination" class="admin-users-pagination" aria-label="Report pages" hidden><button type="button" id="admin-reports-prev">previous</button><span id="admin-reports-page" aria-live="polite"></span><button type="button" id="admin-reports-next">next</button></nav>
+        </footer>
+      </section>
+    </main>
+    <div id="admin-report-drawer-backdrop" class="admin-user-drawer-backdrop" hidden></div>
+    <dialog id="admin-report-drawer" class="admin-user-drawer" aria-modal="true" aria-labelledby="admin-report-drawer-title">
+      <header class="admin-user-drawer-header"><h3 id="admin-report-drawer-title">report details</h3><button type="button" id="admin-report-drawer-close" aria-label="close report details"><i class="ti ti-x" aria-hidden="true"></i></button></header>
+      <div id="admin-reports-detail" class="admin-users-detail"></div>
+    </dialog>
+    <div id="modal-overlay" style="display: none;">
+      <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-message">
+        <p id="modal-message"></p>
+        <div id="modal-actions"><button type="button" id="modal-cancel">cancel</button><button type="button" id="modal-confirm">confirm</button></div>
+      </div>
+    </div>
+    <script src="/reports.js"></script>
+    <div id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+  </body>
+</html>

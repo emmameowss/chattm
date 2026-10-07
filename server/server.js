@@ -5,7 +5,7 @@ import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
 import { randomBytes } from "crypto";
-import { readFile, appendFile } from "fs/promises";
+import { readFile, appendFile, unlink } from "fs/promises";
 import { extname, isAbsolute, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
 import { randomUUID } from "crypto";
@@ -18,6 +18,17 @@ import {
 } from "@aws-sdk/client-s3";
 import {
   db,
+  addActionLog,
+  getActionLogs,
+  createReport,
+  hasOpenReport,
+  getOpenReportCount,
+  getReportStats,
+  getReports,
+  getReportById,
+  addReportNote,
+  updateReportStatus,
+  deleteReport,
   getHistory,
   addMessage,
   deleteMessage,
@@ -78,6 +89,7 @@ import {
   setRole,
   getRole,
   isHidden,
+  getHiddenUsers,
   setHidden,
   removeHidden,
 } from "./db.js";
@@ -122,8 +134,49 @@ const clerkAuthorizedParties = (process.env.CLERK_AUTHORIZED_PARTIES || "")
 // migrate from legacy files on first run
 await migrateFromFiles();
 
+// Serialize library changes and storage sync so a reload cannot race an upload.
+let emojiMutation = Promise.resolve();
+
+async function withEmojiMutation(action) {
+  const previous = emojiMutation;
+  let release;
+  emojiMutation = new Promise(resolve => { release = resolve; });
+  await previous;
+  try {
+    return await action();
+  } finally {
+    release();
+  }
+}
+
+function syncEmojisFromS3() {
+  return withEmojiMutation(syncEmojisFromS3Unlocked);
+}
+
+function emojiStorageKey(publicUrl) {
+  const prefix = (process.env.AWS_S3_PUBLIC_URL || '').replace(/\/+$/, '') + '/';
+  if (!publicUrl.startsWith(prefix)) throw new Error('invalid emoji storage URL');
+  const key = publicUrl.slice(prefix.length).split('?')[0];
+  if (!key.startsWith('emojis/')) throw new Error('invalid emoji storage key');
+  return key;
+}
+
+function emojiImageType(buffer) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return {mime: 'image/png', ext: '.png'};
+  }
+  const gif = buffer.subarray(0, 6).toString('ascii');
+  if (gif === 'GIF87a' || gif === 'GIF89a') return {mime: 'image/gif', ext: '.gif'};
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+      && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return {mime: 'image/webp', ext: '.webp'};
+  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) {
+    return {mime: 'image/jpeg', ext: '.jpg'};
+  }
+  return null;
+}
+
 // sync emojis from S3 emojis/ folder into DB on startup
-async function syncEmojisFromS3() {
+async function syncEmojisFromS3Unlocked() {
   if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) return;
   try {
     const existing = getCustomEmoji();
@@ -268,17 +321,67 @@ setInterval(
   10 * 60 * 1000,
 );
 
+const STAFF_ACTIONS = {
+  ban: { action: "user.ban", category: "moderation" },
+  unban: { action: "user.unban", category: "moderation" },
+  unbanip: { action: "user.unban_ip", category: "moderation" },
+  kick: { action: "user.kick", category: "moderation" },
+  mute: { action: "user.mute", category: "moderation" },
+  unmute: { action: "user.unmute", category: "moderation" },
+  resetstrikes: { action: "user.reset_strikes", category: "moderation" },
+  noguests: { action: "guests.disable", category: "settings" },
+  allowguests: { action: "guests.enable", category: "settings" },
+  reloademojis: { action: "emoji.reload", category: "emoji" },
+  setcolor: { action: "user.set_color", category: "moderation" },
+  hide: { action: "user.hide", category: "moderation" },
+  unhide: { action: "user.unhide", category: "moderation" },
+  createchannel: { action: "channel.create", category: "content" },
+  deletechannel: { action: "channel.delete", category: "content" },
+  deletemessage: { action: "message.delete", category: "content" },
+};
+
+function recordStaffAction(socket, command, { target = null, outcome = "success", details = {} } = {}) {
+  const definition = STAFF_ACTIONS[command];
+  if (!definition || !socket?.userEmail) return;
+  try {
+    addActionLog({
+      actorEmail: socket.userEmail,
+      actorUsername: socket.username || getStoredUsername(socket.userEmail),
+      actorRole: socket.userRole || getRole(socket.userEmail),
+      action: definition.action,
+      category: definition.category,
+      target,
+      outcome,
+      details: { source: "chat command", ...details },
+    });
+  } catch (error) {
+    console.error("failed to record staff command:", error);
+  }
+}
+
+function staffCommandTarget(command, rest) {
+  if (command === "unbanip") return "IP ban";
+  if (["noguests", "allowguests", "reloademojis"].includes(command)) return null;
+  return String(rest || "").trim().split(/\s+/, 1)[0] || null;
+}
+
 const commands = {
   "/ban": {
     minRole: "admin",
     run: async (socket, rest, data) => {
       const args = rest.split(" ");
-      let target = args[0];
+      let target = args[0] || "";
       const banReason = args.slice(1).join(" ") || "no reason given";
+      if (!target) {
+        recordStaffAction(socket, "ban", { outcome: "failed", details: { reason: banReason } });
+        socket.emit("commandError", "usage: /ban <username or email> [reason]", 'error');
+        return;
+      }
       if (!target.includes("@")) {
         target =
           findSocketByUsername(target)?.userEmail ?? getEmailByUsername(target);
         if (!target) {
+          recordStaffAction(socket, "ban", { target: args[0] || null, outcome: "failed", details: { reason: banReason, failure: "target user not found" } });
           socket.emit("commandError", `no user found with username ${args[0]}`, 'error');
           return;
         }
@@ -287,6 +390,7 @@ const commands = {
       const bannedIp = banIpFor(targetEmail);
       addBan(targetEmail, banReason, bannedIp);
       addIpBan(bannedIp);
+      recordStaffAction(socket, "ban", { target: targetEmail, details: { reason: banReason } });
       await appendFile(
         "bans.log",
         `${new Date().toISOString()}: ${socket.userEmail} (${socket.username}) banned ${targetEmail} - reason: ${banReason}\n`,
@@ -306,6 +410,7 @@ const commands = {
     run: (socket, rest) => {
       removeIpBan(getBanIp(rest));
       removeBan(rest);
+      recordStaffAction(socket, "unban", { target: rest || null });
       socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
@@ -313,6 +418,7 @@ const commands = {
     minRole: "admin",
     run: (socket, rest) => {
       removeIpBan(rest);
+      recordStaffAction(socket, "unbanip", { target: "IP ban" });
       socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
@@ -322,11 +428,13 @@ const commands = {
       const [targetUsername, ...reasonParts] = rest.split(" ");
       const kickReason = reasonParts.join(" ") || "kicked by server";
       if (!targetUsername) {
+        recordStaffAction(socket, "kick", { outcome: "failed" });
         socket.emit("commandError", "usage: /kick <username> [reason]", 'error');
         return;
       }
       const target = findSocketByUsername(targetUsername);
       if (!target) {
+        recordStaffAction(socket, "kick", { target: targetUsername, outcome: "failed", details: { reason: kickReason, failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -337,6 +445,7 @@ const commands = {
       target.emit("kicked", kickReason);
       target.skipLeaveMessage = true;
       target.disconnect();
+      recordStaffAction(socket, "kick", { target: targetUsername, details: { reason: kickReason } });
       socket.emit("commandError", `kicked ${targetUsername}`, 'success');
       await appendFile(
         "kicks.log",
@@ -354,6 +463,7 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail) {
+        recordStaffAction(socket, "mute", { target: targetUsername || null, outcome: "failed", details: { reason: muteReason, failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -363,6 +473,7 @@ const commands = {
       }
       const durationMs = durationStr ? parseDuration(durationStr) : null;
       if (durationStr && !durationMs) {
+        recordStaffAction(socket, "mute", { target: targetEmail, outcome: "failed", details: { reason: muteReason, duration: durationStr, failure: "invalid duration format" } });
         socket.emit("commandError", "invalid duration format", 'error');
         return;
       }
@@ -371,6 +482,7 @@ const commands = {
         muteReason,
         durationMs ? Date.now() + durationMs : null,
       );
+      recordStaffAction(socket, "mute", { target: targetEmail, details: { reason: muteReason, duration: durationStr || "indefinite" } });
       const m = getMute(targetEmail);
       await appendFile(
         "mutes.log",
@@ -393,10 +505,12 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail || !getMute(targetEmail)) {
+        recordStaffAction(socket, "unmute", { target: targetUsername || null, outcome: "failed", details: { failure: "target user is not muted or online" } });
         socket.emit("commandError", `${targetUsername} is not muted`, 'info');
         return;
       }
       deleteMute(targetEmail);
+      recordStaffAction(socket, "unmute", { target: targetEmail });
       forEachUserSocket(targetEmail, (s) => s.emit("unmuted"));
       socket.emit("commandError", `unmuted ${targetUsername}`, 'success');
     },
@@ -408,6 +522,7 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail) {
+        recordStaffAction(socket, "resetstrikes", { target: targetUsername || null, outcome: "failed", details: { failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -416,6 +531,7 @@ const commands = {
         return;
       }
       deleteStrikes(targetEmail);
+      recordStaffAction(socket, "resetstrikes", { target: targetEmail });
       socket.emit("commandError", `reset strikes for ${targetUsername}`, 'success');
     },
   },
@@ -432,6 +548,7 @@ const commands = {
           s.disconnect();
         }
       }
+      recordStaffAction(socket, "noguests");
       socket.emit("commandError", "guest logins have been disabled", 'success');
     },
   },
@@ -440,14 +557,21 @@ const commands = {
     run: (socket) => {
       guestsDisabled = false;
       setSetting("guests_disabled", "0");
+      recordStaffAction(socket, "allowguests");
       socket.emit("commandError", "guest logins have been reenabled", 'success');
     },
   },
   "/reloademojis": {
     minRole: "admin",
     run: async (socket) => {
-      await syncEmojisFromS3();
-      socket.emit("commandError", "emoji sync complete", 'success');
+      try {
+        await syncEmojisFromS3();
+        recordStaffAction(socket, "reloademojis");
+        socket.emit("commandError", "emoji sync complete", 'success');
+      } catch (error) {
+        recordStaffAction(socket, "reloademojis", { outcome: "failed" });
+        throw error;
+      }
     },
   },
   "/whois": {
@@ -470,6 +594,7 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail) {
+        recordStaffAction(socket, "setcolor", { target: targetUsername || null, outcome: "failed", details: { color: colorInput, failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -487,10 +612,12 @@ const commands = {
       };
       const color = flagColors[colorInput] ?? colorInput;
       if (isBlockedColor(color)) {
+        recordStaffAction(socket, "setcolor", { target: targetEmail, outcome: "failed", details: { color, failure: "color is blocked" } });
         socket.emit("commandError", "please choose another color", 'error');
         return;
       }
       setColor(targetEmail, color);
+      recordStaffAction(socket, "setcolor", { target: targetEmail, details: { color } });
       forEachUserSocket(targetEmail, (s) => s.emit("colorChanged", color));
       emitAllUserLists();
       socket.emit("commandError", `set ${targetUsername}'s color to ${color}`, 'success');
@@ -554,10 +681,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
+        recordStaffAction(socket, "hide", { target: rest || null, outcome: "failed", details: { failure: "target user not found" } });
         socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       setHidden(targetEmail)
+      recordStaffAction(socket, "hide", { target: targetEmail });
       emitAllUserLists()
       socket.emit('commandError', `hid ${rest} from user list`, 'success')
     },
@@ -567,10 +696,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
+        recordStaffAction(socket, "unhide", { target: rest || null, outcome: "failed", details: { failure: "target user not found" } });
         socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       removeHidden(targetEmail)
+      recordStaffAction(socket, "unhide", { target: targetEmail });
       emitAllUserLists()
       socket.emit('commandError', `unhid ${rest} on user list`, 'success')
     },
@@ -654,6 +785,91 @@ function requireAdminPage(req, res) {
     return null;
   }
   return { user, role }
+}
+
+function requireStaffPage(req, res) {
+  const user = getRequestUser(req);
+  const role = user ? getRole(user.email) : "user";
+  if (!user || !["mod", "admin", "owner"].includes(role)) {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return null;
+  }
+  return { user, role };
+}
+
+function renderAdminNav(role, activePath = "") {
+  const items = [
+    ["/admin", "layout-dashboard", "overview"],
+    ["/admin/users", "users", "users"],
+    ["/admin/emoji", "mood-smile", "emoji"],
+    ["/admin/logs", "list-details", "logs"],
+    ["/admin/reports", "flag", "reports"],
+  ];
+  const visibleItems = role === "mod" ? items.filter(([href]) => href === "/admin/reports") : items;
+  return visibleItems.map(([href, icon, label]) => {
+    const active = href === activePath;
+    return `<a href="${href}"${active ? ' class="active" aria-current="page"' : ""}><i class="ti ti-${icon}" aria-hidden="true"></i>${label}</a>`;
+  }).join("");
+}
+
+async function readJsonRequest(req, maxBytes = 16 * 1024) {
+  return new Promise((resolveBody, rejectBody) => {
+    let body = "";
+    let tooLarge = false;
+    req.on("data", chunk => {
+      if (tooLarge) return;
+      if (Buffer.byteLength(body) + chunk.length > maxBytes) {
+        tooLarge = true;
+        body = "";
+        return;
+      }
+      body += chunk.toString("utf8");
+    });
+    req.on("end", () => {
+      if (tooLarge) {
+        const error = new Error("request body too large");
+        error.statusCode = 413;
+        rejectBody(error);
+        return;
+      }
+      try {
+        resolveBody(body ? JSON.parse(body) : {});
+      } catch {
+        const error = new Error("invalid JSON body");
+        error.statusCode = 400;
+        rejectBody(error);
+      }
+    });
+    req.on("error", rejectBody);
+  });
+}
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    "content-type": "application/json",
+    "cache-control": "no-store",
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function recordReportAction(user, role, action, target, outcome = "success", details = {}) {
+  if (!user?.email) return;
+  const actorEmail = normalizeEmail(user.email);
+  try {
+    addActionLog({
+      actorEmail,
+      actorUsername: getStoredUsername(actorEmail) || actorEmail.split("@")[0],
+      actorRole: role || "user",
+      action,
+      category: "moderation",
+      target: target || null,
+      outcome,
+      details,
+    });
+  } catch (error) {
+    console.error("failed to record report action:", error);
+  }
 }
 
 // resolve the cookie session, mirroring the socket middleware's guest-expiry check
@@ -814,21 +1030,38 @@ setInterval(() => {
       }
     }
   }
+  if (expired.length) {
+    for (const s of io.sockets.sockets.values()) {
+      if (["admin", "owner"].includes(s.userRole)) s.emit("adminUsersChanged");
+    }
+  }
 }, 10 * 1000);
 
 const roomOf = (ch) => "channel:" + ch;
+
+function onlineUserCount() {
+  const onlineEmails = new Set();
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.username && socket.userEmail) onlineEmails.add(socket.userEmail);
+  }
+  return onlineEmails.size;
+}
+
+function emitOnlineUserCount() {
+  io.emit("usercount", onlineUserCount());
+}
 
 function emitAllUserLists() {
   for (const c of listChannels()) emitUserList(c.name);
 }
 
-function buildUserList(channel = "main") {
+function buildUserList(channel = "main", includeHidden = false) {
   const onlineEmails = new Set();
   const onlineUsers = new Map();
 
   for (const [id, s] of io.sockets.sockets) {
     if (!s.username) continue;
-    if (s.currentChannel !== channel) continue;
+    if (channel !== null && s.currentChannel !== channel) continue;
     if (!onlineUsers.has(s.userEmail)) {
       onlineEmails.add(s.userEmail);
       onlineUsers.set(s.userEmail, {
@@ -867,7 +1100,7 @@ function buildUserList(channel = "main") {
     });
   }
 
-  return users.filter((u) => !isHidden(u.email));
+  return includeHidden ? users : users.filter((u) => !isHidden(u.email));
 }
 
 let adminClerkUsersCache = { expiresAt: 0, users: null, promise: null };
@@ -904,9 +1137,21 @@ async function getAllClerkUsers() {
   return adminClerkUsersCache.promise;
 }
 
-async function buildAdminUserList(channel = "main") {
+async function getActiveClerkSessions(userId) {
+  const sessions = [];
+  let offset = 0;
+  while (true) {
+    const page = await clerk.sessions.getSessionList({ userId, status: 'active', limit: 500, offset });
+    sessions.push(...page.data);
+    offset += page.data.length;
+    if (!page.data.length || offset >= page.totalCount) break;
+  }
+  return sessions;
+}
+
+async function buildAdminUserList() {
   const usersByEmail = new Map(
-    buildUserList(channel).map((user) => [user.email, user]),
+    buildUserList(null, true).map((user) => [user.email, user]),
   );
 
   for (const clerkUser of await getAllClerkUsers()) {
@@ -941,7 +1186,87 @@ async function buildAdminUserList(channel = "main") {
     });
   }
 
-  return [...usersByEmail.values()];
+  for (const email of getHiddenUsers()) {
+    if (!email.endsWith("@guest") || usersByEmail.has(email)) continue;
+    usersByEmail.set(email, {
+      username: getStoredUsername(email) ?? email.slice(0, -"@guest".length),
+      email,
+      color: getColor(email) ?? null,
+      avatar: getAvatar(email) ?? null,
+      guest: true,
+      isOwner: false,
+      role: "user",
+      verified: false,
+      redVerified: false,
+      status: "offline",
+      online: false,
+    });
+  }
+
+  return adminModerationFlags([...usersByEmail.values()]);
+}
+
+// Only admin responses include moderation flags; public channel lists stay unchanged.
+function adminModerationFlags(users) {
+  return users.map((user) => {
+    const mute = getMute(user.email);
+    const muted = !!mute && (mute.until === null || mute.until > Date.now());
+    return { ...user, banned: isBanned(user.email), muted, muteUntil: muted ? mute.until : null, hidden: isHidden(user.email) };
+  });
+}
+
+function paginateAdminUsers(users, request = {}) {
+  const views = new Set(["all", "online", "muted", "banned", "hidden"]);
+  const roles = new Set(["user", "mod", "admin", "owner"]);
+  const view = views.has(request.view) ? request.view : "all";
+  const role = roles.has(request.role) ? request.role : "all";
+  const type = ["guest", "registered"].includes(request.type) ? request.type : "all";
+  const sort = ["online", "asc", "desc"].includes(request.sort) ? request.sort : "online";
+  const query = typeof request.query === "string" ? request.query.trim().toLocaleLowerCase() : "";
+  const pageSizeValue = Number(request.pageSize);
+  const pageSize = Number.isFinite(pageSizeValue) ? Math.max(10, Math.min(100, Math.floor(pageSizeValue))) : 50;
+  const requestedPage = Number(request.page);
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const selectedEmail = typeof request.selectedEmail === "string" ? normalizeEmail(request.selectedEmail) : null;
+  const selectedUser = selectedEmail ? users.find(user => user.email === selectedEmail) ?? null : null;
+  const counts = {
+    all: users.length,
+    online: users.filter(user => user.online).length,
+    muted: users.filter(user => user.muted).length,
+    banned: users.filter(user => user.banned).length,
+    hidden: users.filter(user => user.hidden).length,
+  };
+  const visibleUsers = users.filter(user => {
+    if (view === "online" && !user.online) return false;
+    if (view === "muted" && !user.muted) return false;
+    if (view === "banned" && !user.banned) return false;
+    if (view === "hidden" && !user.hidden) return false;
+    if (role !== "all" && user.role !== role) return false;
+    if (type === "guest" && !user.guest) return false;
+    if (type === "registered" && user.guest) return false;
+    if (query && !`${user.username} ${user.email}`.toLocaleLowerCase().includes(query)) return false;
+    return true;
+  });
+  const byName = (a, b) =>
+    (a.username || a.email).localeCompare(b.username || b.email, undefined, { sensitivity: "base", numeric: true }) ||
+    a.email.localeCompare(b.email);
+  visibleUsers.sort((a, b) => sort === "online"
+    ? Number(b.online) - Number(a.online) || byName(a, b)
+    : sort === "desc" ? -byName(a, b) : byName(a, b));
+  const totalPages = Math.max(1, Math.ceil(visibleUsers.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const requestId = Number.isSafeInteger(request.requestId) ? request.requestId : null;
+  return {
+    users: visibleUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    total: visibleUsers.length,
+    totalUsers: users.length,
+    page: currentPage,
+    pageSize,
+    totalPages,
+    counts,
+    requestId,
+    selectedUser,
+  };
 }
 
 function emitUserList(channel = "main") {
@@ -955,12 +1280,7 @@ function emitUserList(channel = "main") {
       s.username &&
       s.currentChannel === channel
     ) {
-      buildAdminUserList(channel)
-        .then((adminUsers) => s.emit("adminUserlist", adminUsers))
-        .catch((e) => {
-          console.error("failed to load admin user list:", e);
-          s.emit("adminUserlist", users);
-        });
+      s.emit("adminUsersChanged");
       s.emit('uRole', getRole(s.userEmail))
     }
   }
@@ -1078,7 +1398,6 @@ io.on("connection", (socket) => {
     socket.handshake.address;
   console.log(`${socket.userEmail} connected`);
   if (!socket.userEmail.endsWith("@guest")) setLastSeen(socket.userEmail);
-  io.emit("usercount", io.engine.clientsCount);
   // everyone starts in the default channel
   socket.currentChannel = "main";
   socket.join(roomOf("main"));
@@ -1119,6 +1438,7 @@ io.on("connection", (socket) => {
     if (saved) socket.username = saved;
     socket.emit("savedUsername", saved);
   }
+  emitOnlineUserCount();
   socket.cachedAvatar = getAvatar(socket.userEmail);
   socket.cachedColor = getColor(socket.userEmail);
   socket.cachedVerified = isVerified(socket.userEmail);
@@ -1149,14 +1469,20 @@ io.on("connection", (socket) => {
     socket.emit("savedProfile", getProfileData(socket.userEmail));
   });
 
-  socket.on("getAdminUsers", async () => {
+  socket.on("getAdminUsers", async (request = {}) => {
     if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
+    const filters = request && typeof request === "object" && !Array.isArray(request) ? request : {};
+    let users;
+    let partial = false;
     try {
-      socket.emit("adminUserlist", await buildAdminUserList(socket.currentChannel));
+      users = await buildAdminUserList();
     } catch (e) {
       console.error("failed to load admin user list:", e);
-      socket.emit("adminUserlist", buildUserList(socket.currentChannel));
+      users = adminModerationFlags(buildUserList(null, true));
+      partial = true;
     }
+    socket.emit("adminUserlist", { ...paginateAdminUsers(users, filters), partial });
+    socket.emit('adminIdentity', { email: socket.userEmail, role: getRole(socket.userEmail) });
     socket.emit('uRole', getRole(socket.userEmail));
   });
 
@@ -1258,6 +1584,7 @@ io.on("connection", (socket) => {
     }
     const prevUser = socket.username;
     socket.username = name;
+    if (prevUser !== name) emitOnlineUserCount();
     if (!socket.userEmail.endsWith("@guest")) {
       saveUsername(socket.userEmail, name);
     }
@@ -1287,23 +1614,43 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    io.emit("usercount", io.engine.clientsCount);
+    emitOnlineUserCount();
     emitUserList(socket.currentChannel);
   });
 
   socket.on("deleteMessage", (messageId) => {
     const history = getHistory(socket.currentChannel);
     const msg = history.find((m) => m.id === messageId);
-    if (!msg) return;
+    if (!msg) {
+      if (["mod", "admin", "owner"].includes(socket.userRole)) {
+        recordStaffAction(socket, "deletemessage", {
+          target: "message",
+          outcome: "failed",
+          details: { channel: socket.currentChannel, failure: "message not found" },
+        });
+      }
+      return;
+    }
 
     const isOwnerOfMsg = msg.ownerEmail === socket.userEmail;
     const isAdmin = ['mod', 'admin', 'owner'].includes(socket.userRole);
 
     if (!isOwnerOfMsg && !isAdmin) {
+      recordStaffAction(socket, "deletemessage", {
+        target: msg.ownerEmail || null,
+        outcome: "denied",
+        details: { channel: socket.currentChannel },
+      });
       socket.emit("commandError", "you can only delete your own messages", 'error');
       return;
     }
     deleteMessage(messageId);
+    if (!isOwnerOfMsg) {
+      recordStaffAction(socket, "deletemessage", {
+        target: msg.ownerEmail || null,
+        details: { channel: socket.currentChannel, messageId },
+      });
+    }
     io.to(roomOf(socket.currentChannel)).emit("messageDeleted", messageId);
   });
 
@@ -1326,20 +1673,28 @@ io.on("connection", (socket) => {
   });
 
   socket.on("createChannel", (rawName) => {
-    if (!['owner'].includes(socket.userRole)) return;
+    if (!['owner'].includes(socket.userRole)) {
+      recordStaffAction(socket, "createchannel", { target: String(rawName ?? "").slice(0, 80), outcome: "denied" });
+      return;
+    }
     const name = String(rawName ?? "")
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "-");
-    if (!/^[a-z0-9-]{1,24}$/.test(name))
+    if (!/^[a-z0-9-]{1,24}$/.test(name)) {
+      recordStaffAction(socket, "createchannel", { target: name || null, outcome: "failed", details: { failure: "invalid channel name" } });
       return socket.emit(
         "commandError",
         "invalid channel name (use a-z, 0-9, - ; max 24)",
         'error'
       );
-    if (channelExists(name))
+    }
+    if (channelExists(name)) {
+      recordStaffAction(socket, "createchannel", { target: name, outcome: "failed", details: { failure: "channel already exists" } });
       return socket.emit("commandError", "channel already exists", 'error');
+    }
     createChannel(name, socket.userEmail);
+    recordStaffAction(socket, "createchannel", { target: name });
     io.emit(
       "channels",
       listChannels().map((c) => c.name),
@@ -1347,14 +1702,24 @@ io.on("connection", (socket) => {
   });
 
   socket.on("deleteChannel", (rawName) => {
-    if (!["owner"].includes(socket.userRole)) return;
+    if (!["owner"].includes(socket.userRole)) {
+      recordStaffAction(socket, "deletechannel", { target: String(rawName ?? "").slice(0, 80), outcome: "denied" });
+      return;
+    }
     const name = String(rawName ?? "")
       .trim()
       .toLowerCase();
-    if (name === "main")
+    if (name === "main") {
+      recordStaffAction(socket, "deletechannel", { target: name, outcome: "failed", details: { failure: "the main channel cannot be deleted" } });
       return socket.emit("commandError", "the main channel cannot be deleted", 'error');
-    if (!channelExists(name)) return;
+    }
+    if (!channelExists(name)) {
+      recordStaffAction(socket, "deletechannel", { target: name || null, outcome: "failed", details: { failure: "channel not found" } });
+      return;
+    }
+    const messagesRemoved = db.prepare("SELECT COUNT(*) AS count FROM messages WHERE channel = ?").get(name).count;
     deleteChannel(name);
+    recordStaffAction(socket, "deletechannel", { target: name, details: { messagesRemoved } });
     // move anyone viewing the deleted channel back to main
     for (const [, s] of io.sockets.sockets) {
       if (s.currentChannel !== name) continue;
@@ -1431,6 +1796,11 @@ io.on("connection", (socket) => {
       if (cmd) {
         const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
         if (cmd.minRole && (roleValues[socket.userRole] ?? 0) < roleValues[cmd.minRole]) {
+          const auditName = name.slice(1);
+          recordStaffAction(socket, auditName, {
+            target: staffCommandTarget(auditName, rest),
+            outcome: "denied",
+          });
           socket.emit('commandError', "you don't have permission to use this command", 'error');
           return;
         }
@@ -1488,6 +1858,139 @@ io.on("connection", (socket) => {
   });
 });
 
+const HTTP_ACTIONS = {
+  "/admin/emoji/add": { action: "emoji.add", category: "emoji", targetField: "shortcode", detailFields: ["shortcode"] },
+  "/admin/emoji/replace": { action: "emoji.replace", category: "emoji", targetField: "shortcode", detailFields: ["shortcode"] },
+  "/admin/emoji/delete": { action: "emoji.delete", category: "emoji", targetField: "shortcode", detailFields: ["shortcode"] },
+  "/admin/mutechat": {
+    action: payload => typeof payload.muted === "boolean"
+      ? payload.muted ? "chat.mute" : "chat.unmute"
+      : "chat.mute_change",
+    category: "settings", target: "chat", detailFields: ["muted"],
+  },
+  "/admin/maintenance": {
+    action: payload => typeof payload.reason === "string"
+      ? payload.reason ? "maintenance.enable" : "maintenance.disable"
+      : "maintenance.change",
+    category: "settings", target: "maintenance", detailFields: ["reason"],
+  },
+  "/admin/clear": { action: "channel.clear", category: "content", targetField: "channel", detailFields: ["channel"] },
+  "/admin/verify": { action: "user.verify", category: "verification", targetField: "email" },
+  "/admin/unverify": { action: "user.unverify", category: "verification", targetField: "email" },
+  "/admin/redverify": { action: "user.red_verify", category: "verification", targetField: "email" },
+  "/admin/unredverify": { action: "user.red_unverify", category: "verification", targetField: "email" },
+  "/admin/hide": { action: "user.hide", category: "moderation", targetField: "email" },
+  "/admin/unhide": { action: "user.unhide", category: "moderation", targetField: "email" },
+  "/admin/user/ban": { action: "user.ban", category: "moderation", targetField: "email", detailFields: ["reason"] },
+  "/admin/user/unban": { action: "user.unban", category: "moderation", targetField: "email" },
+  "/admin/user/kick": { action: "user.kick", category: "moderation", targetField: "email", detailFields: ["reason"] },
+  "/admin/user/mute": { action: "user.mute", category: "moderation", targetField: "email", detailFields: ["reason", "duration"] },
+  "/admin/user/unmute": { action: "user.unmute", category: "moderation", targetField: "email" },
+  "/admin/user/role": { action: "user.role_change", category: "accounts", targetField: "email", detailFields: ["role"] },
+  "/admin/user/revoke-session": { action: "user.session_revoke", category: "accounts", target: "account session", targetField: "email" },
+  "/admin/user/revoke-all-sessions": { action: "user.sessions_revoke_all", category: "accounts", targetField: "email" },
+  "/admin/user/ban-clerk": { action: "user.clerk_ban", category: "accounts", targetField: "email" },
+};
+
+function parseActionResponse(responseBody) {
+  try {
+    const body = Buffer.isBuffer(responseBody) ? responseBody.toString("utf8") : responseBody;
+    return typeof body === "string" ? JSON.parse(body) : null;
+  } catch {
+    return null;
+  }
+}
+
+function actionDetailsFromRequest(definition, payload, req, statusCode, response) {
+  const details = { source: "admin API", ...(req.actionAuditDetails || {}) };
+  for (const field of definition.detailFields || []) {
+    const value = payload?.[field];
+    if (typeof value === "string" && value.trim()) details[field] = value.trim().slice(0, 1000);
+    else if (typeof value === "number" && Number.isFinite(value)) details[field] = value;
+    else if (typeof value === "boolean") details[field] = value;
+  }
+  if (typeof statusCode === "number" && (statusCode < 200 || statusCode >= 300)) {
+    details.httpStatus = statusCode;
+  }
+  if (typeof response?.error === "string") {
+    details.failure = response.error.slice(0, 300);
+  } else if (response?.kicked === false) {
+    details.failure = "target was not online";
+  }
+  return details;
+}
+
+function attachActionAudit(req, res, url) {
+  if (req.method !== "POST") return;
+  const definition = HTTP_ACTIONS[url.pathname];
+  if (!definition) return;
+
+  // Keep only a small, short-lived request buffer so JSON action fields can be
+  // extracted without ever persisting session tokens or arbitrary request data.
+  let requestBody = "";
+  let bodyTooLarge = false;
+  req.on("data", chunk => {
+    if (bodyTooLarge) return;
+    if (Buffer.byteLength(requestBody) + chunk.length > 16 * 1024) {
+      requestBody = "";
+      bodyTooLarge = true;
+      return;
+    }
+    requestBody += chunk.toString("utf8");
+  });
+
+  const originalEnd = res.end;
+  let recorded = false;
+  res.end = function (...args) {
+    if (!recorded) {
+      recorded = true;
+      try {
+        let payload = req.actionAuditPayload || {};
+        if (!bodyTooLarge && !req.actionAuditPayload) {
+          try { payload = JSON.parse(requestBody || "{}"); } catch {}
+        }
+        let actorSession = null;
+        if (typeof payload?.session === "string") actorSession = getSession(payload.session);
+        if (!actorSession) {
+          try { actorSession = getRequestUser(req); } catch {}
+        }
+        if (actorSession && !actorSession.guest) {
+          const role = getRole(actorSession.email);
+          const statusCode = res.statusCode || 200;
+          const response = parseActionResponse(args[0]);
+          const completed = statusCode >= 200 && statusCode < 300 && response?.success !== false && response?.kicked !== false && typeof response?.error !== "string";
+          const outcome = completed
+            ? "success"
+            : [401, 403].includes(statusCode) ? "denied" : "failed";
+          let action = typeof definition.action === "function"
+            ? definition.action(payload)
+            : definition.action;
+          let target = req.actionAuditTarget || definition.target || payload?.[definition.targetField] || null;
+          if (url.pathname === "/admin/user/revoke-session") {
+            const targetSession = payload?.sessionId;
+            if (typeof targetSession === "string") {
+              target = db.prepare("SELECT email FROM sessions WHERE clerk_session_id = ? LIMIT 1").get(targetSession)?.email || "account session";
+            }
+          }
+          addActionLog({
+            actorEmail: actorSession.email,
+            actorUsername: getStoredUsername(actorSession.email),
+            actorRole: role,
+            action,
+            category: definition.category,
+            target,
+            outcome,
+            details: actionDetailsFromRequest(definition, payload, req, statusCode, response),
+          });
+        }
+      } catch (error) {
+        console.error("failed to record admin action:", error);
+      }
+    }
+    return originalEnd.apply(this, args);
+  };
+}
+
 httpServer.on("request", async (req, res) => {
   if (req.url.includes("socket.io")) return;
 
@@ -1495,6 +1998,7 @@ httpServer.on("request", async (req, res) => {
     req.url,
     `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`,
   );
+  attachActionAudit(req, res, url);
 
   // Clerk sign-in: the client signs in with clerk-js and POSTs the resulting
   // session JWT here. We verify it, resolve the user's primary email, and mint
@@ -1862,6 +2366,22 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/stats") {
+    const statsUser = getRequestUser(req);
+    const statsRole = statsUser ? getRole(statsUser.email) : "user";
+    if (!statsUser || !["admin", "owner"].includes(statsRole)) {
+      res.writeHead(403, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "forbidden" }));
+      return;
+    }
+    const forceRefresh = url.searchParams.get("refresh") === "1";
+    if (forceRefresh) {
+      if (!checkRateLimit(statsUser.email, "admin-stats-refresh", 6, 60 * 1000)) {
+        res.writeHead(429, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "rate limited" }));
+        return;
+      }
+      statsCacheTime = 0;
+    }
     if (!statsCache || Date.now() - statsCacheTime > 10 * 60 * 1000) {
       // share a single in-flight promise among concurrent cold-cache requests
       if (!statsFetchPromise) {
@@ -1890,6 +2410,7 @@ httpServer.on("request", async (req, res) => {
             emoji: db.emoji,
             totalSize,
             uploads,
+            updatedAt: new Date().toISOString(),
           };
           statsCacheTime = Date.now();
           return statsCache;
@@ -1949,6 +2470,367 @@ httpServer.on("request", async (req, res) => {
     res.end(JSON.stringify({channels}))
     return;
   }
+  if (url.pathname === "/reports" && req.method === "POST") {
+    const user = getRequestUser(req);
+    if (!user) {
+      sendJson(res, 401, { error: "sign in to submit a report" });
+      return;
+    }
+
+    try {
+      const payload = await readJsonRequest(req, 12 * 1024);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        sendJson(res, 400, { error: "invalid report request" });
+        return;
+      }
+      const allowedReasons = new Set(["spam", "harassment", "hateful_abusive", "inappropriate", "threats", "other"]);
+      const reason = typeof payload.reason === "string" ? payload.reason : "";
+      const note = typeof payload.note === "string" ? payload.note.trim() : "";
+      if (!allowedReasons.has(reason)) {
+        sendJson(res, 400, { error: "choose a valid report reason" });
+        return;
+      }
+      if (payload.note !== undefined && typeof payload.note !== "string") {
+        sendJson(res, 400, { error: "report note must be text" });
+        return;
+      }
+      if (note.length > 500) {
+        sendJson(res, 400, { error: "report note must be 500 characters or fewer" });
+        return;
+      }
+
+      const reporterEmail = normalizeEmail(user.email);
+      let reporterUsername = getStoredUsername(reporterEmail);
+      if (!reporterUsername) {
+        reporterUsername = [...io.sockets.sockets.values()].find(socket => normalizeEmail(socket.userEmail) === reporterEmail)?.username || reporterEmail.split("@")[0];
+      }
+      const targetType = typeof payload.messageId === "string" ? "message" : typeof payload.targetUsername === "string" ? "account" : null;
+      if (!targetType || (targetType === "message" && payload.targetUsername !== undefined) || (targetType === "account" && payload.messageId !== undefined)) {
+        sendJson(res, 400, { error: "report exactly one message or account" });
+        return;
+      }
+
+      let targetKey;
+      let targetEmail = null;
+      let targetUsername = null;
+      let snapshot;
+      if (targetType === "message") {
+        const messageId = payload.messageId.trim();
+        if (!messageId || messageId.length > 80) {
+          sendJson(res, 400, { error: "invalid message" });
+          return;
+        }
+        const message = getMessageById(messageId);
+        if (!message || message.system || !message.ownerEmail) {
+          sendJson(res, 404, { error: "message not found" });
+          return;
+        }
+        targetEmail = normalizeEmail(message.ownerEmail);
+        if (targetEmail === reporterEmail) {
+          sendJson(res, 400, { error: "you cannot report your own message" });
+          return;
+        }
+        targetKey = message.id;
+        targetUsername = message.username || getStoredUsername(targetEmail) || targetEmail.split("@")[0];
+        snapshot = {
+          messageId: message.id,
+          authorUsername: targetUsername,
+          authorEmail: targetEmail,
+          text: message.text,
+          image: message.image,
+          channel: message.channel || "main",
+          time: message.time,
+        };
+      } else {
+        const requestedUsername = payload.targetUsername.trim();
+        if (!isValidUsername(requestedUsername)) {
+          sendJson(res, 400, { error: "invalid account" });
+          return;
+        }
+        for (const socket of io.sockets.sockets.values()) {
+          if (socket.username?.toLowerCase() === requestedUsername.toLowerCase()) {
+            targetEmail = normalizeEmail(socket.userEmail);
+            targetUsername = socket.username;
+            break;
+          }
+        }
+        if (!targetEmail) targetEmail = getEmailByUsername(requestedUsername);
+        if (!targetEmail && /^guest-[a-f0-9]+$/i.test(requestedUsername)) {
+          const candidateEmail = `${requestedUsername}@guest`.toLowerCase();
+          const storedName = getStoredUsername(candidateEmail);
+          if (storedName?.toLowerCase() === requestedUsername.toLowerCase()) targetEmail = candidateEmail;
+          else if (db.prepare("SELECT 1 FROM sessions WHERE email = ? LIMIT 1").get(candidateEmail)) targetEmail = candidateEmail;
+        }
+        targetEmail = normalizeEmail(targetEmail);
+        if (!targetEmail) {
+          sendJson(res, 404, { error: "account not found" });
+          return;
+        }
+        if (targetEmail === reporterEmail) {
+          sendJson(res, 400, { error: "you cannot report your own account" });
+          return;
+        }
+        targetUsername = targetUsername || getStoredUsername(targetEmail) || requestedUsername;
+        targetKey = targetEmail;
+        snapshot = { username: targetUsername, email: targetEmail };
+      }
+
+      const clientIp = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress || "unknown";
+      if (!checkRateLimit(reporterEmail, "report-submit-user", 5, 10 * 60 * 1000) ||
+          !checkRateLimit(clientIp, "report-submit-ip", 20, 10 * 60 * 1000)) {
+        sendJson(res, 429, { error: "too many reports, try again later" });
+        return;
+      }
+      if (hasOpenReport(reporterEmail, targetType, targetKey)) {
+        sendJson(res, 409, { error: "you already have an open report for this target" });
+        return;
+      }
+
+      const reportId = createReport({
+        createdAt: Date.now(),
+        targetType,
+        targetKey,
+        targetUsername,
+        targetEmail,
+        reporterEmail,
+        reporterUsername,
+        reporterRole: getRole(reporterEmail),
+        reason,
+        note,
+        snapshot,
+      });
+      sendJson(res, 201, { success: true, reportId });
+    } catch (error) {
+      if (error?.code === "SQLITE_CONSTRAINT_UNIQUE") {
+        sendJson(res, 409, { error: "you already have an open report for this target" });
+      } else {
+        sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : "could not submit report" });
+        if (!error.statusCode) console.error("report submission failed:", error);
+      }
+    }
+    return;
+  }
+
+  if (url.pathname === "/admin/reports/count" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["mod", "admin", "owner"].includes(role)) {
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    sendJson(res, 200, { count: getOpenReportCount() });
+    return;
+  }
+
+  if (url.pathname === "/admin/reports/stats" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["admin", "owner"].includes(role)) {
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    sendJson(res, 200, getReportStats());
+    return;
+  }
+
+  if (url.pathname === "/admin/reports/data" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["mod", "admin", "owner"].includes(role)) {
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    const status = url.searchParams.get("status") || "open";
+    if (!["open", "resolved", "dismissed", "all"].includes(status)) {
+      sendJson(res, 400, { error: "invalid report status" });
+      return;
+    }
+    const pageValue = Number(url.searchParams.get("page") || 1);
+    if (!Number.isSafeInteger(pageValue) || pageValue < 1) {
+      sendJson(res, 400, { error: "invalid page" });
+      return;
+    }
+    const result = getReports({
+      page: Math.min(1_000_000, pageValue),
+      pageSize: 50,
+      status,
+      search: url.searchParams.get("search") || "",
+    });
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const reportActionMatch = url.pathname.match(/^\/admin\/reports\/(\d+)(?:\/(note|status))?$/);
+  if (reportActionMatch) {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    const reportId = Number(reportActionMatch[1]);
+    const action = reportActionMatch[2];
+    const mutationAction = req.method === "DELETE" && !action ? "report.delete"
+      : req.method === "POST" && action === "note" ? "report.note"
+        : req.method === "POST" && action === "status" ? "report.status_change" : null;
+    if (!user || !["mod", "admin", "owner"].includes(role)) {
+      if (user && mutationAction && checkRateLimit(user.email, "report-denied-audit", 1, 60_000)) {
+        recordReportAction(user, role, mutationAction, `report #${reportId}`, "denied", { reportId, failure: "forbidden" });
+      }
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    if (!Number.isSafeInteger(reportId) || reportId < 1) {
+      if (mutationAction) recordReportAction(user, role, mutationAction, `report #${reportId}`, "failed", { failure: "invalid report ID" });
+      sendJson(res, 400, { error: "invalid report ID" });
+      return;
+    }
+
+    if (req.method === "GET" && !action) {
+      const report = getReportById(reportId);
+      if (!report) sendJson(res, 404, { error: "report not found" });
+      else sendJson(res, 200, { report });
+      return;
+    }
+
+    if (req.method === "POST" && action === "note") {
+      try {
+        const payload = await readJsonRequest(req, 8 * 1024);
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+          recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: "invalid note request" });
+          sendJson(res, 400, { error: "invalid note request" });
+          return;
+        }
+        const note = typeof payload.note === "string" ? payload.note.trim() : "";
+        if (!note || note.length > 1000) {
+          recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: "invalid note length" });
+          sendJson(res, 400, { error: "internal note must be between 1 and 1000 characters" });
+          return;
+        }
+        const report = getReportById(reportId);
+        if (!report) {
+          recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: "report not found" });
+          sendJson(res, 404, { error: "report not found" });
+          return;
+        }
+        const actorEmail = normalizeEmail(user.email);
+        const actorUsername = getStoredUsername(actorEmail) || actorEmail.split("@")[0];
+        const added = addReportNote(reportId, {
+          actorEmail,
+          actorUsername,
+          actorRole: role,
+          note,
+        });
+        recordReportAction(user, role, "report.note", report.targetUsername || report.targetEmail || `report #${reportId}`, "success", { reportId, noteId: added.id });
+        sendJson(res, 201, { success: true, report: getReportById(reportId) });
+      } catch (error) {
+        recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: error.message || "could not save internal note" });
+        sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : "could not save internal note" });
+        if (!error.statusCode) console.error("report note failed:", error);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && action === "status") {
+      try {
+        const payload = await readJsonRequest(req, 8 * 1024);
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: "invalid status request" });
+          sendJson(res, 400, { error: "invalid status request" });
+          return;
+        }
+        if (!["open", "resolved", "dismissed"].includes(payload.status)) {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: "invalid report status" });
+          sendJson(res, 400, { error: "invalid report status" });
+          return;
+        }
+        const report = getReportById(reportId);
+        if (!report) {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, status: payload.status, failure: "report not found" });
+          sendJson(res, 404, { error: "report not found" });
+          return;
+        }
+        if (report.status === payload.status) {
+          sendJson(res, 200, { success: true, report });
+          return;
+        }
+        const updated = updateReportStatus(reportId, payload.status);
+        const actionName = payload.status === "open" ? "report.reopen"
+          : payload.status === "resolved" ? "report.resolve" : "report.dismiss";
+        recordReportAction(user, role, actionName, report.targetUsername || report.targetEmail || `report #${reportId}`, "success", { reportId, previousStatus: updated.previousStatus, status: payload.status });
+        sendJson(res, 200, { success: true, report: getReportById(reportId) });
+      } catch (error) {
+        if (error?.code === "SQLITE_CONSTRAINT_UNIQUE") {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: "another open report exists for this reporter and target" });
+          sendJson(res, 409, { error: "another open report already exists for this reporter and target" });
+        } else {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: error.message || "could not update report" });
+          sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : "could not update report" });
+          if (!error.statusCode) console.error("report status update failed:", error);
+        }
+      }
+      return;
+    }
+
+    if (req.method === "DELETE" && !action) {
+      if (!["admin", "owner"].includes(role)) {
+        recordReportAction(user, role, "report.delete", `report #${reportId}`, "denied", { reportId, failure: "only admins and owners can delete reports" });
+        sendJson(res, 403, { error: "only admins and owners can permanently delete reports" });
+        return;
+      }
+      const report = deleteReport(reportId);
+      if (!report) {
+        recordReportAction(user, role, "report.delete", `report #${reportId}`, "failed", { reportId, failure: "report not found" });
+        sendJson(res, 404, { error: "report not found" });
+        return;
+      }
+      recordReportAction(user, role, "report.delete", report.targetUsername || report.targetEmail || `report #${reportId}`, "success", { reportId, targetType: report.targetType, previousStatus: report.status });
+      sendJson(res, 200, { success: true });
+      return;
+    }
+
+    sendJson(res, 405, { error: "method not allowed" });
+    return;
+  }
+
+  if (url.pathname === "/admin/logs/data" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["admin", "owner"].includes(role)) {
+      res.writeHead(403, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "forbidden" }));
+      return;
+    }
+
+    const categories = new Set(["accounts", "content", "emoji", "moderation", "settings", "verification"]);
+    const rawCategory = url.searchParams.get("category") || "";
+    if (rawCategory && !categories.has(rawCategory)) {
+      res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "invalid category" }));
+      return;
+    }
+    const parseBound = value => {
+      if (value === null || value === "") return null;
+      const number = Number(value);
+      return Number.isSafeInteger(number) && number >= 0 ? number : NaN;
+    };
+    const from = parseBound(url.searchParams.get("from"));
+    const to = parseBound(url.searchParams.get("to"));
+    if (Number.isNaN(from) || Number.isNaN(to) || (from !== null && to !== null && to < from)) {
+      res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "invalid date range" }));
+      return;
+    }
+    const page = Math.min(1_000_000, Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1));
+    const result = getActionLogs({
+      page,
+      pageSize: 50,
+      search: url.searchParams.get("search") || "",
+      category: rawCategory,
+      from,
+      to,
+    });
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ ...result, totalPages: Math.max(1, Math.ceil(result.total / result.pageSize)) }));
+    return;
+  }
+
   if (url.pathname === "/admin/emoji/list" && req.method === "GET") {
     if (!requireAdminPage(req, res)) return
 
@@ -1962,69 +2844,141 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
-  if (url.pathname === "/admin/emoji/delete" && req.method === "POST") {
-    let body = ''
-    req.on('data', (chunk) => (body += chunk))
-    req.on('end', async () => {
+  if (["/admin/emoji/add", "/admin/emoji/replace"].includes(url.pathname) && req.method === "POST") {
+    const user = getRequestUser(req);
+    const send = (status, data) => {
+      res.writeHead(status, {"content-type": "application/json"});
+      res.end(JSON.stringify(data));
+    };
+    if (!user || !["admin", "owner"].includes(getRole(user.email))) {
+      send(403, {success: false, error: "forbidden"});
+      return;
+    }
+    if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) {
+      send(503, {success: false, error: "emoji storage is not configured"});
+      return;
+    }
+    if (!checkRateLimit(user.email, "admin-emoji-upload", 30, 60 * 60 * 1000)) {
+      send(429, {success: false, error: "too many emoji uploads, try again later"});
+      return;
+    }
+    const replacing = url.pathname === "/admin/emoji/replace";
+    const maxFileSize = 2 * 1024 * 1024;
+    const form = formidable({maxFiles: 1, maxFileSize, maxTotalFileSize: maxFileSize,
+      maxFields: 1, maxFieldsSize: 1024, allowEmptyFiles: false, minFileSize: 1});
+    const tempFiles = new Set();
+    form.on("fileBegin", (_name, file) => tempFiles.add(file.filepath));
+    form.parse(req, async (err, fields, files) => {
       try {
-        const { session, shortcode } = JSON.parse(body)
-        const sess = getSession(session)
-        const sessRole = sess ? getRole(sess.email) : 'user'
-
-        if (!sessRole || !['admin', 'owner'].includes(sessRole)) {
-          res.writeHead(403, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'forbidden'}))
-          return
+        if (err) {
+          send(400, {success: false, error: "upload one image up to 2 MB"});
+          return;
         }
-
-        const emojis = getCustomEmoji()
-        if (!emojis[shortcode]) {
-          res.writeHead(404, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'emoji not found'}))
-          return
+        const file = files.file?.[0];
+        const input = fields.shortcode?.[0];
+        req.actionAuditPayload = {
+          shortcode: typeof input === "string" ? input.trim().slice(0, 80) : "",
+        };
+        if (!file || Object.values(files).flat().length !== 1 || typeof input !== "string") {
+          send(400, {success: false, error: "an image and shortcode are required"});
+          return;
         }
-
-        const url = emojis[shortcode]
-        
-        if (!process.env.AWS_S3_PUBLIC_URL) {
-          console.error('AWS_S3_PUBLIC_URL not configured')
-          res.writeHead(500, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'S3 not configured'}))
-          return
+        const name = replacing ? input : input.trim().toLowerCase();
+        const shortcode = ":" + name + ":";
+        if (!replacing && !/^[a-z0-9_]{1,32}$/.test(name)) {
+          send(400, {success: false, error: "use 1–32 lowercase letters, numbers, or underscores"});
+          return;
         }
-        
-        const publicUrlPrefix = process.env.AWS_S3_PUBLIC_URL + '/'
-        if (!url.startsWith(publicUrlPrefix)) {
-          console.error('Emoji URL does not match expected S3 public URL format:', url)
-          res.writeHead(500, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'invalid emoji URL format'}))
-          return
+        const body = await readFile(file.filepath);
+        const type = emojiImageType(body);
+        if (!type || body.length > maxFileSize || file.mimetype !== type.mime) {
+          send(400, {success: false, error: "upload a PNG, GIF, WebP, or JPEG image up to 2 MB"});
+          return;
         }
-        
-        const s3Key = url.replace(publicUrlPrefix, '')
-
-        try {
-          await s3.send(new DeleteObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: s3Key
+        await withEmojiMutation(async () => {
+          // Check again after upload parsing and while holding the mutation queue.
+          const currentUser = getRequestUser(req);
+          if (!currentUser || !["admin", "owner"].includes(getRole(currentUser.email))) {
+            send(403, {success: false, error: "forbidden"});
+            return;
+          }
+          const existing = getCustomEmoji();
+          const currentUrl = Object.hasOwn(existing, shortcode) ? existing[shortcode] : null;
+          if (replacing ? !currentUrl : !!currentUrl) {
+            send(replacing ? 404 : 409, {success: false,
+              error: replacing ? "emoji not found" : "that shortcode is already in use"});
+            return;
+          }
+          const key = replacing ? emojiStorageKey(currentUrl) : "emojis/" + name + type.ext;
+          await s3.send(new PutObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET, Key: key, Body: body,
+            ContentType: type.mime, CacheControl: "no-cache",
           }));
-        } catch (e) {
-          console.error('failed to delete:', e)
-        }
-
-        removeCustomEmoji(shortcode)
-
-        io.emit('emojiUpdate', getCustomEmoji())
-
-        res.writeHead(200, {'content-type': 'application/json'})
-        res.end(JSON.stringify({success: true}))
+          const publicUrl = process.env.AWS_S3_PUBLIC_URL.replace(/\/+$/, "") + "/" + key + "?v=" + randomUUID();
+          addCustomEmoji(shortcode, publicUrl);
+          io.emit("emojiUpdate", getCustomEmoji());
+          send(200, {success: true, emoji: {shortcode, url: publicUrl}});
+        });
       } catch (e) {
-        console.error('error deleting emoji:', e)
-        res.writeHead(500, {'content-type': 'application/json'})
-        res.end(JSON.stringify({success: false, error: 'internal error'}))
+        console.error("emoji upload failed:", e);
+        if (!res.writableEnded) send(500, {success: false, error: "failed to save emoji"});
+      } finally {
+        await Promise.allSettled([...tempFiles].map(path => unlink(path)));
       }
-    })
-    return
+    });
+    return;
+  }
+
+  if (url.pathname === "/admin/emoji/delete" && req.method === "POST") {
+    const send = (status, data) => {
+      res.writeHead(status, {"content-type": "application/json"});
+      res.end(JSON.stringify(data));
+    };
+    let body = "";
+    let tooLarge = false;
+    req.on("data", chunk => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 4096) {
+        tooLarge = true;
+        send(413, {success: false, error: "request too large"});
+      }
+    });
+    req.on("end", async () => {
+      if (tooLarge) return;
+      let payload;
+      try { payload = JSON.parse(body); }
+      catch { send(400, {success: false, error: "invalid request"}); return; }
+      try {
+        await withEmojiMutation(async () => {
+          const sess = typeof payload?.session === "string" ? getSession(payload.session) : null;
+          if (!sess || !["admin", "owner"].includes(getRole(sess.email))) {
+            send(403, {success: false, error: "forbidden"});
+            return;
+          }
+          const shortcode = payload.shortcode;
+          const existing = getCustomEmoji();
+          if (typeof shortcode !== "string" || !Object.hasOwn(existing, shortcode)) {
+            send(404, {success: false, error: "emoji not found"});
+            return;
+          }
+          if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) {
+            send(503, {success: false, error: "emoji storage is not configured"});
+            return;
+          }
+          await s3.send(new DeleteObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET, Key: emojiStorageKey(existing[shortcode]),
+          }));
+          removeCustomEmoji(shortcode);
+          io.emit("emojiUpdate", getCustomEmoji());
+          send(200, {success: true});
+        });
+      } catch (e) {
+        console.error("error deleting emoji:", e);
+        send(500, {success: false, error: "failed to delete emoji; try again"});
+      }
+    });
+    return;
   }
 
   if (url.pathname === "/admin/mutechat" && req.method === "POST") {
@@ -2032,7 +2986,7 @@ httpServer.on("request", async (req, res) => {
     req.on('data', (d) => { body += d })
     req.on('end', async () => {
       try {
-        const { session: sessionId } = JSON.parse(body)
+        const { session: sessionId, muted: requestedMuted } = JSON.parse(body)
         const sess = sessionId ? getSession(sessionId) : null
         const sessRole = sess ? getRole(sess.email) : "user"
         if (!sess || sessRole !== "owner") {
@@ -2041,7 +2995,14 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
-        chatMuted = !chatMuted
+        if (typeof requestedMuted !== "boolean") {
+          res.writeHead(400, { "content-type": "application/json" })
+          res.end(JSON.stringify({ error: "muted state required" }))
+          return
+        }
+
+        req.actionAuditDetails = { previousMuted: chatMuted };
+        chatMuted = requestedMuted
         setSetting("chat_muted", chatMuted ? "1" : "0")
         if (chatMuted) {
           io.emit('mutechat', 'chat has been muted')
@@ -2073,6 +3034,7 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
+        req.actionAuditDetails = { previouslyEnabled: maintenance, previousReason: reason || null };
         const reasonText = newReason || ''
         if (reasonText) {
           maintenance = true
@@ -2113,6 +3075,15 @@ httpServer.on("request", async (req, res) => {
         }
 
         const targetChannel = channel || 'main'
+        if (typeof targetChannel !== 'string' || !channelExists(targetChannel)) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'invalid channel' }))
+          return
+        }
+        req.actionAuditTarget = targetChannel;
+        req.actionAuditDetails = {
+          messagesRemoved: db.prepare("SELECT COUNT(*) AS count FROM messages WHERE channel = ?").get(targetChannel).count,
+        };
         clearMessages(targetChannel)
         io.to(roomOf(targetChannel)).emit('clear')
 
@@ -2126,139 +3097,84 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
-  if (url.pathname === "/admin/verify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d })
+  if (["/admin/verify", "/admin/unverify", "/admin/redverify", "/admin/unredverify"].includes(url.pathname) && req.method === "POST") {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
+      let payload;
       try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null
-        const sessRole = sess ? getRole(sess.email) : 'user'
-
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'forbidden' }))
-          return
-        }
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'email required' }))
-          return
-        }
-
-        const currentRole = getRole(targetEmail)
-        if (!["mod", 'admin', 'owner'].includes(currentRole)) {
-          setRole(targetEmail, 'mod')
-        }
-        setVerified(targetEmail)
-
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ success: true }))
-      } catch (e) {
+        payload = JSON.parse(body);
+      } catch {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'invalid request' }));
+        return;
       }
-    })
-    return;
-  }
-
-  if (url.pathname === "/admin/unverify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d });
-    req.on('end', async () => {
+      const sess = payload?.session ? getSession(payload.session) : null;
+      if (!sess || getRole(sess.email) !== 'owner') {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return;
+      }
+      if (typeof payload.email !== 'string' || !payload.email.trim()) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return;
+      }
+      const targetEmail = normalizeEmail(payload.email);
+      const regular = ['/admin/verify', '/admin/unverify'].includes(url.pathname);
+      if (regular && targetEmail.endsWith('@guest')) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'guests cannot have moderator roles' }));
+        return;
+      }
+      const currentRole = getRole(targetEmail);
+      req.actionAuditDetails = {
+        previousRole: currentRole,
+        previouslyVerified: isVerified(targetEmail),
+        previouslyRedVerified: isRedVerified(targetEmail),
+      };
+      const newRole = url.pathname === '/admin/verify' && currentRole === 'user' ? 'mod'
+        : url.pathname === '/admin/unverify' && currentRole === 'mod' ? 'user' : currentRole;
+      req.actionAuditDetails.newRole = newRole;
       try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null;
-        const sessRole = sess ? getRole(sess.email) : 'user';
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "forbidden" }));
-          return
+        // Clerk remains the source of truth when verification changes a role.
+        // Sync it first so a failed request cannot leave a local promotion behind.
+        if (newRole !== currentRole) {
+          const list = await clerk.users.getUserList({ emailAddress: [targetEmail], limit: 1 });
+          const clerkUser = list.data?.[0];
+          if (!clerkUser) {
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'no Clerk account found' }));
+            return;
+          }
+          await clerk.users.updateUserMetadata(clerkUser.id, { publicMetadata: { role: newRole } });
+          setRole(targetEmail, newRole);
         }
+        if (url.pathname === '/admin/verify') setVerified(targetEmail);
+        if (url.pathname === '/admin/unverify') removeVerified(targetEmail);
+        if (url.pathname === '/admin/redverify') setRedVerified(targetEmail);
+        if (url.pathname === '/admin/unredverify') removeRedVerified(targetEmail);
 
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "email required" }));
-          return
+        const verified = isVerified(targetEmail);
+        const redVerified = isRedVerified(targetEmail);
+        forEachUserSocket(targetEmail, socket => {
+          socket.userRole = newRole;
+          socket.cachedVerified = verified;
+          socket.cachedRedVerified = redVerified;
+          socket.emit('uRole', newRole);
+        });
+        for (const socket of io.sockets.sockets.values()) {
+          if (['admin', 'owner'].includes(socket.userRole)) socket.emit('userVerificationChanged', targetEmail);
         }
-
-        const currentRole = getRole(targetEmail);
-        if (currentRole === "mod") {
-          setRole(targetEmail, 'user');
-        }
-        removeVerified(targetEmail);
-
+        emitAllUserLists();
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ success: true }));
-      } catch (e) {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid request' }));
+        res.end(JSON.stringify({ success: true, role: newRole, verified, redVerified }));
+      } catch (error) {
+        console.error('verification update failed:', error);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'could not update verification. try again.' }));
       }
-    })
-    return;
-  }
-
-  if (url.pathname === "/admin/redverify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d })
-    req.on('end', async () => {
-      try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null
-        const sessRole = sess ? getRole(sess.email) : 'user'
-
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'forbidden' }))
-          return
-        }
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'email required' }))
-          return
-        }
-
-        setRedVerified(targetEmail)
-
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ success: true }))
-      } catch (e) {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid request' }));
-      }
-    })
-    return;
-  }
-
-  if (url.pathname === "/admin/unredverify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d });
-    req.on('end', async () => {
-      try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null;
-        const sessRole = sess ? getRole(sess.email) : 'user';
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "forbidden" }));
-          return
-        }
-
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "email required" }));
-          return
-        }
-
-        removeRedVerified(targetEmail);
-
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ success: true }));
-      } catch (e) {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid request' }));
-      }
-    })
+    });
     return;
   }
 
@@ -2276,13 +3192,14 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
-        if (!targetEmail) {
+        if (typeof targetEmail !== 'string' || !targetEmail.trim()) {
           res.writeHead(400, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'email required' }));
           return
         }
 
-        setHidden(targetEmail)
+        setHidden(normalizeEmail(targetEmail))
+        emitAllUserLists()
 
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
@@ -2308,13 +3225,14 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
-        if (!targetEmail) {
+        if (typeof targetEmail !== 'string' || !targetEmail.trim()) {
           res.writeHead(400, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'email required' }));
           return
         }
 
-        removeHidden(targetEmail)
+        removeHidden(normalizeEmail(targetEmail))
+        emitAllUserLists()
 
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
@@ -2352,7 +3270,7 @@ httpServer.on("request", async (req, res) => {
       const banned = isBanned(targetEmail)
       const banReason = banned ? getBanReason(targetEmail) : null
       const muteData = getMute(targetEmail)
-      const muted = !!muteData
+      const muted = !!muteData && (muteData.until === null || muteData.until > Date.now())
       const muteReason = muteData?.reason || null
       const muteUntil = muteData?.until || null
 
@@ -2387,7 +3305,8 @@ httpServer.on("request", async (req, res) => {
 
       let clerkId = null
       let lastSignInAt = null
-      let activeSessions = 0;
+      let activeSessions = null;
+      let clerkBanned = targetEmail.endsWith('@guest') ? false : null;
       let clerkUsername = null;
 
       if (!targetEmail.endsWith("@guest")) {
@@ -2407,6 +3326,7 @@ httpServer.on("request", async (req, res) => {
 
           if (clerkId) {
             const clerkUser = await clerk.users.getUser(clerkId);
+            clerkBanned = !!clerkUser.banned;
             clerkUsername =
               clerkUser.username ||
               [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
@@ -2418,10 +3338,10 @@ httpServer.on("request", async (req, res) => {
                 userId: clerkId,
                 status: 'active'
               });
-              activeSessions = sessionList.data?.length || 0;
+              activeSessions = sessionList.totalCount ?? sessionList.data?.length ?? 0;
             } catch (e) {
               console.error('failed to fetch sessions:', e);
-              activeSessions = 0;
+              activeSessions = null;
             }
 
             if (clerkUser.createdAt && clerkUser.createdAt < createdAt) {
@@ -2439,15 +3359,24 @@ httpServer.on("request", async (req, res) => {
         email: targetEmail,
         username,
         role,
+        hidden: isHidden(normalizeEmail(targetEmail)),
         verified,
         redVerified,
         guest: targetEmail.endsWith("@guest"),
         online,
+        avatar: getAvatar(targetEmail),
+        profile: {
+          bio: targetEmail.endsWith('@guest') ? "i'm a guest on chat™" : (profileData.bio || ''),
+          pronouns: targetEmail.endsWith('@guest') ? '' : (profileData.pronouns || ''),
+          status: profileData.status || '',
+          lastSeen: online ? null : profileData.lastSeen,
+        },
         clerkId,
         createdAt,
         lastSignInAt,
         messageCount,
         activeSessions,
+        clerkBanned,
         banned,
         banReason,
         muted,
@@ -2455,7 +3384,10 @@ httpServer.on("request", async (req, res) => {
         muteUntil
       };
 
-      res.writeHead(200, { 'content-type': 'application/json' });
+      res.writeHead(200, {
+        'content-type': 'application/json',
+        'cache-control': 'no-store',
+      });
       res.end(JSON.stringify(result));
     } catch (e) {
       console.error('Error in /admin/user/info:', e);
@@ -2516,12 +3448,7 @@ httpServer.on("request", async (req, res) => {
       }
 
       try {
-        const sessionList = await clerk.sessions.getSessionList({
-          userId: clerkId,
-          status: 'active'
-        });
-
-        const sessions = (sessionList.data || []).map(s => ({
+        const sessions = (await getActiveClerkSessions(clerkId)).map(s => ({
           id: s.id,
           status: s.status,
           lastActiveAt: s.lastActiveAt,
@@ -2583,6 +3510,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const banReason = reason || 'no reason given'
+        req.actionAuditDetails = { reason: banReason };
 
         const bannedIp = banIpFor(targetEmail)
         addBan(targetEmail, banReason, bannedIp)
@@ -2654,6 +3582,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const kickReason = reason || 'no reason given'
+        req.actionAuditDetails = { reason: kickReason };
 
         let kicked = false
         for (const [, s] of io.sockets.sockets) {
@@ -2715,6 +3644,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const muteReason = reason || 'no reason given'
+        req.actionAuditDetails = { reason: muteReason, duration: duration ?? "indefinite" };
 
         let until = null
         if (duration !== null && duration !== undefined) {
@@ -2841,6 +3771,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const currentRole = getRole(targetEmail)
+        req.actionAuditDetails = { previousRole: currentRole };
         if (currentRole === 'owner' && sessRole !== 'owner') {
           res.writeHead(403, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'only owner can set/remove owner role' }));
@@ -3017,10 +3948,11 @@ httpServer.on("request", async (req, res) => {
         }
 
         try {
-          const clerkUser = await clerk.users.getUser(clerkId);
+          const activeSessions = await getActiveClerkSessions(clerkId);
           let revokedCount = 0;
+          let failedCount = 0;
 
-          for (const sess of clerkUser.sessions || []) {
+          for (const sess of activeSessions) {
             if (sess.status === "active") {
               try {
                 await clerk.sessions.revokeSession(sess.id);
@@ -3030,6 +3962,7 @@ httpServer.on("request", async (req, res) => {
                 })
                 revokedCount++;
               } catch (e) {
+                failedCount++;
                 console.error(`failed to revoke session ${sess.id}: `, e)
               }
             }
@@ -3041,8 +3974,10 @@ httpServer.on("request", async (req, res) => {
             s.disconnect()
           })
 
-          res.writeHead(200, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ success: true, revokedCount }));
+          res.writeHead(failedCount ? 500 : 200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify(failedCount
+            ? { error: `failed to revoke ${failedCount} session(s); ${revokedCount} revoked`, revokedCount, failedCount }
+            : { success: true, revokedCount }));
         } catch (e) {
           console.error("Failed to revoke sessions:", e);
           res.writeHead(500, { "content-type": "application/json" });
@@ -3352,6 +4287,18 @@ httpServer.on("request", async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/admin/reports" && req.method === "GET") {
+    const staff = requireStaffPage(req, res);
+    if (!staff) return;
+    const html = await renderPage("reports.html", {
+      ADMIN_NAV_LINKS: renderAdminNav(staff.role, "/admin/reports"),
+      STAFF_ROLE: escapeHtml(staff.role),
+    });
+    res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
+    res.end(html);
+    return;
+  }
+
   if (url.pathname === "/admin" && req.method === "GET") {
     if (!requireAdminPage(req, res)) return
     const html = await renderPage("admin.html", {})
@@ -3372,6 +4319,14 @@ httpServer.on("request", async (req, res) => {
     if (!requireAdminPage(req, res)) return
     const html = await renderPage("emoji.html", {})
     res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
+  }
+
+  if (url.pathname === "/admin/logs" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("logs.html", {})
+    res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" })
     res.end(html)
     return
   }

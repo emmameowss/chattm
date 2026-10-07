@@ -532,6 +532,9 @@ if (session) {
     profilePanel.style.display = "block";
     document.querySelector("#profile-backdrop").style.display = "block";
     profilePanel.dataset.profileUsername = targetUsername;
+    const reportButton = document.querySelector("#profile-report-btn");
+    reportButton.hidden = true;
+    reportButton.dataset.targetUsername = "";
     // clear previous content
     document.querySelector("#profile-avatar-wrap").innerHTML = "";
     document.querySelector("#profile-name-row").innerHTML = "";
@@ -694,7 +697,10 @@ if (session) {
       data.pronouns || "";
 
     // status display
-    const isOwnProfile = data.username === username;
+    const isOwnProfile = data.username?.toLowerCase() === username?.toLowerCase();
+    const reportButton = document.querySelector("#profile-report-btn");
+    reportButton.hidden = isOwnProfile;
+    reportButton.dataset.targetUsername = data.username;
     if (isOwnProfile) {
       myVerified = data.verified;
       myRedVerified = data.redVerified ?? false;
@@ -820,8 +826,15 @@ if (session) {
     document.querySelector("#profile-edit-actions").style.display = "none";
     document.querySelector("#profile-edit-btn").style.display = "none";
     document.querySelector("#profile-avatar-wrap").innerHTML = "";
+    document.querySelector("#profile-report-btn").hidden = true;
     pendingAvatar = undefined;
   }
+
+  document.querySelector("#profile-report-btn").addEventListener("click", (event) => {
+    event.stopPropagation();
+    const targetUsername = event.currentTarget.dataset.targetUsername;
+    if (targetUsername) openReportForm({ targetUsername });
+  });
 
   document
     .querySelector("#profile-close")
@@ -882,6 +895,14 @@ if (session) {
   socket.on("emojiUpdate", (map) => {
     customEmoji = map;
     renderEmojiPicker();
+    document.querySelectorAll("img.custom-emoji").forEach(image => {
+      const shortcode = image.alt;
+      if (Object.hasOwn(map, shortcode)) {
+        image.src = map[shortcode];
+      } else {
+        image.replaceWith(document.createTextNode(shortcode));
+      }
+    });
   });
 
   emojiBtn.addEventListener("click", (e) => {
@@ -1473,31 +1494,39 @@ if (session) {
 
     li.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      openMessageContextMenu(li, data.id, ausername === username || isOwner);
+      openMessageContextMenu(li, data, ausername === username || isOwner);
     });
 
     appendMessage(li);
   }
 
-  function openMessageContextMenu(li, messageId, canDelete) {
+  function openMessageContextMenu(li, message, canDelete) {
     const menu = document.querySelector("#message-context-menu");
     const rect = li.getBoundingClientRect();
-    menu.style.left = `${rect.left}px`;
-    menu.style.top = `${rect.bottom + 4}px`;
-    menu.classList.add("open");
-
     const replyBtn = document.querySelector("#ctx-reply-btn");
     replyBtn.onclick = () => {
-      startReply(messageId);
+      startReply(message.id);
+      menu.classList.remove("open");
+    };
+
+    const reportBtn = document.querySelector("#ctx-report-btn");
+    const canReport = !message.system && message.username?.toLowerCase() !== username?.toLowerCase();
+    reportBtn.style.display = canReport ? "" : "none";
+    reportBtn.onclick = () => {
+      openReportForm({ message });
       menu.classList.remove("open");
     };
 
     const deleteBtn = document.querySelector("#ctx-delete-btn");
     deleteBtn.style.display = canDelete ? "" : "none";
     deleteBtn.onclick = () => {
-      socket.emit("deleteMessage", messageId);
+      socket.emit("deleteMessage", message.id);
       menu.classList.remove("open");
     };
+
+    menu.classList.add("open");
+    menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 12))}px`;
+    menu.style.top = `${Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 12))}px`;
   }
 
   document.addEventListener("click", (e) => {
@@ -2215,8 +2244,12 @@ socket.on("messageDeleted", (messageId) => {
         );
       }
       document.querySelector("#owner-divider").style.display = "block";
-      if (isOwner) {
-        document.querySelector("#admin-btn").style.display = "";
+      if (["mod", "admin", "owner"].includes(role)) {
+        const adminButton = document.querySelector("#admin-btn");
+        adminButton.style.display = "";
+        adminButton.innerHTML = role === "mod"
+          ? '<i class="ti ti-flag"></i> reports'
+          : '<i class="ti ti-shield-lock"></i> admin';
       }
 
       if (color) {
@@ -2269,7 +2302,62 @@ socket.on("messageDeleted", (messageId) => {
       if (withInput) inputEl.addEventListener("keydown", onKey);
     });
   }
+
+  let activeReportTarget = null;
+  function openReportForm(target) {
+    const dialog = document.querySelector("#report-dialog");
+    const form = document.querySelector("#report-form");
+    const summary = document.querySelector("#report-target-summary");
+    const title = document.querySelector("#report-dialog-title");
+    form.reset();
+    activeReportTarget = target.message
+      ? { messageId: target.message.id }
+      : { targetUsername: target.targetUsername };
+    if (target.message) {
+      const preview = target.message.text || (target.message.image ? "image message" : "message");
+      title.textContent = "report message";
+      summary.textContent = `by ${target.message.username || "unknown user"} in #${target.message.channel || currentChannel}: ${preview.slice(0, 140)}`;
+    } else {
+      title.textContent = "report account";
+      summary.textContent = `reporting ${target.targetUsername}`;
+    }
+    if (!dialog.open) dialog.showModal();
+    document.querySelector("#report-reason").focus();
+  }
+
+  const reportDialog = document.querySelector("#report-dialog");
+  document.querySelector("#report-dialog-close").addEventListener("click", () => reportDialog.close());
+  document.querySelector("#report-dialog-cancel").addEventListener("click", () => reportDialog.close());
+  document.querySelector("#report-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!activeReportTarget) return;
+    const submit = document.querySelector("#report-submit");
+    const payload = {
+      ...activeReportTarget,
+      reason: document.querySelector("#report-reason").value,
+      note: document.querySelector("#report-note").value,
+    };
+    submit.disabled = true;
+    submit.textContent = "sending…";
+    try {
+      const response = await fetch("/reports", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "could not submit report");
+      reportDialog.close();
+      activeReportTarget = null;
+      showToast("report sent to the moderators", "success");
+    } catch (error) {
+      showToast(error.message || "could not submit report", "error");
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "send report";
+    }
+  });
   document.querySelector("#admin-btn").addEventListener("click", () => {
-    window.location.href = "/admin";
+    window.location.href = role === "mod" ? "/admin/reports" : "/admin";
   });
 }

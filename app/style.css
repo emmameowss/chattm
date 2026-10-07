@@ -1677,6 +1677,18 @@ button:active {
     margin-top: 4px;
 }
 
+#profile-report-btn {
+    width: 100%;
+    margin-bottom: 7px;
+    border-color: #5b3944;
+    background: #21171b;
+    color: var(--pink);
+}
+
+#profile-report-btn:hover {
+    background: #2b1c22;
+}
+
 #profile-edit-btn {
     width: 100%;
 }
@@ -2574,6 +2586,76 @@ html.light .dev-badge {
 #modal-confirm {
     border-color: var(--pink);
     color: var(--pink);
+}
+
+.report-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(460px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    padding: 0;
+    overflow: auto;
+    border: 1px solid #503540;
+    border-radius: 15px;
+    background: linear-gradient(145deg, #191417, #101010 62%);
+    color: var(--text);
+    box-shadow: 0 24px 80px #000b, 0 0 0 1px #f5a9b812;
+}
+
+.report-dialog::backdrop {
+    background: #050305c9;
+    backdrop-filter: blur(7px) saturate(.85);
+}
+
+#report-form {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    padding: 24px;
+}
+
+.report-dialog-header,
+.report-dialog-footer,
+.report-dialog-footer > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.report-dialog-header { align-self: stretch; min-height: 36px; margin-bottom: 4px; padding-right: 44px; }
+.report-dialog-header > div { flex: 1; min-width: 0; }
+.report-dialog-header h2 { margin: 0; font-size: 18px; font-weight: 600; text-align: left; }
+.report-dialog-header p { margin: 5px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.report-dialog-header button { position: absolute; top: 12px; right: 12px; min-width: 34px; min-height: 34px; padding: 4px; }
+.report-dialog label { color: var(--text); font-size: 12px; font-weight: 500; }
+.report-dialog label span { color: var(--muted); font-weight: 400; }
+.report-dialog select,
+.report-dialog textarea {
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid #393039;
+    border-radius: 9px;
+    background: #0b0b0b;
+    color: var(--text);
+    font: 14px var(--font-sans);
+}
+.report-dialog textarea { min-height: 96px; resize: vertical; }
+.report-dialog select:focus,
+.report-dialog textarea:focus { border-color: var(--pink); outline: 3px solid #f5a9b822; }
+.report-dialog-footer { align-items: flex-end; margin-top: 5px; }
+.report-dialog-footer > span { max-width: 180px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.report-dialog-footer > div { justify-content: flex-end; }
+.report-dialog-footer button { min-height: 38px; border-radius: 8px; }
+#report-submit { border-color: var(--pink); background: var(--pink); color: #25151a; font-weight: 600; }
+#report-submit:hover:not(:disabled) { background: #ffc0ce; color: #25151a; }
+
+@media (max-width: 480px) {
+    #report-form { padding: 20px; }
+    .report-dialog-footer { align-items: stretch; flex-direction: column; }
+    .report-dialog-footer > span { max-width: none; }
 }
 
 /* my emoji panel */

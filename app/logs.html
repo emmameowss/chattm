@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>chat™ admin | logs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="/admin.css">
+    <script src="/admin-ui.js" defer></script>
+  </head>
+  <body class="admin-page admin-users-page admin-logs-page">
+    <a class="admin-skip-link" href="#admin-main">skip to content</a>
+    <aside class="admin-shell-sidebar">
+      <div class="admin-brand"><h1>chat™</h1></div>
+      <nav class="admin-nav" aria-label="Admin navigation">
+        <div class="admin-nav-tabs">
+          <a href="/admin"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>overview</a>
+          <a href="/admin/users"><i class="ti ti-users" aria-hidden="true"></i>users</a>
+          <a href="/admin/emoji"><i class="ti ti-mood-smile" aria-hidden="true"></i>emoji</a>
+          <a href="/admin/logs" class="active" aria-current="page"><i class="ti ti-list-details" aria-hidden="true"></i>logs</a>
+          <a href="/admin/reports"><i class="ti ti-flag" aria-hidden="true"></i>reports</a>
+        </div>
+        <a href="/" class="admin-nav-back"><i class="ti ti-arrow-left" aria-hidden="true"></i>back to chat™</a>
+      </nav>
+    </aside>
+    <main id="admin-main" class="admin-main" tabindex="-1">
+      <header class="admin-page-header admin-users-page-header">
+        <div><h2>action logs</h2><p>staff actions and attempted changes, newest first.</p></div>
+        <button type="button" id="admin-logs-refresh"><i class="ti ti-refresh" aria-hidden="true"></i> refresh</button>
+      </header>
+      <section class="admin-section admin-users-directory" aria-label="Action log directory">
+        <div class="admin-users-toolbar admin-logs-toolbar">
+          <label class="admin-users-search" for="admin-logs-search"><span class="admin-visually-hidden">search action logs</span><i class="ti ti-search" aria-hidden="true"></i><input id="admin-logs-search" type="search" placeholder="search actor, action, target, or details" autocomplete="off"></label>
+          <label class="admin-users-filter" for="admin-logs-category"><span>category</span><select id="admin-logs-category"><option value="">all categories</option><option value="accounts">accounts</option><option value="content">content</option><option value="emoji">emoji</option><option value="moderation">moderation</option><option value="settings">settings</option><option value="verification">verification</option></select></label>
+          <label class="admin-users-filter" for="admin-logs-from"><span>from date</span><input id="admin-logs-from" type="date"></label>
+          <label class="admin-users-filter" for="admin-logs-to"><span>to date</span><input id="admin-logs-to" type="date"></label>
+          <button type="button" id="admin-logs-reset" hidden>clear filters</button>
+        </div>
+        <div id="admin-logs-state" class="admin-users-state" role="status" aria-live="polite">loading action logs…</div>
+        <div id="admin-logs-table-wrap" class="admin-users-table-wrap" hidden>
+          <table class="admin-users-table admin-logs-table">
+            <thead><tr><th scope="col">time</th><th scope="col">action</th><th scope="col">actor</th><th scope="col">target</th><th scope="col">result</th></tr></thead>
+            <tbody id="admin-logs-list"></tbody>
+          </table>
+        </div>
+        <footer class="admin-users-directory-footer"><p id="admin-logs-results" role="status" aria-live="polite"></p><nav id="admin-logs-pagination" class="admin-users-pagination" aria-label="Action log pages" hidden><button type="button" id="admin-logs-prev">previous</button><span id="admin-logs-page" aria-live="polite"></span><button type="button" id="admin-logs-next">next</button></nav></footer>
+      </section>
+    </main>
+    <div id="admin-log-drawer-backdrop" class="admin-user-drawer-backdrop" hidden></div>
+    <dialog id="admin-log-drawer" class="admin-user-drawer" aria-modal="true" aria-labelledby="admin-log-drawer-title">
+      <header class="admin-user-drawer-header"><h3 id="admin-log-drawer-title">action details</h3><button type="button" id="admin-log-drawer-close" aria-label="close action details"><i class="ti ti-x" aria-hidden="true"></i></button></header>
+      <div id="admin-logs-detail" class="admin-users-detail"></div>
+    </dialog>
+    <script src="/logs.js"></script>
+    <div id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+  </body>
+</html>

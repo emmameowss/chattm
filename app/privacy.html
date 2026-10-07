@@ -277,6 +277,14 @@
                     permanently stored.
                 </li>
                 <li>
+                    <strong>moderation reports</strong> — if you report a
+                    message or account, the report stores your username and
+                    account identifier, the selected reason, any optional note,
+                    and a snapshot of the reported message or account. Reports
+                    and staff notes are visible to moderators and admins, not
+                    to the reported user.
+                </li>
+                <li>
                     <strong>images and files</strong> — any images or files you
                     upload are stored in Amazon S3.
                 </li>
@@ -285,10 +293,10 @@
             <h3>guest accounts</h3>
             <p>
                 if you use chat™ without logging in, you are assigned a
-                temporary guest session. guest sessions may generate data such
-                as messages and IP addresses, however this data is not linked to
-                any account, email address, or persistent identifier. as a
-                result, it cannot be traced back to you specifically.
+                temporary guest session. guest sessions may generate messages
+                and IP logs. if you submit a report, it is associated with the
+                temporary guest username and guest account identifier so staff
+                can review it; it is not linked to a real email address.
             </p>
 
             <h3>local storage</h3>
@@ -311,7 +319,7 @@
             <h2>3. how your data is stored</h2>
             <div class="warning">
                 all stored data — including usernames, email addresses,
-                messages, and IP addresses — is kept in an SQLite database
+                messages, reports, report notes, and IP addresses — is kept in an SQLite database
                 <strong>and is not encrypted</strong>. you should be
                 aware of this when deciding what information to share on the
                 platform. images and all other files uploaded while using the
@@ -320,7 +328,9 @@
 
             <h2>4. how your data is used</h2>
             <p>
-                stored data (logged messages, emails, and IP addresses) is
+                reports and messages may be reviewed by moderators and admins
+                when investigating abuse. other stored personal data, such as
+                emails and IP logs, is
                 <strong>not actively accessed or reviewed</strong> except when
                 necessary — for example, to investigate abuse or resolve
                 technical issues.
@@ -374,8 +384,10 @@
 
             <h2>6. data retention</h2>
             <p>
-                messages and account data (email, username, IP) are retained
-                <strong>indefinitely</strong>. there is currently no automated
+                messages, account data (email, username, IP), moderation
+                reports, and report notes are retained
+                <strong>indefinitely</strong> unless an admin or owner
+                deliberately deletes a report. there is currently no automated
                 deletion process.
             </p>
 
@@ -397,8 +409,8 @@
 
             <h3>data deletion requests</h3>
             <p>
-                to request deletion of your data (messages, email, username, IP
-                address), please contact me (Emma) at
+                to request deletion of your data (messages, reports, email,
+                username, IP address), please contact me (Emma) at
                 <a href="mailto:emma@chattm.app">emma@chattm.app</a>.
                 deletion requests will be handled on a best-effort basis, and
                 may take some time to fully review and take action. for the

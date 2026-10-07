@@ -6,12 +6,6 @@ const socket = io(window.location.origin, {
   transports: ["websocket"]
 });
 
-const logsTab = document.querySelector('#logs')
-
-logsTab.addEventListener('click', () => {
-  showToast('action logs have not yet been implemented, check back later', 'info')
-})
-
 let availableChannels = ['main']
 
 async function loadChannels() {
@@ -24,7 +18,7 @@ async function loadChannels() {
     }
   } catch (e) {
     console.error('failed to load channels:', e)
-    showModal('failed to load channels:' + e.message, 'error')
+    showToast('failed to load channels: ' + e.message, 'error')
     availableChannels = ['main']
   }
 }
@@ -52,16 +46,24 @@ function showModal({ message, withInput = false, withSelect = false, selectOptio
       selectEl.value = defaultValue || selectOptions[0];
     }
 
-    overlay.style.display = "flex";
+    if (window.openAdminModal) window.openAdminModal(overlay);
+    else overlay.style.display = "flex";
     if (withInput) inputEl.focus();
     if (withSelect) selectEl.focus();
 
+    let closing = false;
     function cleanUp(result) {
-      overlay.style.display = "none";
-      confirmBtn.removeEventListener('click', onConfirm);
-      cancelBtn.removeEventListener('click', onCancel);
-      if (withInput) inputEl.removeEventListener('keydown', onKey);
-      resolve(result);
+      if (closing) return;
+      closing = true;
+      const finish = () => {
+        overlay.style.display = "none";
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        if (withInput) inputEl.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      if (window.closeAdminModal) window.closeAdminModal(overlay, finish);
+      else finish();
     }
     function onConfirm() {
       if (withInput) {
@@ -91,6 +93,7 @@ function showModal({ message, withInput = false, withSelect = false, selectOptio
 }
 
 function showToast(message, type = 'info') {
+  if (window.showAdminToast) return window.showAdminToast(message, type);
   const container = document.querySelector('#toast-container');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
@@ -137,7 +140,11 @@ function updateMaintenanceStatus(maintenance, reason) {
 
 let chatMutedb = false;
 
-socket.on("init", ({ chatMuted }) => {
+socket.on("init", ({ chatMuted, role }) => {
+  const isOwner = role === 'owner';
+  document.querySelector('#owner-mutechat-btn').hidden = !isOwner;
+  document.querySelector('#owner-maintenance-btn').hidden = !isOwner;
+  document.querySelector('#admin-clear-btn').hidden = !['admin', 'owner'].includes(role);
   chatMutedb = chatMuted;
   updateChatMuteStatus(chatMuted);
 
@@ -170,8 +177,13 @@ socket.on("status", (statusText) => {
 });
 
 async function loadStats() {
+  const refreshButton = document.querySelector('#admin-stats-refresh');
+  const updatedLabel = document.querySelector('#admin-stats-updated');
+  refreshButton.disabled = true;
+  refreshButton.textContent = 'refreshing…';
   try {
-    const res = await fetch('/stats');
+    const res = await fetch(`/stats${loadStats.forceRefresh ? '?refresh=1' : ''}`);
+    if (!res.ok) throw new Error(`stats request failed (${res.status})`);
     const data = await res.json();
 
     function formatBytes(bytes) {
@@ -198,11 +210,44 @@ async function loadStats() {
         </div>`
       )
       .join('');
+    const updatedAt = new Date(data.updatedAt);
+    updatedLabel.textContent = Number.isNaN(updatedAt.getTime())
+      ? 'updated time unavailable'
+      : `updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   } catch (e) {
     document.querySelector('#admin-stats-grid').innerHTML =
       '<div class="admin-loading">failed to load stats</div>';
+    updatedLabel.textContent = 'refresh failed';
+  } finally {
+    refreshButton.disabled = false;
+    refreshButton.textContent = 'refresh';
+    loadStats.forceRefresh = false;
   }
 }
+
+async function loadReportOverview() {
+  const updatedLabel = document.querySelector('#admin-report-stats-updated');
+  try {
+    const response = await fetch('/admin/reports/stats', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`report stats request failed (${response.status})`);
+    const data = await response.json();
+    for (const key of ['open', 'resolved', 'dismissed', 'total']) {
+      if (!Number.isSafeInteger(data[key]) || data[key] < 0) throw new Error('invalid report stats');
+    }
+    document.querySelector('#admin-report-open-count').textContent = data.open.toLocaleString();
+    document.querySelector('#admin-report-resolved-count').textContent = data.resolved.toLocaleString();
+    document.querySelector('#admin-report-dismissed-count').textContent = data.dismissed.toLocaleString();
+    document.querySelector('#admin-report-total-count').textContent = data.total.toLocaleString();
+    updatedLabel.textContent = `updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {
+    updatedLabel.textContent = 'report stats unavailable';
+  }
+}
+
+document.querySelector('#admin-stats-refresh').addEventListener('click', () => {
+  loadStats.forceRefresh = true;
+  loadStats();
+});
 
 socket.on('usercount', (count) => {
   document.querySelector('#admin-online-count').textContent = count;
@@ -211,13 +256,20 @@ socket.on('usercount', (count) => {
 });
 
 loadStats();
+loadReportOverview();
+window.setInterval(loadReportOverview, 60_000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) loadReportOverview();
+});
 
-document.querySelector('#owner-mutechat-btn').addEventListener('click', async () => {
+document.querySelector('#owner-mutechat-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
   try {
     const res = await fetch('/admin/mutechat', {
       method: "POST",
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session }),
+      body: JSON.stringify({ session, muted: !chatMutedb }),
     });
     const data = await res.json();
     if (data.success) {
@@ -229,17 +281,34 @@ document.querySelector('#owner-mutechat-btn').addEventListener('click', async ()
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error');
+  } finally {
+    button.disabled = false;
   }
 });
 
-document.querySelector('#owner-maintenance-btn').addEventListener('click', async () => {
-  const reason = await showModal({
-    message: "maintenance reason (leave blank to turn off)",
-    withInput: true,
-    defaultValue: ''
-  });
-  if (reason === null) return;
+document.querySelector('#owner-maintenance-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
   try {
+    const statusRes = await fetch('/maintenance', { cache: 'no-store' });
+    if (!statusRes.ok) throw new Error('failed to fetch maintenance status');
+    const status = await statusRes.json();
+    updateMaintenanceStatus(status.maintenance, status.reason);
+
+    let reason = '';
+    if (status.maintenance) {
+      const confirmed = await showModal({ message: 'disable maintenance mode?' });
+      if (!confirmed) return;
+    } else {
+      const input = await showModal({ message: 'maintenance reason', withInput: true });
+      if (input === null) return;
+      reason = input.trim();
+      if (!reason) {
+        showToast('enter a reason to enable maintenance', 'error');
+        return;
+      }
+    }
+
     const res = await fetch('/admin/maintenance', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -254,19 +323,28 @@ document.querySelector('#owner-maintenance-btn').addEventListener('click', async
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error');
+  } finally {
+    button.disabled = false;
   }
 });
 
-document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
-  const channel = await showModal({
-    message: 'select channel to clear:',
-    withSelect: true,
-    selectOptions: availableChannels,
-    defaultValue: 'main'
-  })
-  if (!channel) return
-
+document.querySelector('#admin-clear-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  if (button.disabled) return;
+  button.disabled = true;
   try {
+    const channel = await showModal({
+      message: 'select channel to clear:',
+      withSelect: true,
+      selectOptions: availableChannels,
+      defaultValue: 'main'
+    });
+    if (!channel) return;
+    const confirmed = await showModal({
+      message: `permanently clear all message history in #${channel}?`,
+    });
+    if (!confirmed) return;
+
     const res = await fetch('/admin/clear', {
       method: "POST",
       headers: {'content-type': 'application/json'},
@@ -280,16 +358,23 @@ document.querySelector('#owner-clear-btn').addEventListener('click', async () =>
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error')
+  } finally {
+    button.disabled = false;
   }
 });
 
-document.querySelector('#owner-refresh-version-btn').addEventListener('click', async () => {
+document.querySelector('#admin-refresh-version-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
   try {
     showToast('refreshing version status...', 'info');
-    await fetch('/version?refresh=1');
+    const res = await fetch('/version?refresh=1');
+    if (!res.ok) throw new Error(`version refresh failed (${res.status})`);
     showToast('version status refreshed', 'success');
   } catch (e) {
     showToast('failed to refresh version', 'error');
+  } finally {
+    button.disabled = false;
   }
 });
 
