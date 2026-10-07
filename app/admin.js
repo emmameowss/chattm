@@ -170,8 +170,13 @@ socket.on("status", (statusText) => {
 });
 
 async function loadStats() {
+  const refreshButton = document.querySelector('#admin-stats-refresh');
+  const updatedLabel = document.querySelector('#admin-stats-updated');
+  refreshButton.disabled = true;
+  refreshButton.textContent = 'refreshing…';
   try {
-    const res = await fetch('/stats');
+    const res = await fetch(`/stats${loadStats.forceRefresh ? '?refresh=1' : ''}`);
+    if (!res.ok) throw new Error(`stats request failed (${res.status})`);
     const data = await res.json();
 
     function formatBytes(bytes) {
@@ -198,11 +203,25 @@ async function loadStats() {
         </div>`
       )
       .join('');
+    const updatedAt = new Date(data.updatedAt);
+    updatedLabel.textContent = Number.isNaN(updatedAt.getTime())
+      ? 'updated time unavailable'
+      : `updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   } catch (e) {
     document.querySelector('#admin-stats-grid').innerHTML =
       '<div class="admin-loading">failed to load stats</div>';
+    updatedLabel.textContent = 'refresh failed';
+  } finally {
+    refreshButton.disabled = false;
+    refreshButton.textContent = 'refresh';
+    loadStats.forceRefresh = false;
   }
 }
+
+document.querySelector('#admin-stats-refresh').addEventListener('click', () => {
+  loadStats.forceRefresh = true;
+  loadStats();
+});
 
 socket.on('usercount', (count) => {
   document.querySelector('#admin-online-count').textContent = count;

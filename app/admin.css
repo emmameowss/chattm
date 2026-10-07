@@ -127,6 +127,10 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-page .admin-section-title { color: var(--text); font-size: 15px; font-weight: 500; text-transform: none; letter-spacing: -.2px; margin: 0; }
 .admin-page .admin-metrics-section { background: none; border: 0; padding: 0; }
 .admin-page .admin-metrics-section .admin-section-heading { margin-bottom: 14px; }
+.admin-page .admin-stats-controls { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.admin-page .admin-stats-refresh { border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; color: var(--text); background: var(--surface); font: inherit; cursor: pointer; }
+.admin-page .admin-stats-refresh:hover:not(:disabled) { background: #1b1b1b; }
+.admin-page .admin-stats-refresh:disabled { opacity: .6; cursor: wait; }
 .admin-page .admin-stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 .admin-page .admin-stat-row { flex-direction: column; align-items: flex-start; gap: 18px; padding: 20px; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: none; font-size: 13px; }
 .admin-page .admin-stat-row:last-child { border-right: 0; }

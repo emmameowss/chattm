@@ -1925,6 +1925,22 @@ httpServer.on("request", async (req, res) => {
   }
 
   if (url.pathname === "/stats") {
+    const statsUser = getRequestUser(req);
+    const statsRole = statsUser ? getRole(statsUser.email) : "user";
+    if (!statsUser || !["admin", "owner"].includes(statsRole)) {
+      res.writeHead(403, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "forbidden" }));
+      return;
+    }
+    const forceRefresh = url.searchParams.get("refresh") === "1";
+    if (forceRefresh) {
+      if (!checkRateLimit(statsUser.email, "admin-stats-refresh", 6, 60 * 1000)) {
+        res.writeHead(429, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "rate limited" }));
+        return;
+      }
+      statsCacheTime = 0;
+    }
     if (!statsCache || Date.now() - statsCacheTime > 10 * 60 * 1000) {
       // share a single in-flight promise among concurrent cold-cache requests
       if (!statsFetchPromise) {
@@ -1953,6 +1969,7 @@ httpServer.on("request", async (req, res) => {
             emoji: db.emoji,
             totalSize,
             uploads,
+            updatedAt: new Date().toISOString(),
           };
           statsCacheTime = Date.now();
           return statsCache;
