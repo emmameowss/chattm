@@ -18,6 +18,8 @@ import {
 } from "@aws-sdk/client-s3";
 import {
   db,
+  addActionLog,
+  getActionLogs,
   getHistory,
   addMessage,
   deleteMessage,
@@ -310,17 +312,67 @@ setInterval(
   10 * 60 * 1000,
 );
 
+const STAFF_ACTIONS = {
+  ban: { action: "user.ban", category: "moderation" },
+  unban: { action: "user.unban", category: "moderation" },
+  unbanip: { action: "user.unban_ip", category: "moderation" },
+  kick: { action: "user.kick", category: "moderation" },
+  mute: { action: "user.mute", category: "moderation" },
+  unmute: { action: "user.unmute", category: "moderation" },
+  resetstrikes: { action: "user.reset_strikes", category: "moderation" },
+  noguests: { action: "guests.disable", category: "settings" },
+  allowguests: { action: "guests.enable", category: "settings" },
+  reloademojis: { action: "emoji.reload", category: "emoji" },
+  setcolor: { action: "user.set_color", category: "moderation" },
+  hide: { action: "user.hide", category: "moderation" },
+  unhide: { action: "user.unhide", category: "moderation" },
+  createchannel: { action: "channel.create", category: "content" },
+  deletechannel: { action: "channel.delete", category: "content" },
+  deletemessage: { action: "message.delete", category: "content" },
+};
+
+function recordStaffAction(socket, command, { target = null, outcome = "success", details = {} } = {}) {
+  const definition = STAFF_ACTIONS[command];
+  if (!definition || !socket?.userEmail) return;
+  try {
+    addActionLog({
+      actorEmail: socket.userEmail,
+      actorUsername: socket.username || getStoredUsername(socket.userEmail),
+      actorRole: socket.userRole || getRole(socket.userEmail),
+      action: definition.action,
+      category: definition.category,
+      target,
+      outcome,
+      details: { source: "chat command", ...details },
+    });
+  } catch (error) {
+    console.error("failed to record staff command:", error);
+  }
+}
+
+function staffCommandTarget(command, rest) {
+  if (command === "unbanip") return "IP ban";
+  if (["noguests", "allowguests", "reloademojis"].includes(command)) return null;
+  return String(rest || "").trim().split(/\s+/, 1)[0] || null;
+}
+
 const commands = {
   "/ban": {
     minRole: "admin",
     run: async (socket, rest, data) => {
       const args = rest.split(" ");
-      let target = args[0];
+      let target = args[0] || "";
       const banReason = args.slice(1).join(" ") || "no reason given";
+      if (!target) {
+        recordStaffAction(socket, "ban", { outcome: "failed", details: { reason: banReason } });
+        socket.emit("commandError", "usage: /ban <username or email> [reason]", 'error');
+        return;
+      }
       if (!target.includes("@")) {
         target =
           findSocketByUsername(target)?.userEmail ?? getEmailByUsername(target);
         if (!target) {
+          recordStaffAction(socket, "ban", { target: args[0] || null, outcome: "failed", details: { reason: banReason, failure: "target user not found" } });
           socket.emit("commandError", `no user found with username ${args[0]}`, 'error');
           return;
         }
@@ -329,6 +381,7 @@ const commands = {
       const bannedIp = banIpFor(targetEmail);
       addBan(targetEmail, banReason, bannedIp);
       addIpBan(bannedIp);
+      recordStaffAction(socket, "ban", { target: targetEmail, details: { reason: banReason } });
       await appendFile(
         "bans.log",
         `${new Date().toISOString()}: ${socket.userEmail} (${socket.username}) banned ${targetEmail} - reason: ${banReason}\n`,
@@ -348,6 +401,7 @@ const commands = {
     run: (socket, rest) => {
       removeIpBan(getBanIp(rest));
       removeBan(rest);
+      recordStaffAction(socket, "unban", { target: rest || null });
       socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
@@ -355,6 +409,7 @@ const commands = {
     minRole: "admin",
     run: (socket, rest) => {
       removeIpBan(rest);
+      recordStaffAction(socket, "unbanip", { target: "IP ban" });
       socket.emit("commandError", `unbanned ${rest}`, 'success');
     },
   },
@@ -364,11 +419,13 @@ const commands = {
       const [targetUsername, ...reasonParts] = rest.split(" ");
       const kickReason = reasonParts.join(" ") || "kicked by server";
       if (!targetUsername) {
+        recordStaffAction(socket, "kick", { outcome: "failed" });
         socket.emit("commandError", "usage: /kick <username> [reason]", 'error');
         return;
       }
       const target = findSocketByUsername(targetUsername);
       if (!target) {
+        recordStaffAction(socket, "kick", { target: targetUsername, outcome: "failed", details: { reason: kickReason, failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -379,6 +436,7 @@ const commands = {
       target.emit("kicked", kickReason);
       target.skipLeaveMessage = true;
       target.disconnect();
+      recordStaffAction(socket, "kick", { target: targetUsername, details: { reason: kickReason } });
       socket.emit("commandError", `kicked ${targetUsername}`, 'success');
       await appendFile(
         "kicks.log",
@@ -396,6 +454,7 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail) {
+        recordStaffAction(socket, "mute", { target: targetUsername || null, outcome: "failed", details: { reason: muteReason, failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -405,6 +464,7 @@ const commands = {
       }
       const durationMs = durationStr ? parseDuration(durationStr) : null;
       if (durationStr && !durationMs) {
+        recordStaffAction(socket, "mute", { target: targetEmail, outcome: "failed", details: { reason: muteReason, duration: durationStr, failure: "invalid duration format" } });
         socket.emit("commandError", "invalid duration format", 'error');
         return;
       }
@@ -413,6 +473,7 @@ const commands = {
         muteReason,
         durationMs ? Date.now() + durationMs : null,
       );
+      recordStaffAction(socket, "mute", { target: targetEmail, details: { reason: muteReason, duration: durationStr || "indefinite" } });
       const m = getMute(targetEmail);
       await appendFile(
         "mutes.log",
@@ -435,10 +496,12 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail || !getMute(targetEmail)) {
+        recordStaffAction(socket, "unmute", { target: targetUsername || null, outcome: "failed", details: { failure: "target user is not muted or online" } });
         socket.emit("commandError", `${targetUsername} is not muted`, 'info');
         return;
       }
       deleteMute(targetEmail);
+      recordStaffAction(socket, "unmute", { target: targetEmail });
       forEachUserSocket(targetEmail, (s) => s.emit("unmuted"));
       socket.emit("commandError", `unmuted ${targetUsername}`, 'success');
     },
@@ -450,6 +513,7 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail) {
+        recordStaffAction(socket, "resetstrikes", { target: targetUsername || null, outcome: "failed", details: { failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -458,6 +522,7 @@ const commands = {
         return;
       }
       deleteStrikes(targetEmail);
+      recordStaffAction(socket, "resetstrikes", { target: targetEmail });
       socket.emit("commandError", `reset strikes for ${targetUsername}`, 'success');
     },
   },
@@ -474,6 +539,7 @@ const commands = {
           s.disconnect();
         }
       }
+      recordStaffAction(socket, "noguests");
       socket.emit("commandError", "guest logins have been disabled", 'success');
     },
   },
@@ -482,14 +548,21 @@ const commands = {
     run: (socket) => {
       guestsDisabled = false;
       setSetting("guests_disabled", "0");
+      recordStaffAction(socket, "allowguests");
       socket.emit("commandError", "guest logins have been reenabled", 'success');
     },
   },
   "/reloademojis": {
     minRole: "admin",
     run: async (socket) => {
-      await syncEmojisFromS3();
-      socket.emit("commandError", "emoji sync complete", 'success');
+      try {
+        await syncEmojisFromS3();
+        recordStaffAction(socket, "reloademojis");
+        socket.emit("commandError", "emoji sync complete", 'success');
+      } catch (error) {
+        recordStaffAction(socket, "reloademojis", { outcome: "failed" });
+        throw error;
+      }
     },
   },
   "/whois": {
@@ -512,6 +585,7 @@ const commands = {
       const targetEmail =
         findSocketByUsername(targetUsername)?.userEmail ?? null;
       if (!targetEmail) {
+        recordStaffAction(socket, "setcolor", { target: targetUsername || null, outcome: "failed", details: { color: colorInput, failure: "target user is not online" } });
         socket.emit(
           "commandError",
           `no user found with username ${targetUsername}`,
@@ -529,10 +603,12 @@ const commands = {
       };
       const color = flagColors[colorInput] ?? colorInput;
       if (isBlockedColor(color)) {
+        recordStaffAction(socket, "setcolor", { target: targetEmail, outcome: "failed", details: { color, failure: "color is blocked" } });
         socket.emit("commandError", "please choose another color", 'error');
         return;
       }
       setColor(targetEmail, color);
+      recordStaffAction(socket, "setcolor", { target: targetEmail, details: { color } });
       forEachUserSocket(targetEmail, (s) => s.emit("colorChanged", color));
       emitAllUserLists();
       socket.emit("commandError", `set ${targetUsername}'s color to ${color}`, 'success');
@@ -596,10 +672,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
+        recordStaffAction(socket, "hide", { target: rest || null, outcome: "failed", details: { failure: "target user not found" } });
         socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       setHidden(targetEmail)
+      recordStaffAction(socket, "hide", { target: targetEmail });
       emitAllUserLists()
       socket.emit('commandError', `hid ${rest} from user list`, 'success')
     },
@@ -609,10 +687,12 @@ const commands = {
     run: (socket, rest) => {
       const targetEmail = findSocketByUsername(rest)?.userEmail ?? getEmailByUsername(rest)
       if (!targetEmail) {
+        recordStaffAction(socket, "unhide", { target: rest || null, outcome: "failed", details: { failure: "target user not found" } });
         socket.emit('commandError', `no user found with username ${rest}`, 'error')
         return
       }
       removeHidden(targetEmail)
+      recordStaffAction(socket, "unhide", { target: targetEmail });
       emitAllUserLists()
       socket.emit('commandError', `unhid ${rest} on user list`, 'success')
     },
@@ -1447,16 +1527,36 @@ io.on("connection", (socket) => {
   socket.on("deleteMessage", (messageId) => {
     const history = getHistory(socket.currentChannel);
     const msg = history.find((m) => m.id === messageId);
-    if (!msg) return;
+    if (!msg) {
+      if (["mod", "admin", "owner"].includes(socket.userRole)) {
+        recordStaffAction(socket, "deletemessage", {
+          target: "message",
+          outcome: "failed",
+          details: { channel: socket.currentChannel, failure: "message not found" },
+        });
+      }
+      return;
+    }
 
     const isOwnerOfMsg = msg.ownerEmail === socket.userEmail;
     const isAdmin = ['mod', 'admin', 'owner'].includes(socket.userRole);
 
     if (!isOwnerOfMsg && !isAdmin) {
+      recordStaffAction(socket, "deletemessage", {
+        target: msg.ownerEmail || null,
+        outcome: "denied",
+        details: { channel: socket.currentChannel },
+      });
       socket.emit("commandError", "you can only delete your own messages", 'error');
       return;
     }
     deleteMessage(messageId);
+    if (!isOwnerOfMsg) {
+      recordStaffAction(socket, "deletemessage", {
+        target: msg.ownerEmail || null,
+        details: { channel: socket.currentChannel, messageId },
+      });
+    }
     io.to(roomOf(socket.currentChannel)).emit("messageDeleted", messageId);
   });
 
@@ -1479,20 +1579,28 @@ io.on("connection", (socket) => {
   });
 
   socket.on("createChannel", (rawName) => {
-    if (!['owner'].includes(socket.userRole)) return;
+    if (!['owner'].includes(socket.userRole)) {
+      recordStaffAction(socket, "createchannel", { target: String(rawName ?? "").slice(0, 80), outcome: "denied" });
+      return;
+    }
     const name = String(rawName ?? "")
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "-");
-    if (!/^[a-z0-9-]{1,24}$/.test(name))
+    if (!/^[a-z0-9-]{1,24}$/.test(name)) {
+      recordStaffAction(socket, "createchannel", { target: name || null, outcome: "failed", details: { failure: "invalid channel name" } });
       return socket.emit(
         "commandError",
         "invalid channel name (use a-z, 0-9, - ; max 24)",
         'error'
       );
-    if (channelExists(name))
+    }
+    if (channelExists(name)) {
+      recordStaffAction(socket, "createchannel", { target: name, outcome: "failed", details: { failure: "channel already exists" } });
       return socket.emit("commandError", "channel already exists", 'error');
+    }
     createChannel(name, socket.userEmail);
+    recordStaffAction(socket, "createchannel", { target: name });
     io.emit(
       "channels",
       listChannels().map((c) => c.name),
@@ -1500,14 +1608,24 @@ io.on("connection", (socket) => {
   });
 
   socket.on("deleteChannel", (rawName) => {
-    if (!["owner"].includes(socket.userRole)) return;
+    if (!["owner"].includes(socket.userRole)) {
+      recordStaffAction(socket, "deletechannel", { target: String(rawName ?? "").slice(0, 80), outcome: "denied" });
+      return;
+    }
     const name = String(rawName ?? "")
       .trim()
       .toLowerCase();
-    if (name === "main")
+    if (name === "main") {
+      recordStaffAction(socket, "deletechannel", { target: name, outcome: "failed", details: { failure: "the main channel cannot be deleted" } });
       return socket.emit("commandError", "the main channel cannot be deleted", 'error');
-    if (!channelExists(name)) return;
+    }
+    if (!channelExists(name)) {
+      recordStaffAction(socket, "deletechannel", { target: name || null, outcome: "failed", details: { failure: "channel not found" } });
+      return;
+    }
+    const messagesRemoved = db.prepare("SELECT COUNT(*) AS count FROM messages WHERE channel = ?").get(name).count;
     deleteChannel(name);
+    recordStaffAction(socket, "deletechannel", { target: name, details: { messagesRemoved } });
     // move anyone viewing the deleted channel back to main
     for (const [, s] of io.sockets.sockets) {
       if (s.currentChannel !== name) continue;
@@ -1584,6 +1702,11 @@ io.on("connection", (socket) => {
       if (cmd) {
         const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
         if (cmd.minRole && (roleValues[socket.userRole] ?? 0) < roleValues[cmd.minRole]) {
+          const auditName = name.slice(1);
+          recordStaffAction(socket, auditName, {
+            target: staffCommandTarget(auditName, rest),
+            outcome: "denied",
+          });
           socket.emit('commandError', "you don't have permission to use this command", 'error');
           return;
         }
@@ -1641,6 +1764,139 @@ io.on("connection", (socket) => {
   });
 });
 
+const HTTP_ACTIONS = {
+  "/admin/emoji/add": { action: "emoji.add", category: "emoji", targetField: "shortcode", detailFields: ["shortcode"] },
+  "/admin/emoji/replace": { action: "emoji.replace", category: "emoji", targetField: "shortcode", detailFields: ["shortcode"] },
+  "/admin/emoji/delete": { action: "emoji.delete", category: "emoji", targetField: "shortcode", detailFields: ["shortcode"] },
+  "/admin/mutechat": {
+    action: payload => typeof payload.muted === "boolean"
+      ? payload.muted ? "chat.mute" : "chat.unmute"
+      : "chat.mute_change",
+    category: "settings", target: "chat", detailFields: ["muted"],
+  },
+  "/admin/maintenance": {
+    action: payload => typeof payload.reason === "string"
+      ? payload.reason ? "maintenance.enable" : "maintenance.disable"
+      : "maintenance.change",
+    category: "settings", target: "maintenance", detailFields: ["reason"],
+  },
+  "/admin/clear": { action: "channel.clear", category: "content", targetField: "channel", detailFields: ["channel"] },
+  "/admin/verify": { action: "user.verify", category: "verification", targetField: "email" },
+  "/admin/unverify": { action: "user.unverify", category: "verification", targetField: "email" },
+  "/admin/redverify": { action: "user.red_verify", category: "verification", targetField: "email" },
+  "/admin/unredverify": { action: "user.red_unverify", category: "verification", targetField: "email" },
+  "/admin/hide": { action: "user.hide", category: "moderation", targetField: "email" },
+  "/admin/unhide": { action: "user.unhide", category: "moderation", targetField: "email" },
+  "/admin/user/ban": { action: "user.ban", category: "moderation", targetField: "email", detailFields: ["reason"] },
+  "/admin/user/unban": { action: "user.unban", category: "moderation", targetField: "email" },
+  "/admin/user/kick": { action: "user.kick", category: "moderation", targetField: "email", detailFields: ["reason"] },
+  "/admin/user/mute": { action: "user.mute", category: "moderation", targetField: "email", detailFields: ["reason", "duration"] },
+  "/admin/user/unmute": { action: "user.unmute", category: "moderation", targetField: "email" },
+  "/admin/user/role": { action: "user.role_change", category: "accounts", targetField: "email", detailFields: ["role"] },
+  "/admin/user/revoke-session": { action: "user.session_revoke", category: "accounts", target: "account session", targetField: "email" },
+  "/admin/user/revoke-all-sessions": { action: "user.sessions_revoke_all", category: "accounts", targetField: "email" },
+  "/admin/user/ban-clerk": { action: "user.clerk_ban", category: "accounts", targetField: "email" },
+};
+
+function parseActionResponse(responseBody) {
+  try {
+    const body = Buffer.isBuffer(responseBody) ? responseBody.toString("utf8") : responseBody;
+    return typeof body === "string" ? JSON.parse(body) : null;
+  } catch {
+    return null;
+  }
+}
+
+function actionDetailsFromRequest(definition, payload, req, statusCode, response) {
+  const details = { source: "admin API", ...(req.actionAuditDetails || {}) };
+  for (const field of definition.detailFields || []) {
+    const value = payload?.[field];
+    if (typeof value === "string" && value.trim()) details[field] = value.trim().slice(0, 1000);
+    else if (typeof value === "number" && Number.isFinite(value)) details[field] = value;
+    else if (typeof value === "boolean") details[field] = value;
+  }
+  if (typeof statusCode === "number" && (statusCode < 200 || statusCode >= 300)) {
+    details.httpStatus = statusCode;
+  }
+  if (typeof response?.error === "string") {
+    details.failure = response.error.slice(0, 300);
+  } else if (response?.kicked === false) {
+    details.failure = "target was not online";
+  }
+  return details;
+}
+
+function attachActionAudit(req, res, url) {
+  if (req.method !== "POST") return;
+  const definition = HTTP_ACTIONS[url.pathname];
+  if (!definition) return;
+
+  // Keep only a small, short-lived request buffer so JSON action fields can be
+  // extracted without ever persisting session tokens or arbitrary request data.
+  let requestBody = "";
+  let bodyTooLarge = false;
+  req.on("data", chunk => {
+    if (bodyTooLarge) return;
+    if (Buffer.byteLength(requestBody) + chunk.length > 16 * 1024) {
+      requestBody = "";
+      bodyTooLarge = true;
+      return;
+    }
+    requestBody += chunk.toString("utf8");
+  });
+
+  const originalEnd = res.end;
+  let recorded = false;
+  res.end = function (...args) {
+    if (!recorded) {
+      recorded = true;
+      try {
+        let payload = req.actionAuditPayload || {};
+        if (!bodyTooLarge && !req.actionAuditPayload) {
+          try { payload = JSON.parse(requestBody || "{}"); } catch {}
+        }
+        let actorSession = null;
+        if (typeof payload?.session === "string") actorSession = getSession(payload.session);
+        if (!actorSession) {
+          try { actorSession = getRequestUser(req); } catch {}
+        }
+        if (actorSession && !actorSession.guest) {
+          const role = getRole(actorSession.email);
+          const statusCode = res.statusCode || 200;
+          const response = parseActionResponse(args[0]);
+          const completed = statusCode >= 200 && statusCode < 300 && response?.success !== false && response?.kicked !== false && typeof response?.error !== "string";
+          const outcome = completed
+            ? "success"
+            : [401, 403].includes(statusCode) ? "denied" : "failed";
+          let action = typeof definition.action === "function"
+            ? definition.action(payload)
+            : definition.action;
+          let target = req.actionAuditTarget || definition.target || payload?.[definition.targetField] || null;
+          if (url.pathname === "/admin/user/revoke-session") {
+            const targetSession = payload?.sessionId;
+            if (typeof targetSession === "string") {
+              target = db.prepare("SELECT email FROM sessions WHERE clerk_session_id = ? LIMIT 1").get(targetSession)?.email || "account session";
+            }
+          }
+          addActionLog({
+            actorEmail: actorSession.email,
+            actorUsername: getStoredUsername(actorSession.email),
+            actorRole: role,
+            action,
+            category: definition.category,
+            target,
+            outcome,
+            details: actionDetailsFromRequest(definition, payload, req, statusCode, response),
+          });
+        }
+      } catch (error) {
+        console.error("failed to record admin action:", error);
+      }
+    }
+    return originalEnd.apply(this, args);
+  };
+}
+
 httpServer.on("request", async (req, res) => {
   if (req.url.includes("socket.io")) return;
 
@@ -1648,6 +1904,7 @@ httpServer.on("request", async (req, res) => {
     req.url,
     `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`,
   );
+  attachActionAudit(req, res, url);
 
   // Clerk sign-in: the client signs in with clerk-js and POSTs the resulting
   // session JWT here. We verify it, resolve the user's primary email, and mint
@@ -2119,6 +2376,48 @@ httpServer.on("request", async (req, res) => {
     res.end(JSON.stringify({channels}))
     return;
   }
+  if (url.pathname === "/admin/logs/data" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["admin", "owner"].includes(role)) {
+      res.writeHead(403, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "forbidden" }));
+      return;
+    }
+
+    const categories = new Set(["accounts", "content", "emoji", "moderation", "settings", "verification"]);
+    const rawCategory = url.searchParams.get("category") || "";
+    if (rawCategory && !categories.has(rawCategory)) {
+      res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "invalid category" }));
+      return;
+    }
+    const parseBound = value => {
+      if (value === null || value === "") return null;
+      const number = Number(value);
+      return Number.isSafeInteger(number) && number >= 0 ? number : NaN;
+    };
+    const from = parseBound(url.searchParams.get("from"));
+    const to = parseBound(url.searchParams.get("to"));
+    if (Number.isNaN(from) || Number.isNaN(to) || (from !== null && to !== null && to < from)) {
+      res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "invalid date range" }));
+      return;
+    }
+    const page = Math.min(1_000_000, Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1));
+    const result = getActionLogs({
+      page,
+      pageSize: 50,
+      search: url.searchParams.get("search") || "",
+      category: rawCategory,
+      from,
+      to,
+    });
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ ...result, totalPages: Math.max(1, Math.ceil(result.total / result.pageSize)) }));
+    return;
+  }
+
   if (url.pathname === "/admin/emoji/list" && req.method === "GET") {
     if (!requireAdminPage(req, res)) return
 
@@ -2164,6 +2463,9 @@ httpServer.on("request", async (req, res) => {
         }
         const file = files.file?.[0];
         const input = fields.shortcode?.[0];
+        req.actionAuditPayload = {
+          shortcode: typeof input === "string" ? input.trim().slice(0, 80) : "",
+        };
         if (!file || Object.values(files).flat().length !== 1 || typeof input !== "string") {
           send(400, {success: false, error: "an image and shortcode are required"});
           return;
@@ -2286,6 +2588,7 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
+        req.actionAuditDetails = { previousMuted: chatMuted };
         chatMuted = requestedMuted
         setSetting("chat_muted", chatMuted ? "1" : "0")
         if (chatMuted) {
@@ -2318,6 +2621,7 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
+        req.actionAuditDetails = { previouslyEnabled: maintenance, previousReason: reason || null };
         const reasonText = newReason || ''
         if (reasonText) {
           maintenance = true
@@ -2363,6 +2667,10 @@ httpServer.on("request", async (req, res) => {
           res.end(JSON.stringify({ error: 'invalid channel' }))
           return
         }
+        req.actionAuditTarget = targetChannel;
+        req.actionAuditDetails = {
+          messagesRemoved: db.prepare("SELECT COUNT(*) AS count FROM messages WHERE channel = ?").get(targetChannel).count,
+        };
         clearMessages(targetChannel)
         io.to(roomOf(targetChannel)).emit('clear')
 
@@ -2407,8 +2715,14 @@ httpServer.on("request", async (req, res) => {
         return;
       }
       const currentRole = getRole(targetEmail);
+      req.actionAuditDetails = {
+        previousRole: currentRole,
+        previouslyVerified: isVerified(targetEmail),
+        previouslyRedVerified: isRedVerified(targetEmail),
+      };
       const newRole = url.pathname === '/admin/verify' && currentRole === 'user' ? 'mod'
         : url.pathname === '/admin/unverify' && currentRole === 'mod' ? 'user' : currentRole;
+      req.actionAuditDetails.newRole = newRole;
       try {
         // Clerk remains the source of truth when verification changes a role.
         // Sync it first so a failed request cannot leave a local promotion behind.
@@ -2783,6 +3097,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const banReason = reason || 'no reason given'
+        req.actionAuditDetails = { reason: banReason };
 
         const bannedIp = banIpFor(targetEmail)
         addBan(targetEmail, banReason, bannedIp)
@@ -2854,6 +3169,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const kickReason = reason || 'no reason given'
+        req.actionAuditDetails = { reason: kickReason };
 
         let kicked = false
         for (const [, s] of io.sockets.sockets) {
@@ -2915,6 +3231,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const muteReason = reason || 'no reason given'
+        req.actionAuditDetails = { reason: muteReason, duration: duration ?? "indefinite" };
 
         let until = null
         if (duration !== null && duration !== undefined) {
@@ -3041,6 +3358,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const currentRole = getRole(targetEmail)
+        req.actionAuditDetails = { previousRole: currentRole };
         if (currentRole === 'owner' && sessRole !== 'owner') {
           res.writeHead(403, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'only owner can set/remove owner role' }));
@@ -3576,6 +3894,14 @@ httpServer.on("request", async (req, res) => {
     if (!requireAdminPage(req, res)) return
     const html = await renderPage("emoji.html", {})
     res.writeHead(200, { "content-type": "text/html" })
+    res.end(html)
+    return
+  }
+
+  if (url.pathname === "/admin/logs" && req.method === "GET") {
+    if (!requireAdminPage(req, res)) return
+    const html = await renderPage("logs.html", {})
+    res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" })
     res.end(html)
     return
   }

@@ -484,6 +484,45 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-users-page .admin-users-search input, .admin-users-page select { font-size: 16px; }
 }
 
+/* Action history shares the directory and animated detail drawer pattern. */
+.admin-logs-page .admin-logs-toolbar { grid-template-columns: minmax(220px, 1fr) minmax(145px, auto) repeat(2, minmax(135px, auto)) auto; }
+.admin-logs-page .admin-logs-toolbar input[type="date"] { width: 100%; height: 40px; min-height: 40px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; }
+.admin-logs-page .admin-logs-table { min-width: 820px; }
+.admin-logs-page .admin-logs-table th:first-child { width: 19%; padding-left: 24px; }
+.admin-logs-page .admin-logs-table th:nth-child(2) { width: 23%; }
+.admin-logs-page .admin-logs-table th:nth-child(3) { width: 27%; }
+.admin-logs-page .admin-logs-table th:nth-child(4) { width: 19%; }
+.admin-logs-page .admin-logs-table th:last-child { width: 12%; }
+.admin-logs-page .admin-logs-table td { font-variant-numeric: tabular-nums; }
+.admin-logs-page .admin-log-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.admin-logs-page .admin-log-action strong, .admin-logs-page .admin-log-actor strong { display: block; color: var(--text); font-weight: 500; }
+.admin-logs-page .admin-log-action small, .admin-logs-page .admin-log-actor small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.admin-logs-page .admin-log-role { display: inline-flex; margin-top: 5px; padding: 1px 6px; border: 1px solid #483039; border-radius: 4px; color: var(--pink); font-size: 10px; line-height: 17px; }
+.admin-logs-page .admin-log-target { color: #c9c4c6; font-family: var(--font-mono); font-size: 11px; }
+.admin-logs-page .admin-log-outcome { display: inline-flex; align-items: center; min-height: 23px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 11px; line-height: 1.4; white-space: nowrap; }
+.admin-logs-page .admin-log-outcome.success { color: #83dab1; border-color: #2b5340; background: #14261b; }
+.admin-logs-page .admin-log-outcome.failed { color: #eac082; border-color: #56442a; background: #261f13; }
+.admin-logs-page .admin-log-outcome.denied { color: var(--danger); border-color: #5c2c2c; background: var(--danger-dim); }
+.admin-logs-page #admin-log-drawer { width: min(560px, 100%); }
+.admin-logs-page #admin-logs-detail { display: flex; flex-direction: column; gap: 24px; overflow-y: auto; overscroll-behavior: contain; }
+.admin-logs-page .admin-log-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.admin-logs-page .admin-log-detail-heading h4 { min-width: 0; margin: 0; color: var(--text); font-size: 20px; font-weight: 500; letter-spacing: -.4px; overflow-wrap: anywhere; }
+.admin-logs-page .admin-detail-section .admin-detail-field { align-items: flex-start; }
+.admin-logs-page .admin-detail-field-value { white-space: pre-wrap; }
+.admin-logs-page .admin-detail-section p { color: var(--muted); font-size: 12px; margin: 0; }
+@media (max-width: 1150px) {
+    .admin-logs-page .admin-logs-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .admin-logs-page .admin-logs-toolbar .admin-users-search { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+    .admin-logs-page .admin-logs-toolbar { padding: 16px; }
+    .admin-logs-page .admin-logs-table { min-width: 820px; }
+    .admin-logs-page .admin-logs-table th, .admin-logs-page .admin-logs-table .admin-directory-row td { padding: 12px; }
+    .admin-logs-page .admin-logs-table th:first-child, .admin-logs-page .admin-logs-table .admin-directory-row td:first-child { padding-left: 16px; }
+    .admin-logs-page #admin-log-drawer { width: 100%; border-left: 0; }
+    .admin-logs-page #admin-logs-detail { padding: 20px; }
+}
+
 
 /* Emoji directory reuses the users page's directory and drawer layout. */
 .admin-emoji-page .admin-emoji-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }

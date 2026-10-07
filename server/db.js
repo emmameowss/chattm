@@ -106,6 +106,25 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS hidden_users (
     email TEXT PRIMARY KEY
   );
+
+  CREATE TABLE IF NOT EXISTS action_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at INTEGER NOT NULL,
+    actor_email TEXT NOT NULL,
+    actor_username TEXT,
+    actor_role TEXT NOT NULL,
+    action TEXT NOT NULL,
+    category TEXT NOT NULL,
+    target TEXT,
+    outcome TEXT NOT NULL CHECK (outcome IN ('success', 'failed', 'denied')),
+    details_json TEXT NOT NULL DEFAULT '{}'
+  );
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS action_logs_time_idx ON action_logs (occurred_at DESC, id DESC);
+  CREATE INDEX IF NOT EXISTS action_logs_category_time_idx ON action_logs (category, occurred_at DESC, id DESC);
+  CREATE INDEX IF NOT EXISTS action_logs_actor_time_idx ON action_logs (actor_email, occurred_at DESC, id DESC);
 `);
 
 // seed the default channel (idempotent)
@@ -365,8 +384,26 @@ const stmts = {
   isHidden: db.prepare(`SELECT 1 FROM hidden_users WHERE lower(email) = lower(?)`),
   getHiddenUsers: db.prepare(`SELECT DISTINCT lower(email) AS email FROM hidden_users ORDER BY lower(email)`),
   setHidden: db.prepare(`INSERT OR IGNORE INTO hidden_users (email) VALUES (?)`),
-  removeHidden: db.prepare(`DELETE FROM hidden_users WHERE lower(email) = lower(?)`)
+  removeHidden: db.prepare(`DELETE FROM hidden_users WHERE lower(email) = lower(?)`),
+
+  // Action audit log
+  insertActionLog: db.prepare(`
+    INSERT INTO action_logs
+      (occurred_at, actor_email, actor_username, actor_role, action, category, target, outcome, details_json)
+    VALUES
+      (@occurred_at, @actor_email, @actor_username, @actor_role, @action, @category, @target, @outcome, @details_json)
+  `),
+  pruneActionLogs: db.prepare(`
+    DELETE FROM action_logs
+    WHERE id NOT IN (SELECT id FROM action_logs ORDER BY id DESC LIMIT ?)
+  `)
 };
+
+const insertActionLogTransaction = db.transaction((record) => {
+  const result = stmts.insertActionLog.run(record);
+  if (Number(result.lastInsertRowid) > 10_000) stmts.pruneActionLogs.run(10_000);
+  return Number(result.lastInsertRowid);
+});
 
 // ─── Message API ─────────────────────────────────────────────────────────────
 
@@ -721,6 +758,111 @@ export function getRecentUsers(cutoffMs) {
 
 export function getRole(email) {
   return stmts.getRole.get(email)?.role ?? 'user';
+}
+
+export function addActionLog({
+  occurredAt = Date.now(),
+  actorEmail,
+  actorUsername = null,
+  actorRole,
+  action,
+  category,
+  target = null,
+  outcome = 'success',
+  details = {},
+}) {
+  if (!actorEmail || !action || !category) return null;
+  const inputDetails = details && typeof details === 'object' && !Array.isArray(details)
+    ? details
+    : {};
+  const safeDetails = {};
+  for (const [key, value] of Object.entries(inputDetails).slice(0, 20)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(key)) continue;
+    if (typeof value === 'string') safeDetails[key] = value.slice(0, 1000);
+    else if (typeof value === 'number' && Number.isFinite(value)) safeDetails[key] = value;
+    else if (typeof value === 'boolean' || value === null) safeDetails[key] = value;
+  }
+  let detailsJson = '{}';
+  try { detailsJson = JSON.stringify(safeDetails); } catch {}
+  if (detailsJson.length > 4000) {
+    detailsJson = JSON.stringify({ note: 'additional details omitted' });
+  }
+  return insertActionLogTransaction({
+    occurred_at: Number(occurredAt) || Date.now(),
+    actor_email: String(actorEmail).slice(0, 320),
+    actor_username: actorUsername ? String(actorUsername).slice(0, 80) : null,
+    actor_role: String(actorRole || 'user').slice(0, 20),
+    action: String(action).slice(0, 80),
+    category: String(category).slice(0, 32),
+    target: target ? String(target).slice(0, 320) : null,
+    outcome: ['success', 'failed', 'denied'].includes(outcome) ? outcome : 'failed',
+    details_json: detailsJson,
+  });
+}
+
+export function getActionLogs({
+  page = 1,
+  pageSize = 50,
+  search = '',
+  category = '',
+  from = null,
+  to = null,
+} = {}) {
+  const conditions = [];
+  const values = [];
+  const normalizedSearch = String(search).trim().slice(0, 100);
+  if (normalizedSearch) {
+    const pattern = `%${normalizedSearch}%`;
+    conditions.push(`(
+      actor_email LIKE ? COLLATE NOCASE OR
+      actor_username LIKE ? COLLATE NOCASE OR
+      action LIKE ? COLLATE NOCASE OR
+      target LIKE ? COLLATE NOCASE OR
+      details_json LIKE ? COLLATE NOCASE
+    )`);
+    values.push(pattern, pattern, pattern, pattern, pattern);
+  }
+  if (category) {
+    conditions.push('category = ?');
+    values.push(String(category).slice(0, 32));
+  }
+  if (Number.isFinite(from)) {
+    conditions.push('occurred_at >= ?');
+    values.push(from);
+  }
+  if (Number.isFinite(to)) {
+    conditions.push('occurred_at < ?');
+    values.push(to);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const safePage = Math.max(1, Math.floor(Number(page) || 1));
+  const safePageSize = Math.min(50, Math.max(1, Math.floor(Number(pageSize) || 50)));
+  const total = db.prepare(`SELECT COUNT(*) AS count FROM action_logs ${where}`).get(...values).count;
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const currentPage = Math.min(safePage, totalPages);
+  const records = db.prepare(`
+    SELECT id, occurred_at, actor_email, actor_username, actor_role,
+           action, category, target, outcome, details_json
+    FROM action_logs ${where}
+    ORDER BY occurred_at DESC, id DESC
+    LIMIT ? OFFSET ?
+  `).all(...values, safePageSize, (currentPage - 1) * safePageSize).map(row => {
+    let details = {};
+    try { details = JSON.parse(row.details_json || '{}'); } catch {}
+    return {
+      id: row.id,
+      occurredAt: row.occurred_at,
+      actorEmail: row.actor_email,
+      actorUsername: row.actor_username,
+      actorRole: row.actor_role,
+      action: row.action,
+      category: row.category,
+      target: row.target,
+      outcome: row.outcome,
+      details,
+    };
+  });
+  return { records, total, page: currentPage, pageSize: safePageSize };
 }
 
 export function setRole(email, role) {

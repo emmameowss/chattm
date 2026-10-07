@@ -775,8 +775,6 @@ refreshButton.addEventListener('click', requestUsers);
 document.querySelector('#admin-user-drawer-close').addEventListener('click', closeUser);
 backdrop.addEventListener('click', () => closeUser(true));
 drawer.addEventListener('cancel', event => { event.preventDefault(); closeUser(); });
-document.querySelector('#logs').addEventListener('click', () => showToast('action logs have not been implemented yet, check back later'));
-
 socket.on('adminUserlist', response => {
   if (!response || !Array.isArray(response.users) || response.requestId !== listRequestId) return;
   usersData = response.users;

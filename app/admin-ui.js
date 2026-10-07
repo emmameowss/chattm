@@ -1,10 +1,10 @@
 // Shared presentation and keyboard behavior; moderation stays in the page scripts.
 (() => {
-  const rowSelector = '.admin-user-row, .admin-emoji-row';
+  const rowSelector = '.admin-user-row, .admin-emoji-row, .admin-log-row';
   const overlay = document.querySelector('#modal-overlay');
   const main = document.querySelector('.admin-main');
   const sidebar = document.querySelector('.admin-shell-sidebar');
-  const drawer = document.querySelector('#admin-user-drawer, #admin-emoji-drawer');
+  const drawer = document.querySelector('#admin-user-drawer, #admin-emoji-drawer, #admin-log-drawer');
   let activeDialog = null;
   let returnFocus = null;
   let lastActivation = null;
@@ -197,14 +197,16 @@
     let focusTarget = previousFocus;
     // Directory rows and detail controls can be replaced during live updates.
     if (previousFocus && (!previousFocus.isConnected || !visible(previousFocus))) {
-      if (previousFocus.dataset.userOpen || previousFocus.dataset.emojiOpen) {
-        focusTarget = [...document.querySelectorAll('[data-user-open], [data-emoji-open]')]
-          .find(button => previousFocus.dataset.userOpen ? button.dataset.userOpen === previousFocus.dataset.userOpen : button.dataset.emojiOpen === previousFocus.dataset.emojiOpen)
-          || document.querySelector('#admin-users-search, #admin-emoji-search');
+      if (previousFocus.dataset.userOpen || previousFocus.dataset.emojiOpen || previousFocus.dataset.logId) {
+        focusTarget = [...document.querySelectorAll('[data-user-open], [data-emoji-open], [data-log-id]')]
+          .find(button => previousFocus.dataset.userOpen ? button.dataset.userOpen === previousFocus.dataset.userOpen
+            : previousFocus.dataset.emojiOpen ? button.dataset.emojiOpen === previousFocus.dataset.emojiOpen
+              : button.dataset.logId === previousFocus.dataset.logId)
+          || document.querySelector('#admin-users-search, #admin-emoji-search, #admin-logs-search');
       } else if (previousFocus.classList.contains('admin-sessions-btn')) {
         focusTarget = drawer?.querySelector('.admin-sessions-btn');
       } else {
-        focusTarget = drawer?.open ? document.querySelector('#admin-user-drawer-close, #admin-emoji-drawer-close') : null;
+        focusTarget = drawer?.open ? document.querySelector('#admin-user-drawer-close, #admin-emoji-drawer-close, #admin-log-drawer-close') : null;
       }
     }
     if (activeDialog && focusTarget?.isConnected && visible(focusTarget) && (!dialog || dialog.contains(focusTarget))) focusTarget.focus();
@@ -221,7 +223,7 @@
 
     if (!focusOrigins.has(dialog)) {
       const origin = dialog === drawer
-        ? lastActivation || document.querySelector('.admin-directory-row.selected [data-user-open], .admin-directory-row.selected [data-emoji-open]') || document.querySelector('#admin-users-search, #admin-emoji-search')
+        ? lastActivation || document.querySelector('.admin-directory-row.selected [data-user-open], .admin-directory-row.selected [data-emoji-open], .admin-log-row.selected') || document.querySelector('#admin-users-search, #admin-emoji-search, #admin-logs-search')
         : lastActivation || document.activeElement;
       focusOrigins.set(dialog, origin);
     }
@@ -232,7 +234,7 @@
     if (drawer) drawer.inert = dialog !== drawer;
     if (sessionsDialog) sessionsDialog.inert = dialog !== sessionsDialog;
     const field = [...dialog.querySelectorAll('input, select')].find(visible);
-    const cancel = dialog.querySelector('#modal-cancel, .admin-sessions-modal-close, #admin-user-drawer-close, #admin-emoji-drawer-close');
+    const cancel = dialog.querySelector('#modal-cancel, .admin-sessions-modal-close, #admin-user-drawer-close, #admin-emoji-drawer-close, #admin-log-drawer-close');
     if (!dialog.contains(document.activeElement)) (field || cancel || focusable(dialog)[0])?.focus();
   }
 
@@ -241,7 +243,7 @@
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopImmediatePropagation();
-        activeDialog.querySelector('#modal-cancel, .admin-sessions-modal-close, #admin-user-drawer-close, #admin-emoji-drawer-close')?.click();
+        activeDialog.querySelector('#modal-cancel, .admin-sessions-modal-close, #admin-user-drawer-close, #admin-emoji-drawer-close, #admin-log-drawer-close')?.click();
       } else if (event.key === 'Tab') {
         const items = focusable(activeDialog);
         const first = items[0];

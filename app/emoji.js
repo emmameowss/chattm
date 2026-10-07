@@ -6,12 +6,6 @@ const socket = io(window.location.origin, {
     transports: ['websocket']
 })
 
-const logsTab = document.querySelector('#logs')
-
-logsTab.addEventListener('click', () => {
-    showToast('action logs have not been implemented yet, check back later', 'info')
-})
-
 function showModal({message, withInput = false, defaultValue = '', previewUrl = null}) {
     return new Promise((resolve) => {
         const overlay = document.querySelector('#modal-overlay')

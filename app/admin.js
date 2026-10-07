@@ -6,12 +6,6 @@ const socket = io(window.location.origin, {
   transports: ["websocket"]
 });
 
-const logsTab = document.querySelector('#logs')
-
-logsTab.addEventListener('click', () => {
-  showToast('action logs have not yet been implemented, check back later', 'info')
-})
-
 let availableChannels = ['main']
 
 async function loadChannels() {
