@@ -35,11 +35,7 @@
         <p>chat stats and settings.</p>
       </header>
       <div id="admin-actions-content">
-        <section class="admin-section admin-metrics-section" aria-labelledby="stats-heading">
-          <div class="admin-section-heading"><h3 id="stats-heading" class="admin-section-title">server stats</h3><span class="admin-section-caption">community totals</span></div>
-          <div id="admin-stats-grid" class="admin-stats-grid" aria-live="polite"><div class="admin-loading">loading stats…</div></div>
-        </section>
-        <div class="admin-sections-grid">
+        <div class="admin-sections-grid admin-overview-controls">
           <section class="admin-section admin-status-section" aria-labelledby="status-heading">
             <div class="admin-section-heading"><h3 id="status-heading" class="admin-section-title">chat status</h3><i class="ti ti-adjustments-horizontal" aria-hidden="true"></i></div>
             <p class="admin-section-description">chat mute and maintenance status.</p>
@@ -47,11 +43,6 @@
               <div class="admin-status-item" id="chat-mute-status"><div class="admin-status-indicator"></div><div class="admin-status-info"><span class="admin-status-label">chat mute</span><span class="admin-status-value" aria-live="polite">loading status…</span></div></div>
               <div class="admin-status-item" id="maintenance-status"><div class="admin-status-indicator"></div><div class="admin-status-info"><span class="admin-status-label">maintenance mode</span><span class="admin-status-value" aria-live="polite">loading status…</span></div></div>
             </div>
-          </section>
-          <section class="admin-section admin-online-section" aria-labelledby="online-heading">
-            <div class="admin-section-heading"><h3 id="online-heading" class="admin-section-title">online now</h3><span class="admin-live-label"><span></span>live</span></div>
-            <div class="admin-online-users"><div class="admin-online-count" aria-live="polite"><span class="count" id="admin-online-count">—</span><span>users online</span></div></div>
-            <a href="/admin/users" class="admin-text-link">manage users <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
           </section>
           <section class="admin-section admin-actions-section" aria-labelledby="actions-heading">
             <div class="admin-section-heading"><h3 id="actions-heading" class="admin-section-title">quick actions</h3><i class="ti ti-bolt" aria-hidden="true"></i></div>
@@ -63,16 +54,27 @@
               <button type="button" id="owner-clear-btn" class="admin-danger-action"><i class="ti ti-trash" aria-hidden="true"></i><span><strong>clear channel history</strong><small>delete all messages in a channel.</small></span><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
             </div>
           </section>
-          <section class="admin-section admin-resources-section" aria-labelledby="links-heading">
-            <div class="admin-section-heading"><h3 id="links-heading" class="admin-section-title">quick links</h3><i class="ti ti-external-link" aria-hidden="true"></i></div>
-            <p class="admin-section-description">external dashboards and source code.</p>
-            <div class="admin-quick-links">
-              <a href="https://dashboard.clerk.com" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-key" aria-hidden="true"></i><span>clerk dashboard<small>authentication &amp; accounts</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
-              <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-cloud" aria-hidden="true"></i><span>cloudflare dashboard<small>storage &amp; infrastructure</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
-              <a href="https://github.com/emmameowss/chattm" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-brand-github" aria-hidden="true"></i><span>github repo<small>source code &amp; releases</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
-            </div>
+        </div>
+        <div class="admin-sections-grid admin-overview-activity">
+          <section class="admin-section admin-online-section" aria-labelledby="online-heading">
+            <div class="admin-section-heading"><h3 id="online-heading" class="admin-section-title">online now</h3><span class="admin-live-label"><span></span>live</span></div>
+            <div class="admin-online-users"><div class="admin-online-count" aria-live="polite"><span class="count" id="admin-online-count">—</span><span>users online</span></div></div>
+            <a href="/admin/users" class="admin-text-link">manage users <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+          </section>
+          <section class="admin-section admin-metrics-section" aria-labelledby="stats-heading">
+            <div class="admin-section-heading"><h3 id="stats-heading" class="admin-section-title">server stats</h3><span class="admin-section-caption">community totals</span></div>
+            <div id="admin-stats-grid" class="admin-stats-grid" aria-live="polite"><div class="admin-loading">loading stats…</div></div>
           </section>
         </div>
+        <section class="admin-section admin-resources-section" aria-labelledby="links-heading">
+          <div class="admin-section-heading"><h3 id="links-heading" class="admin-section-title">quick links</h3><i class="ti ti-external-link" aria-hidden="true"></i></div>
+          <p class="admin-section-description">external dashboards and source code.</p>
+          <div class="admin-quick-links">
+            <a href="https://dashboard.clerk.com" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-key" aria-hidden="true"></i><span>clerk dashboard<small>authentication &amp; accounts</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+            <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-cloud" aria-hidden="true"></i><span>cloudflare dashboard<small>storage &amp; infrastructure</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+            <a href="https://github.com/emmameowss/chattm" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-brand-github" aria-hidden="true"></i><span>github repo<small>source code &amp; releases</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+          </div>
+        </section>
       </div>
       <footer class="admin-main-footer">chat™ <span>admin workspace</span></footer>
     </main>

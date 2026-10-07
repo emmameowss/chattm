@@ -126,7 +126,7 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-page .admin-main-footer { display: flex; justify-content: space-between; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 
 .admin-page #admin-actions-content { gap: 24px; }
-.admin-page .admin-sections-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; }
+.admin-page .admin-sections-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 24px; }
 .admin-page .admin-section { min-width: 0; padding: 24px; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .admin-page #admin-actions-content > .admin-section:last-child { max-width: none; }
 .admin-page .admin-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
@@ -177,6 +177,37 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-page .admin-link i:last-child { font-size: 16px; }
 .admin-page .admin-link small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
 .admin-page .admin-link:hover { color: var(--pink); background: none; border-color: var(--border); }
+
+/* Keep controls together, then activity, with external links at the bottom. */
+.admin-page .admin-overview-controls .admin-actions-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.admin-page .admin-overview-controls .admin-danger-action { margin-top: 0; }
+.admin-page .admin-overview-controls .admin-actions-buttons button { align-items: flex-start; }
+.admin-page .admin-overview-controls .admin-actions-buttons button > i { margin-top: 2px; }
+.admin-page .admin-overview-activity { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); }
+.admin-page .admin-overview-activity .admin-metrics-section { padding: 24px; border: 1px solid var(--border); background: var(--surface); }
+.admin-page .admin-overview-activity .admin-stats-grid { flex: 1; border: 0; border-radius: 0; }
+.admin-page .admin-overview-activity .admin-stat-row { padding: 12px 16px; justify-content: center; }
+.admin-page .admin-overview-activity .admin-stat-row:first-child { padding-left: 0; }
+.admin-page .admin-overview-activity .admin-stat-row:last-child { padding-right: 0; }
+.admin-page .admin-resources-section .admin-quick-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.admin-page .admin-resources-section .admin-link { padding: 0; border: 0; min-width: 0; }
+.admin-page .admin-resources-section .admin-section-description { margin-bottom: 20px; }
+
+@media (min-width: 701px) and (max-width: 1250px) {
+    .admin-page .admin-overview-activity { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+    .admin-page .admin-overview-activity .admin-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .admin-page .admin-overview-activity .admin-stat-row { padding: 12px; border-bottom: 1px solid var(--border); }
+    .admin-page .admin-overview-activity .admin-stat-row:nth-child(3) { border-right: 0; }
+    .admin-page .admin-overview-activity .admin-stat-row:nth-child(4) { border-bottom: 0; }
+    .admin-page .admin-overview-activity .admin-stat-row:last-child { grid-column: span 2; border-bottom: 0; }
+}
+@media (max-width: 1000px) {
+    .admin-page .admin-overview-controls { grid-template-columns: minmax(0, 1fr); }
+    .admin-page .admin-resources-section .admin-quick-links { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .admin-page .admin-resources-section .admin-link { padding: 16px 0; border-top: 1px solid var(--border); }
+    .admin-page .admin-resources-section .admin-link:first-child { padding-top: 0; border-top: 0; }
+    .admin-page .admin-resources-section .admin-link:last-child { padding-bottom: 0; }
+}
 
 .admin-page .admin-workspace-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
 .admin-page .admin-workspace-label span:first-child { color: var(--text); font-weight: 500; }
@@ -279,6 +310,11 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-page .admin-stat-row:nth-child(even) { border-right: 0; }
     .admin-page .admin-stat-row:last-child { grid-column: 1 / -1; border-bottom: 0; }
     .admin-page .admin-stat-value { font-size: 26px; }
+    .admin-page .admin-overview-controls .admin-actions-buttons { grid-template-columns: minmax(0, 1fr); }
+    .admin-page .admin-overview-activity .admin-metrics-section { padding: 20px; }
+    .admin-page .admin-overview-activity .admin-stat-row { padding: 16px 12px; }
+    .admin-page .admin-overview-activity .admin-stat-row:first-child { padding-left: 12px; }
+    .admin-page .admin-overview-activity .admin-stat-row:last-child { padding-right: 12px; }
     .admin-page .admin-workspace-label span:last-child { display: none; }
 }
 @media (max-width: 540px) {
