@@ -2589,6 +2589,9 @@ html.light .dev-badge {
 }
 
 .report-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
     width: min(460px, calc(100vw - 32px));
     max-height: calc(100dvh - 32px);
     padding: 0;
@@ -2621,10 +2624,11 @@ html.light .dev-badge {
     gap: 12px;
 }
 
-.report-dialog-header { margin-bottom: 4px; }
-.report-dialog-header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.report-dialog-header { min-height: 36px; margin-bottom: 4px; padding-right: 44px; }
+.report-dialog-header > div { flex: 1; min-width: 0; }
+.report-dialog-header h2 { margin: 0; font-size: 18px; font-weight: 600; text-align: left; }
 .report-dialog-header p { margin: 5px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.report-dialog-header button { min-width: 34px; min-height: 34px; padding: 4px; }
+.report-dialog-header button { position: absolute; top: 12px; right: 12px; min-width: 34px; min-height: 34px; padding: 4px; }
 .report-dialog label { color: var(--text); font-size: 12px; font-weight: 500; }
 .report-dialog label span { color: var(--muted); font-weight: 400; }
 .report-dialog select,
