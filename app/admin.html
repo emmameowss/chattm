@@ -1,104 +1,91 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <title>chat™ admin</title>
-        <link rel="stylesheet" href="/style.css">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-    </head>
-    <body class="admin-page">
-        <h1>chat™</h1>
-        <nav class="admin-nav">
-          <div class="admin-nav-tabs">
-            <a href="/admin" class="active">home</a>
-            <a href="/admin/users">users</a>
-            <a href="/admin/emoji">emoji</a>
-            <a id='logs' class="noselect">logs</a>
-          </div>
-          <a href="/" class="admin-nav-back">← back to chat™</a>
-        </nav>
-        <div id="admin-actions-content">
-            <div class="admin-sections-grid">
-                <div class="admin-section">
-                    <h3 class="admin-section-title">quick actions</h3>
-                    <div class="admin-actions-buttons">
-                        <button id="owner-mutechat-btn"><i class="ti ti-microphone-off"></i> toggle chat mute</button>
-                        <button id="owner-maintenance-btn"><i class="ti ti-tool"></i> toggle maintenance</button>
-                        <button id="owner-clear-btn"><i class="ti ti-trash"></i> clear channel history</button>
-                        <button id="owner-refresh-version-btn"><i class="ti ti-refresh"></i> refresh version status</button>
-                    </div>
-                </div>
-
-                <div class="admin-section">
-                    <h3 class="admin-section-title">status</h3>
-                    <div class="admin-status-grid">
-                        <div class="admin-status-item" id="chat-mute-status">
-                            <div class="admin-status-indicator"></div>
-                            <div class="admin-status-info">
-                                <span class="admin-status-label">chat mute</span>
-                                <span class="admin-status-value">-</span>
-                            </div>
-                        </div>
-                        <div class="admin-status-item" id="maintenance-status">
-                            <div class="admin-status-indicator"></div>
-                            <div class="admin-status-info">
-                                <span class="admin-status-label">maintenance mode</span>
-                                <span class="admin-status-value">-</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="admin-section">
-                    <h3 class="admin-section-title">server stats</h3>
-                    <div id="admin-stats-grid" class="admin-stats-grid">
-                        <div class="admin-loading">loading...</div>
-                    </div>
-                </div>
-
-                <div class="admin-section">
-                    <h3 class="admin-section-title">online now</h3>
-                    <div class="admin-online-users">
-                        <div class="admin-online-count">
-                            <span class="count" id="admin-online-count">-</span>
-                            <span>users online</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="admin-section">
-                <h3 class="admin-section-title">quick links</h3>
-                <div class="admin-quick-links">
-                    <a href="https://dashboard.clerk.com" target="_blank" rel="noopener noreferrer" class="admin-link">
-                        <i class="ti ti-key"></i>
-                        <span>clerk dashboard</span>
-                    </a>
-                    <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer" class="admin-link">
-                        <i class="ti ti-cloud"></i>
-                        <span>cloudflare dashboard</span>
-                    </a>
-                    <a href="https://github.com/emmameowss/chattm" target="_blank" rel="noopener noreferrer" class="admin-link">
-                        <i class="ti ti-brand-github"></i>
-                        <span>github repo</span>
-                    </a>
-                </div>
-            </div>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>chat™ admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="/admin.css">
+    <script src="/admin-ui.js" defer></script>
+  </head>
+  <body class="admin-page">
+    <a class="admin-skip-link" href="#admin-main">skip to content</a>
+    <aside class="admin-shell-sidebar">
+      <div class="admin-brand"><h1>chat™</h1><span class="admin-brand-caption">administration</span></div>
+      <nav class="admin-nav" aria-label="Admin navigation">
+        <div class="admin-nav-tabs">
+          <a href="/admin" class="active" aria-current="page"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>overview</a>
+          <a href="/admin/users"><i class="ti ti-users" aria-hidden="true"></i>users</a>
+          <a href="/admin/emoji"><i class="ti ti-mood-smile" aria-hidden="true"></i>emoji</a>
+          <button id="logs" type="button" title="Action logs are not yet implemented"><i class="ti ti-list-details" aria-hidden="true"></i>logs<span class="admin-nav-soon">soon</span></button>
         </div>
-        <script src="/socket.io/socket.io.js"></script>
-        <script src="/admin.js"></script>
-
-        <div id="modal-overlay" style="display: none;">
-            <div id="modal-box">
-                <p id="modal-message"></p>
-                <input type="text" id="modal-input" style="display: none;"/>
-                <select id="modal-select" style="display: none;"></select>
-                <div id="modal-actions">
-                    <button type="button" id="modal-cancel">cancel</button>
-                    <button type="button" id="modal-confirm">confirm</button>
-                </div>
+        <a href="/" class="admin-nav-back"><i class="ti ti-arrow-left" aria-hidden="true"></i>back to chat™</a>
+      </nav>
+      <div class="admin-sidebar-footer"><span class="admin-sidebar-mark">™</span><span>a little space for everyone.</span></div>
+    </aside>
+    <main id="admin-main" class="admin-main" tabindex="-1">
+      <header class="admin-page-header">
+        <div class="admin-breadcrumb">workspace <span>/</span> overview</div>
+        <h2>overview</h2>
+        <p>Your community, at a glance. Manage the space and keep things running.</p>
+      </header>
+      <div id="admin-actions-content">
+        <section class="admin-section admin-metrics-section" aria-labelledby="stats-heading">
+          <div class="admin-section-heading"><h3 id="stats-heading" class="admin-section-title">server stats</h3><span class="admin-section-caption">community totals</span></div>
+          <div id="admin-stats-grid" class="admin-stats-grid" aria-live="polite"><div class="admin-loading">loading stats…</div></div>
+        </section>
+        <div class="admin-sections-grid">
+          <section class="admin-section admin-status-section" aria-labelledby="status-heading">
+            <div class="admin-section-heading"><h3 id="status-heading" class="admin-section-title">chat status</h3><i class="ti ti-adjustments-horizontal" aria-hidden="true"></i></div>
+            <p class="admin-section-description">Current settings for the whole community.</p>
+            <div class="admin-status-grid">
+              <div class="admin-status-item" id="chat-mute-status"><div class="admin-status-indicator"></div><div class="admin-status-info"><span class="admin-status-label">chat mute</span><span class="admin-status-value" aria-live="polite">loading status…</span></div></div>
+              <div class="admin-status-item" id="maintenance-status"><div class="admin-status-indicator"></div><div class="admin-status-info"><span class="admin-status-label">maintenance mode</span><span class="admin-status-value" aria-live="polite">loading status…</span></div></div>
             </div>
+          </section>
+          <section class="admin-section admin-online-section" aria-labelledby="online-heading">
+            <div class="admin-section-heading"><h3 id="online-heading" class="admin-section-title">online now</h3><span class="admin-live-label"><span></span>live</span></div>
+            <div class="admin-online-users"><div class="admin-online-count" aria-live="polite"><span class="count" id="admin-online-count">—</span><span>users online</span></div></div>
+            <a href="/admin/users" class="admin-text-link">manage users <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+          </section>
+          <section class="admin-section admin-actions-section" aria-labelledby="actions-heading">
+            <div class="admin-section-heading"><h3 id="actions-heading" class="admin-section-title">quick actions</h3><i class="ti ti-bolt" aria-hidden="true"></i></div>
+            <p class="admin-section-description">Manage chat access and server settings.</p>
+            <div class="admin-actions-buttons">
+              <button type="button" id="owner-mutechat-btn"><i class="ti ti-microphone-off" aria-hidden="true"></i><span><strong>toggle chat mute</strong><small>Pause or resume messages for everyone.</small></span><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+              <button type="button" id="owner-maintenance-btn"><i class="ti ti-tool" aria-hidden="true"></i><span><strong>toggle maintenance</strong><small>Set a reason, or leave it blank to turn off.</small></span><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+              <button type="button" id="owner-refresh-version-btn"><i class="ti ti-refresh" aria-hidden="true"></i><span><strong>refresh version status</strong><small>Check for the latest version.</small></span><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+              <button type="button" id="owner-clear-btn" class="admin-danger-action"><i class="ti ti-trash" aria-hidden="true"></i><span><strong>clear channel history</strong><small>Remove all messages from a selected channel.</small></span><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+            </div>
+          </section>
+          <section class="admin-section admin-resources-section" aria-labelledby="links-heading">
+            <div class="admin-section-heading"><h3 id="links-heading" class="admin-section-title">quick links</h3><i class="ti ti-external-link" aria-hidden="true"></i></div>
+            <p class="admin-section-description">The services behind chat™.</p>
+            <div class="admin-quick-links">
+              <a href="https://dashboard.clerk.com" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-key" aria-hidden="true"></i><span>clerk dashboard<small>authentication &amp; accounts</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+              <a href="https://dash.cloudflare.com" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-cloud" aria-hidden="true"></i><span>cloudflare dashboard<small>storage &amp; infrastructure</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+              <a href="https://github.com/emmameowss/chattm" target="_blank" rel="noopener noreferrer" class="admin-link"><i class="ti ti-brand-github" aria-hidden="true"></i><span>github repo<small>source code &amp; releases</small></span><i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+            </div>
+          </section>
         </div>
-        <div id="toast-container"></div>
-    </body>
+      </div>
+      <footer class="admin-main-footer">chat™ <span>admin workspace</span></footer>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/admin.js"></script>
+    <div id="modal-overlay" style="display: none;">
+      <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-message">
+        <p id="modal-message"></p>
+        <input type="text" id="modal-input" aria-labelledby="modal-message" style="display: none;">
+        <select id="modal-select" aria-labelledby="modal-message" style="display: none;"></select>
+        <div id="modal-actions"><button type="button" id="modal-cancel">cancel</button><button type="button" id="modal-confirm">confirm</button></div>
+      </div>
+    </div>
+    <div id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+  </body>
 </html>
