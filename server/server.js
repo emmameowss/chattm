@@ -22,6 +22,7 @@ import {
   getActionLogs,
   createReport,
   hasOpenReport,
+  getOpenReportCount,
   getReports,
   getReportById,
   addReportNote,
@@ -2606,6 +2607,17 @@ httpServer.on("request", async (req, res) => {
         if (!error.statusCode) console.error("report submission failed:", error);
       }
     }
+    return;
+  }
+
+  if (url.pathname === "/admin/reports/count" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["mod", "admin", "owner"].includes(role)) {
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    sendJson(res, 200, { count: getOpenReportCount() });
     return;
   }
 

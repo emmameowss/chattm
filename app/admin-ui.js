@@ -5,12 +5,46 @@
   const main = document.querySelector('.admin-main');
   const sidebar = document.querySelector('.admin-shell-sidebar');
   const drawer = document.querySelector('#admin-user-drawer, #admin-emoji-drawer, #admin-log-drawer, #admin-report-drawer');
+  const reportsNavLink = document.querySelector('.admin-nav-tabs a[href="/admin/reports"]');
   let activeDialog = null;
   let returnFocus = null;
   let lastActivation = null;
   const focusOrigins = new WeakMap();
   const drawerExits = new WeakMap();
   const modalMotions = new WeakMap();
+
+  async function refreshReportCount() {
+    if (!reportsNavLink) return;
+    try {
+      const response = await fetch('/admin/reports/count', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !Number.isSafeInteger(data.count) || data.count < 0) return;
+      let badge = reportsNavLink.querySelector('.admin-report-nav-count');
+      if (data.count > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'admin-report-nav-count';
+          badge.setAttribute('aria-hidden', 'true');
+          reportsNavLink.append(badge);
+        }
+        badge.textContent = data.count > 99 ? '99+' : String(data.count);
+        const noun = data.count === 1 ? 'report' : 'reports';
+        reportsNavLink.setAttribute('aria-label', `reports, ${data.count} unresolved ${noun}`);
+      } else {
+        badge?.remove();
+        reportsNavLink.removeAttribute('aria-label');
+      }
+    } catch {}
+  }
+
+  if (reportsNavLink) {
+    window.refreshAdminReportCount = refreshReportCount;
+    refreshReportCount();
+    window.setInterval(refreshReportCount, 60_000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshReportCount();
+    });
+  }
 
   function cancelModalMotion(overlay) {
     modalMotions.get(overlay)?.forEach(animation => animation.cancel());

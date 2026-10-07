@@ -952,6 +952,10 @@ export function hasOpenReport(reporterEmail, targetType, targetKey) {
   `).get(reporterEmail, targetType, targetKey);
 }
 
+export function getOpenReportCount() {
+  return db.prepare("SELECT COUNT(*) AS count FROM reports WHERE status = 'open'").get().count;
+}
+
 export function getReports({ page = 1, pageSize = 50, status = 'open', search = '' } = {}) {
   const conditions = [];
   const values = [];

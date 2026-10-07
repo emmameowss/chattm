@@ -107,7 +107,6 @@ function renderList() {
   document.querySelector('#admin-reports-prev').disabled = currentPage <= 1;
   document.querySelector('#admin-reports-next').disabled = currentPage >= totalPages;
   reportPagination.hidden = totalPages <= 1 || total === 0;
-  document.querySelector('#admin-reports-count').textContent = `${total.toLocaleString()} ${reportStatus.value === 'all' ? 'reports' : `${reportStatus.value} reports`}`;
   if (!entries.length) {
     showState(total ? 'no matching reports' : reportStatus.value === 'open' ? 'no open reports' : 'no reports found', total
       ? 'try another search or status filter.'
@@ -148,7 +147,7 @@ function detailField(container, label, value) {
 }
 
 function detailSection(title, description = '') {
-  const section = element('section', 'admin-detail-section');
+  const section = element('section', 'admin-detail-section admin-report-section');
   section.append(element('h5', 'admin-detail-section-title', title));
   if (description) section.append(element('p', 'admin-report-help', description));
   return section;
@@ -306,6 +305,7 @@ async function changeStatus(report, status) {
     const data = await response.json();
     if (!response.ok || !data.report) throw new Error(data.error || 'could not update report');
     toast(`report ${status}`, 'success');
+    window.refreshAdminReportCount?.();
     if (reportStatus.value !== 'all' && reportStatus.value !== status) closeReport(false);
     else renderReportDetails(data.report);
     requestReports();
@@ -350,6 +350,7 @@ async function deleteReportPermanently(report) {
     if (!response.ok || !data.success) throw new Error(data.error || 'could not delete report');
     closeReport(false);
     toast('report permanently deleted', 'success');
+    window.refreshAdminReportCount?.();
     requestReports();
   } catch (error) {
     toast(error.message || 'could not delete report', 'error');
