@@ -865,6 +865,18 @@ setInterval(() => {
 
 const roomOf = (ch) => "channel:" + ch;
 
+function onlineUserCount() {
+  const onlineEmails = new Set();
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.username && socket.userEmail) onlineEmails.add(socket.userEmail);
+  }
+  return onlineEmails.size;
+}
+
+function emitOnlineUserCount() {
+  io.emit("usercount", onlineUserCount());
+}
+
 function emitAllUserLists() {
   for (const c of listChannels()) emitUserList(c.name);
 }
@@ -1212,7 +1224,7 @@ io.on("connection", (socket) => {
     socket.handshake.address;
   console.log(`${socket.userEmail} connected`);
   if (!socket.userEmail.endsWith("@guest")) setLastSeen(socket.userEmail);
-  io.emit("usercount", io.engine.clientsCount);
+  emitOnlineUserCount();
   // everyone starts in the default channel
   socket.currentChannel = "main";
   socket.join(roomOf("main"));
@@ -1398,6 +1410,7 @@ io.on("connection", (socket) => {
     }
     const prevUser = socket.username;
     socket.username = name;
+    if (prevUser !== name) emitOnlineUserCount();
     if (!socket.userEmail.endsWith("@guest")) {
       saveUsername(socket.userEmail, name);
     }
@@ -1427,7 +1440,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    io.emit("usercount", io.engine.clientsCount);
+    emitOnlineUserCount();
     emitUserList(socket.currentChannel);
   });
 
