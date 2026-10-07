@@ -163,6 +163,9 @@
                 ></textarea>
             </div>
             <div id="profile-actions">
+                <button type="button" id="profile-report-btn" class="profile-report-btn" hidden>
+                    <i class="ti ti-flag"></i> report account
+                </button>
                 <button
                     type="button"
                     id="profile-edit-btn"
@@ -234,10 +237,34 @@
             <button type="button" id="ctx-reply-btn">
                 <i class="ti ti-arrow-back-up"></i> reply
             </button>
+            <button type="button" id="ctx-report-btn">
+                <i class="ti ti-flag"></i> report message
+            </button>
             <button type="button" id="ctx-delete-btn">
                 <i class="ti ti-trash"></i> delete message
             </button>
         </div>
+        <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-dialog-title">
+            <form id="report-form">
+                <header class="report-dialog-header">
+                    <div><h2 id="report-dialog-title">report content</h2><p id="report-target-summary"></p></div>
+                    <button type="button" id="report-dialog-close" aria-label="close report form"><i class="ti ti-x"></i></button>
+                </header>
+                <label for="report-reason">reason</label>
+                <select id="report-reason" name="reason" required>
+                    <option value="">choose a reason</option>
+                    <option value="spam">spam</option>
+                    <option value="harassment">harassment</option>
+                    <option value="hateful_abusive">hateful or abusive content</option>
+                    <option value="inappropriate">inappropriate content</option>
+                    <option value="threats">threats</option>
+                    <option value="other">other</option>
+                </select>
+                <label for="report-note">additional context <span>optional</span></label>
+                <textarea id="report-note" name="note" maxlength="500" rows="4" placeholder="add context for the moderators"></textarea>
+                <div class="report-dialog-footer"><span>only moderators and admins can see this report.</span><div><button type="button" id="report-dialog-cancel">cancel</button><button type="submit" id="report-submit">send report</button></div></div>
+            </form>
+        </dialog>
         <nav id="channels">
             <div id="channels-header">channels</div>
             <div id="channels-list"></div>

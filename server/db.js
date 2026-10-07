@@ -119,12 +119,45 @@ db.exec(`
     outcome TEXT NOT NULL CHECK (outcome IN ('success', 'failed', 'denied')),
     details_json TEXT NOT NULL DEFAULT '{}'
   );
+
+  CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+    target_type TEXT NOT NULL CHECK (target_type IN ('message', 'account')),
+    target_key TEXT NOT NULL,
+    target_username TEXT,
+    target_email TEXT,
+    reporter_email TEXT NOT NULL,
+    reporter_username TEXT,
+    reporter_role TEXT NOT NULL DEFAULT 'user',
+    reason TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    snapshot_json TEXT NOT NULL DEFAULT '{}'
+  );
+
+  CREATE TABLE IF NOT EXISTS report_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id INTEGER NOT NULL,
+    occurred_at INTEGER NOT NULL,
+    actor_email TEXT NOT NULL,
+    actor_username TEXT,
+    actor_role TEXT NOT NULL,
+    note TEXT NOT NULL
+  );
 `);
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS action_logs_time_idx ON action_logs (occurred_at DESC, id DESC);
   CREATE INDEX IF NOT EXISTS action_logs_category_time_idx ON action_logs (category, occurred_at DESC, id DESC);
   CREATE INDEX IF NOT EXISTS action_logs_actor_time_idx ON action_logs (actor_email, occurred_at DESC, id DESC);
+  CREATE INDEX IF NOT EXISTS reports_status_time_idx ON reports (status, created_at DESC, id DESC);
+  CREATE INDEX IF NOT EXISTS reports_target_idx ON reports (target_type, target_key);
+  CREATE INDEX IF NOT EXISTS reports_reporter_idx ON reports (reporter_email, created_at DESC);
+  CREATE UNIQUE INDEX IF NOT EXISTS reports_open_duplicate_idx
+    ON reports (reporter_email, target_type, target_key) WHERE status = 'open';
+  CREATE INDEX IF NOT EXISTS report_notes_report_time_idx ON report_notes (report_id, occurred_at, id);
 `);
 
 // seed the default channel (idempotent)
@@ -863,6 +896,167 @@ export function getActionLogs({
     };
   });
   return { records, total, page: currentPage, pageSize: safePageSize };
+}
+
+function mapReportRow(row) {
+  if (!row) return null;
+  let snapshot = {};
+  try { snapshot = JSON.parse(row.snapshot_json || '{}'); } catch {}
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    status: row.status,
+    targetType: row.target_type,
+    targetKey: row.target_key,
+    targetUsername: row.target_username,
+    targetEmail: row.target_email,
+    reporterEmail: row.reporter_email,
+    reporterUsername: row.reporter_username,
+    reporterRole: row.reporter_role,
+    reason: row.reason,
+    note: row.note,
+    snapshot,
+  };
+}
+
+export function createReport(report) {
+  const result = db.prepare(`
+    INSERT INTO reports (
+      created_at, updated_at, status, target_type, target_key, target_username,
+      target_email, reporter_email, reporter_username, reporter_role, reason,
+      note, snapshot_json
+    ) VALUES (?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    report.createdAt,
+    report.createdAt,
+    report.targetType,
+    report.targetKey,
+    report.targetUsername ?? null,
+    report.targetEmail ?? null,
+    report.reporterEmail,
+    report.reporterUsername ?? null,
+    report.reporterRole ?? 'user',
+    report.reason,
+    report.note ?? '',
+    JSON.stringify(report.snapshot ?? {}),
+  );
+  return Number(result.lastInsertRowid);
+}
+
+export function hasOpenReport(reporterEmail, targetType, targetKey) {
+  return !!db.prepare(`
+    SELECT 1 FROM reports
+    WHERE reporter_email = ? AND target_type = ? AND target_key = ? AND status = 'open'
+    LIMIT 1
+  `).get(reporterEmail, targetType, targetKey);
+}
+
+export function getReports({ page = 1, pageSize = 50, status = 'open', search = '' } = {}) {
+  const conditions = [];
+  const values = [];
+  if (status && status !== 'all') {
+    conditions.push('status = ?');
+    values.push(status);
+  }
+  const normalizedSearch = String(search).trim().slice(0, 100);
+  if (normalizedSearch) {
+    const pattern = `%${normalizedSearch}%`;
+    conditions.push(`(
+      CAST(id AS TEXT) LIKE ? OR
+      target_username LIKE ? COLLATE NOCASE OR
+      target_email LIKE ? COLLATE NOCASE OR
+      reporter_username LIKE ? COLLATE NOCASE OR
+      reporter_email LIKE ? COLLATE NOCASE OR
+      reason LIKE ? COLLATE NOCASE OR
+      note LIKE ? COLLATE NOCASE OR
+      snapshot_json LIKE ? COLLATE NOCASE OR
+      EXISTS (
+        SELECT 1 FROM report_notes rn
+        WHERE rn.report_id = reports.id AND rn.note LIKE ? COLLATE NOCASE
+      )
+    )`);
+    values.push(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const safePage = Math.max(1, Math.floor(Number(page) || 1));
+  const safePageSize = Math.min(50, Math.max(1, Math.floor(Number(pageSize) || 50)));
+  const total = db.prepare(`SELECT COUNT(*) AS count FROM reports ${where}`).get(...values).count;
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const currentPage = Math.min(safePage, totalPages);
+  const records = db.prepare(`
+    SELECT id, created_at, updated_at, status, target_type, target_key,
+           target_username, target_email, reporter_email, reporter_username,
+           reporter_role, reason, note
+    FROM reports ${where}
+    ORDER BY created_at DESC, id DESC
+    LIMIT ? OFFSET ?
+  `).all(...values, safePageSize, (currentPage - 1) * safePageSize).map(row => ({
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    status: row.status,
+    targetType: row.target_type,
+    targetKey: row.target_key,
+    targetUsername: row.target_username,
+    targetEmail: row.target_email,
+    reporterEmail: row.reporter_email,
+    reporterUsername: row.reporter_username,
+    reporterRole: row.reporter_role,
+    reason: row.reason,
+    note: row.note,
+  }));
+  return { records, total, page: currentPage, pageSize: safePageSize, totalPages };
+}
+
+export function getReportById(id) {
+  const row = db.prepare('SELECT * FROM reports WHERE id = ?').get(id);
+  if (!row) return null;
+  const report = mapReportRow(row);
+  report.internalNotes = db.prepare(`
+    SELECT id, occurred_at, actor_email, actor_username, actor_role, note
+    FROM report_notes WHERE report_id = ? ORDER BY occurred_at ASC, id ASC
+  `).all(id).map(note => ({
+    id: note.id,
+    occurredAt: note.occurred_at,
+    actorEmail: note.actor_email,
+    actorUsername: note.actor_username,
+    actorRole: note.actor_role,
+    note: note.note,
+  }));
+  return report;
+}
+
+export function addReportNote(reportId, note) {
+  const occurredAt = Date.now();
+  return db.transaction(() => {
+    const result = db.prepare(`
+      INSERT INTO report_notes (report_id, occurred_at, actor_email, actor_username, actor_role, note)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(reportId, occurredAt, note.actorEmail, note.actorUsername ?? null, note.actorRole, note.note);
+    db.prepare('UPDATE reports SET updated_at = ? WHERE id = ?').run(occurredAt, reportId);
+    return { id: Number(result.lastInsertRowid), occurredAt };
+  })();
+}
+
+export function updateReportStatus(reportId, status) {
+  return db.transaction(() => {
+    const current = db.prepare('SELECT status FROM reports WHERE id = ?').get(reportId);
+    if (!current) return null;
+    const updatedAt = Date.now();
+    db.prepare('UPDATE reports SET status = ?, updated_at = ? WHERE id = ?').run(status, updatedAt, reportId);
+    return { previousStatus: current.status, updatedAt };
+  })();
+}
+
+export function deleteReport(reportId) {
+  return db.transaction(() => {
+    const row = db.prepare('SELECT * FROM reports WHERE id = ?').get(reportId);
+    if (!row) return null;
+    db.prepare('DELETE FROM report_notes WHERE report_id = ?').run(reportId);
+    db.prepare('DELETE FROM reports WHERE id = ?').run(reportId);
+    return mapReportRow(row);
+  })();
 }
 
 export function setRole(email, role) {

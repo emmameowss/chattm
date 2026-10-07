@@ -20,6 +20,13 @@ import {
   db,
   addActionLog,
   getActionLogs,
+  createReport,
+  hasOpenReport,
+  getReports,
+  getReportById,
+  addReportNote,
+  updateReportStatus,
+  deleteReport,
   getHistory,
   addMessage,
   deleteMessage,
@@ -776,6 +783,91 @@ function requireAdminPage(req, res) {
     return null;
   }
   return { user, role }
+}
+
+function requireStaffPage(req, res) {
+  const user = getRequestUser(req);
+  const role = user ? getRole(user.email) : "user";
+  if (!user || !["mod", "admin", "owner"].includes(role)) {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return null;
+  }
+  return { user, role };
+}
+
+function renderAdminNav(role, activePath = "") {
+  const items = [
+    ["/admin", "layout-dashboard", "overview"],
+    ["/admin/users", "users", "users"],
+    ["/admin/emoji", "mood-smile", "emoji"],
+    ["/admin/logs", "list-details", "logs"],
+    ["/admin/reports", "flag", "reports"],
+  ];
+  const visibleItems = role === "mod" ? items.filter(([href]) => href === "/admin/reports") : items;
+  return visibleItems.map(([href, icon, label]) => {
+    const active = href === activePath;
+    return `<a href="${href}"${active ? ' class="active" aria-current="page"' : ""}><i class="ti ti-${icon}" aria-hidden="true"></i>${label}</a>`;
+  }).join("");
+}
+
+async function readJsonRequest(req, maxBytes = 16 * 1024) {
+  return new Promise((resolveBody, rejectBody) => {
+    let body = "";
+    let tooLarge = false;
+    req.on("data", chunk => {
+      if (tooLarge) return;
+      if (Buffer.byteLength(body) + chunk.length > maxBytes) {
+        tooLarge = true;
+        body = "";
+        return;
+      }
+      body += chunk.toString("utf8");
+    });
+    req.on("end", () => {
+      if (tooLarge) {
+        const error = new Error("request body too large");
+        error.statusCode = 413;
+        rejectBody(error);
+        return;
+      }
+      try {
+        resolveBody(body ? JSON.parse(body) : {});
+      } catch {
+        const error = new Error("invalid JSON body");
+        error.statusCode = 400;
+        rejectBody(error);
+      }
+    });
+    req.on("error", rejectBody);
+  });
+}
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    "content-type": "application/json",
+    "cache-control": "no-store",
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function recordReportAction(user, role, action, target, outcome = "success", details = {}) {
+  if (!user?.email) return;
+  const actorEmail = normalizeEmail(user.email);
+  try {
+    addActionLog({
+      actorEmail,
+      actorUsername: getStoredUsername(actorEmail) || actorEmail.split("@")[0],
+      actorRole: role || "user",
+      action,
+      category: "moderation",
+      target: target || null,
+      outcome,
+      details,
+    });
+  } catch (error) {
+    console.error("failed to record report action:", error);
+  }
 }
 
 // resolve the cookie session, mirroring the socket middleware's guest-expiry check
@@ -2376,6 +2468,301 @@ httpServer.on("request", async (req, res) => {
     res.end(JSON.stringify({channels}))
     return;
   }
+  if (url.pathname === "/reports" && req.method === "POST") {
+    const user = getRequestUser(req);
+    if (!user) {
+      sendJson(res, 401, { error: "sign in to submit a report" });
+      return;
+    }
+
+    try {
+      const payload = await readJsonRequest(req, 12 * 1024);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        sendJson(res, 400, { error: "invalid report request" });
+        return;
+      }
+      const allowedReasons = new Set(["spam", "harassment", "hateful_abusive", "inappropriate", "threats", "other"]);
+      const reason = typeof payload.reason === "string" ? payload.reason : "";
+      const note = typeof payload.note === "string" ? payload.note.trim() : "";
+      if (!allowedReasons.has(reason)) {
+        sendJson(res, 400, { error: "choose a valid report reason" });
+        return;
+      }
+      if (payload.note !== undefined && typeof payload.note !== "string") {
+        sendJson(res, 400, { error: "report note must be text" });
+        return;
+      }
+      if (note.length > 500) {
+        sendJson(res, 400, { error: "report note must be 500 characters or fewer" });
+        return;
+      }
+
+      const reporterEmail = normalizeEmail(user.email);
+      let reporterUsername = getStoredUsername(reporterEmail);
+      if (!reporterUsername) {
+        reporterUsername = [...io.sockets.sockets.values()].find(socket => normalizeEmail(socket.userEmail) === reporterEmail)?.username || reporterEmail.split("@")[0];
+      }
+      const targetType = typeof payload.messageId === "string" ? "message" : typeof payload.targetUsername === "string" ? "account" : null;
+      if (!targetType || (targetType === "message" && payload.targetUsername !== undefined) || (targetType === "account" && payload.messageId !== undefined)) {
+        sendJson(res, 400, { error: "report exactly one message or account" });
+        return;
+      }
+
+      let targetKey;
+      let targetEmail = null;
+      let targetUsername = null;
+      let snapshot;
+      if (targetType === "message") {
+        const messageId = payload.messageId.trim();
+        if (!messageId || messageId.length > 80) {
+          sendJson(res, 400, { error: "invalid message" });
+          return;
+        }
+        const message = getMessageById(messageId);
+        if (!message || message.system || !message.ownerEmail) {
+          sendJson(res, 404, { error: "message not found" });
+          return;
+        }
+        targetEmail = normalizeEmail(message.ownerEmail);
+        if (targetEmail === reporterEmail) {
+          sendJson(res, 400, { error: "you cannot report your own message" });
+          return;
+        }
+        targetKey = message.id;
+        targetUsername = message.username || getStoredUsername(targetEmail) || targetEmail.split("@")[0];
+        snapshot = {
+          messageId: message.id,
+          authorUsername: targetUsername,
+          authorEmail: targetEmail,
+          text: message.text,
+          image: message.image,
+          channel: message.channel || "main",
+          time: message.time,
+        };
+      } else {
+        const requestedUsername = payload.targetUsername.trim();
+        if (!isValidUsername(requestedUsername)) {
+          sendJson(res, 400, { error: "invalid account" });
+          return;
+        }
+        for (const socket of io.sockets.sockets.values()) {
+          if (socket.username?.toLowerCase() === requestedUsername.toLowerCase()) {
+            targetEmail = normalizeEmail(socket.userEmail);
+            targetUsername = socket.username;
+            break;
+          }
+        }
+        if (!targetEmail) targetEmail = getEmailByUsername(requestedUsername);
+        if (!targetEmail && /^guest-[a-f0-9]+$/i.test(requestedUsername)) {
+          const candidateEmail = `${requestedUsername}@guest`.toLowerCase();
+          const storedName = getStoredUsername(candidateEmail);
+          if (storedName?.toLowerCase() === requestedUsername.toLowerCase()) targetEmail = candidateEmail;
+          else if (db.prepare("SELECT 1 FROM sessions WHERE email = ? LIMIT 1").get(candidateEmail)) targetEmail = candidateEmail;
+        }
+        targetEmail = normalizeEmail(targetEmail);
+        if (!targetEmail) {
+          sendJson(res, 404, { error: "account not found" });
+          return;
+        }
+        if (targetEmail === reporterEmail) {
+          sendJson(res, 400, { error: "you cannot report your own account" });
+          return;
+        }
+        targetUsername = targetUsername || getStoredUsername(targetEmail) || requestedUsername;
+        targetKey = targetEmail;
+        snapshot = { username: targetUsername, email: targetEmail };
+      }
+
+      const clientIp = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress || "unknown";
+      if (!checkRateLimit(reporterEmail, "report-submit-user", 5, 10 * 60 * 1000) ||
+          !checkRateLimit(clientIp, "report-submit-ip", 20, 10 * 60 * 1000)) {
+        sendJson(res, 429, { error: "too many reports, try again later" });
+        return;
+      }
+      if (hasOpenReport(reporterEmail, targetType, targetKey)) {
+        sendJson(res, 409, { error: "you already have an open report for this target" });
+        return;
+      }
+
+      const reportId = createReport({
+        createdAt: Date.now(),
+        targetType,
+        targetKey,
+        targetUsername,
+        targetEmail,
+        reporterEmail,
+        reporterUsername,
+        reporterRole: getRole(reporterEmail),
+        reason,
+        note,
+        snapshot,
+      });
+      sendJson(res, 201, { success: true, reportId });
+    } catch (error) {
+      if (error?.code === "SQLITE_CONSTRAINT_UNIQUE") {
+        sendJson(res, 409, { error: "you already have an open report for this target" });
+      } else {
+        sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : "could not submit report" });
+        if (!error.statusCode) console.error("report submission failed:", error);
+      }
+    }
+    return;
+  }
+
+  if (url.pathname === "/admin/reports/data" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["mod", "admin", "owner"].includes(role)) {
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    const status = url.searchParams.get("status") || "open";
+    if (!["open", "resolved", "dismissed", "all"].includes(status)) {
+      sendJson(res, 400, { error: "invalid report status" });
+      return;
+    }
+    const pageValue = Number(url.searchParams.get("page") || 1);
+    if (!Number.isSafeInteger(pageValue) || pageValue < 1) {
+      sendJson(res, 400, { error: "invalid page" });
+      return;
+    }
+    const result = getReports({
+      page: Math.min(1_000_000, pageValue),
+      pageSize: 50,
+      status,
+      search: url.searchParams.get("search") || "",
+    });
+    sendJson(res, 200, result);
+    return;
+  }
+
+  const reportActionMatch = url.pathname.match(/^\/admin\/reports\/(\d+)(?:\/(note|status))?$/);
+  if (reportActionMatch) {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    const reportId = Number(reportActionMatch[1]);
+    const action = reportActionMatch[2];
+    const mutationAction = req.method === "DELETE" && !action ? "report.delete"
+      : req.method === "POST" && action === "note" ? "report.note"
+        : req.method === "POST" && action === "status" ? "report.status_change" : null;
+    if (!user || !["mod", "admin", "owner"].includes(role)) {
+      if (user && mutationAction) recordReportAction(user, role, mutationAction, `report #${reportId}`, "denied", { reportId, failure: "forbidden" });
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    if (!Number.isSafeInteger(reportId) || reportId < 1) {
+      if (mutationAction) recordReportAction(user, role, mutationAction, `report #${reportId}`, "failed", { failure: "invalid report ID" });
+      sendJson(res, 400, { error: "invalid report ID" });
+      return;
+    }
+
+    if (req.method === "GET" && !action) {
+      const report = getReportById(reportId);
+      if (!report) sendJson(res, 404, { error: "report not found" });
+      else sendJson(res, 200, { report });
+      return;
+    }
+
+    if (req.method === "POST" && action === "note") {
+      try {
+        const payload = await readJsonRequest(req, 8 * 1024);
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+          recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: "invalid note request" });
+          sendJson(res, 400, { error: "invalid note request" });
+          return;
+        }
+        const note = typeof payload.note === "string" ? payload.note.trim() : "";
+        if (!note || note.length > 1000) {
+          recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: "invalid note length" });
+          sendJson(res, 400, { error: "internal note must be between 1 and 1000 characters" });
+          return;
+        }
+        const report = getReportById(reportId);
+        if (!report) {
+          recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: "report not found" });
+          sendJson(res, 404, { error: "report not found" });
+          return;
+        }
+        const actorEmail = normalizeEmail(user.email);
+        const actorUsername = getStoredUsername(actorEmail) || actorEmail.split("@")[0];
+        const added = addReportNote(reportId, {
+          actorEmail,
+          actorUsername,
+          actorRole: role,
+          note,
+        });
+        recordReportAction(user, role, "report.note", report.targetUsername || report.targetEmail || `report #${reportId}`, "success", { reportId, noteId: added.id });
+        sendJson(res, 201, { success: true, report: getReportById(reportId) });
+      } catch (error) {
+        recordReportAction(user, role, "report.note", `report #${reportId}`, "failed", { reportId, failure: error.message || "could not save internal note" });
+        sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : "could not save internal note" });
+        if (!error.statusCode) console.error("report note failed:", error);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && action === "status") {
+      try {
+        const payload = await readJsonRequest(req, 8 * 1024);
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: "invalid status request" });
+          sendJson(res, 400, { error: "invalid status request" });
+          return;
+        }
+        if (!["open", "resolved", "dismissed"].includes(payload.status)) {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: "invalid report status" });
+          sendJson(res, 400, { error: "invalid report status" });
+          return;
+        }
+        const report = getReportById(reportId);
+        if (!report) {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, status: payload.status, failure: "report not found" });
+          sendJson(res, 404, { error: "report not found" });
+          return;
+        }
+        if (report.status === payload.status) {
+          sendJson(res, 200, { success: true, report });
+          return;
+        }
+        const updated = updateReportStatus(reportId, payload.status);
+        const actionName = payload.status === "open" ? "report.reopen"
+          : payload.status === "resolved" ? "report.resolve" : "report.dismiss";
+        recordReportAction(user, role, actionName, report.targetUsername || report.targetEmail || `report #${reportId}`, "success", { reportId, previousStatus: updated.previousStatus, status: payload.status });
+        sendJson(res, 200, { success: true, report: getReportById(reportId) });
+      } catch (error) {
+        if (error?.code === "SQLITE_CONSTRAINT_UNIQUE") {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: "another open report exists for this reporter and target" });
+          sendJson(res, 409, { error: "another open report already exists for this reporter and target" });
+        } else {
+          recordReportAction(user, role, "report.status_change", `report #${reportId}`, "failed", { reportId, failure: error.message || "could not update report" });
+          sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : "could not update report" });
+          if (!error.statusCode) console.error("report status update failed:", error);
+        }
+      }
+      return;
+    }
+
+    if (req.method === "DELETE" && !action) {
+      if (!["admin", "owner"].includes(role)) {
+        recordReportAction(user, role, "report.delete", `report #${reportId}`, "denied", { reportId, failure: "only admins and owners can delete reports" });
+        sendJson(res, 403, { error: "only admins and owners can permanently delete reports" });
+        return;
+      }
+      const report = deleteReport(reportId);
+      if (!report) {
+        recordReportAction(user, role, "report.delete", `report #${reportId}`, "failed", { reportId, failure: "report not found" });
+        sendJson(res, 404, { error: "report not found" });
+        return;
+      }
+      recordReportAction(user, role, "report.delete", report.targetUsername || report.targetEmail || `report #${reportId}`, "success", { reportId, targetType: report.targetType, previousStatus: report.status });
+      sendJson(res, 200, { success: true });
+      return;
+    }
+
+    sendJson(res, 405, { error: "method not allowed" });
+    return;
+  }
+
   if (url.pathname === "/admin/logs/data" && req.method === "GET") {
     const user = getRequestUser(req);
     const role = user ? getRole(user.email) : "user";
@@ -3871,6 +4258,18 @@ httpServer.on("request", async (req, res) => {
         res.end("invalid signature");
       }
     });
+    return;
+  }
+
+  if (url.pathname === "/admin/reports" && req.method === "GET") {
+    const staff = requireStaffPage(req, res);
+    if (!staff) return;
+    const html = await renderPage("reports.html", {
+      ADMIN_NAV_LINKS: renderAdminNav(staff.role, "/admin/reports"),
+      STAFF_ROLE: escapeHtml(staff.role),
+    });
+    res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
+    res.end(html);
     return;
   }
 
