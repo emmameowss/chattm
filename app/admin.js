@@ -225,6 +225,25 @@ async function loadStats() {
   }
 }
 
+async function loadReportOverview() {
+  const updatedLabel = document.querySelector('#admin-report-stats-updated');
+  try {
+    const response = await fetch('/admin/reports/stats', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`report stats request failed (${response.status})`);
+    const data = await response.json();
+    for (const key of ['open', 'resolved', 'dismissed', 'total']) {
+      if (!Number.isSafeInteger(data[key]) || data[key] < 0) throw new Error('invalid report stats');
+    }
+    document.querySelector('#admin-report-open-count').textContent = data.open.toLocaleString();
+    document.querySelector('#admin-report-resolved-count').textContent = data.resolved.toLocaleString();
+    document.querySelector('#admin-report-dismissed-count').textContent = data.dismissed.toLocaleString();
+    document.querySelector('#admin-report-total-count').textContent = data.total.toLocaleString();
+    updatedLabel.textContent = `updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {
+    updatedLabel.textContent = 'report stats unavailable';
+  }
+}
+
 document.querySelector('#admin-stats-refresh').addEventListener('click', () => {
   loadStats.forceRefresh = true;
   loadStats();
@@ -237,6 +256,11 @@ socket.on('usercount', (count) => {
 });
 
 loadStats();
+loadReportOverview();
+window.setInterval(loadReportOverview, 60_000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) loadReportOverview();
+});
 
 document.querySelector('#owner-mutechat-btn').addEventListener('click', async (event) => {
   const button = event.currentTarget;

@@ -956,6 +956,17 @@ export function getOpenReportCount() {
   return db.prepare("SELECT COUNT(*) AS count FROM reports WHERE status = 'open'").get().count;
 }
 
+export function getReportStats() {
+  return db.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      COALESCE(SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END), 0) AS open,
+      COALESCE(SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END), 0) AS resolved,
+      COALESCE(SUM(CASE WHEN status = 'dismissed' THEN 1 ELSE 0 END), 0) AS dismissed
+    FROM reports
+  `).get();
+}
+
 export function getReports({ page = 1, pageSize = 50, status = 'open', search = '' } = {}) {
   const conditions = [];
   const values = [];

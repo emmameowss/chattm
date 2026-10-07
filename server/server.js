@@ -23,6 +23,7 @@ import {
   createReport,
   hasOpenReport,
   getOpenReportCount,
+  getReportStats,
   getReports,
   getReportById,
   addReportNote,
@@ -2618,6 +2619,17 @@ httpServer.on("request", async (req, res) => {
       return;
     }
     sendJson(res, 200, { count: getOpenReportCount() });
+    return;
+  }
+
+  if (url.pathname === "/admin/reports/stats" && req.method === "GET") {
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    if (!user || !["admin", "owner"].includes(role)) {
+      sendJson(res, 403, { error: "forbidden" });
+      return;
+    }
+    sendJson(res, 200, getReportStats());
     return;
   }
 

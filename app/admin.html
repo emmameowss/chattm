@@ -63,6 +63,18 @@
             <div id="admin-stats-grid" class="admin-stats-grid" aria-live="polite"><div class="admin-loading">loading stats…</div></div>
           </section>
         </div>
+        <section class="admin-section admin-report-overview" aria-labelledby="report-overview-heading">
+          <div class="admin-section-heading">
+            <div><h3 id="report-overview-heading" class="admin-section-title">report overview</h3><span id="admin-report-stats-updated" class="admin-report-stats-updated" aria-live="polite">loading report stats…</span></div>
+            <a href="/admin/reports" class="admin-text-link">open inbox <i class="ti ti-arrow-up-right" aria-hidden="true"></i></a>
+          </div>
+          <div class="admin-report-overview-grid" aria-live="polite">
+            <div class="admin-report-overview-stat open"><span>open</span><strong id="admin-report-open-count">—</strong></div>
+            <div class="admin-report-overview-stat"><span>resolved</span><strong id="admin-report-resolved-count">—</strong></div>
+            <div class="admin-report-overview-stat"><span>dismissed</span><strong id="admin-report-dismissed-count">—</strong></div>
+            <div class="admin-report-overview-stat"><span>all reports</span><strong id="admin-report-total-count">—</strong></div>
+          </div>
+        </section>
         <section class="admin-section admin-resources-section" aria-labelledby="links-heading">
           <div class="admin-section-heading"><h3 id="links-heading" class="admin-section-title">quick links</h3></div>
           <div class="admin-quick-links">
