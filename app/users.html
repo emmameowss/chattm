@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/admin.css">
     <script src="/admin-ui.js" defer></script>
   </head>
-  <body class="admin-page">
+  <body class="admin-page admin-users-page">
     <a class="admin-skip-link" href="#admin-main">skip to content</a>
     <aside class="admin-shell-sidebar">
       <div class="admin-brand"><h1>chat™</h1></div>
@@ -28,29 +28,45 @@
       </nav>
     </aside>
     <main id="admin-main" class="admin-main" tabindex="-1">
-      <header class="admin-page-header">
-        <h2>users</h2>
-        <p>user details, roles, and moderation.</p>
+      <header class="admin-page-header admin-users-page-header">
+        <div><h2>users</h2><p>user details, roles, and moderation.</p></div>
+        <button type="button" id="admin-users-refresh"><i class="ti ti-refresh" aria-hidden="true"></i> refresh</button>
       </header>
-<div class="admin-users-container">
-            <div class="admin-users-sidebar" role="region" aria-label="User directory" id="admin-users-sidebar">
-
-            </div>
-
-            <div class="admin-users-detail" role="region" aria-label="User details" id="admin-users-detail">
-                <div class="admin-users-detail-empty">
-                    <strong>select a user</strong>
-                </div>
-            </div>
+      <section class="admin-section admin-users-directory" aria-label="User directory">
+        <div class="admin-users-views" role="group" aria-label="Filter users">
+          <button type="button" data-user-view="all" aria-pressed="true">all users <span data-user-count="all">—</span></button>
+          <button type="button" data-user-view="online" aria-pressed="false">online <span data-user-count="online">—</span></button>
+          <button type="button" data-user-view="muted" aria-pressed="false">muted <span data-user-count="muted">—</span></button>
+          <button type="button" data-user-view="banned" aria-pressed="false">banned <span data-user-count="banned">—</span></button>
         </div>
+        <div id="admin-users-toolbar" class="admin-users-toolbar">
+          <label class="admin-users-search" for="admin-users-search"><span class="admin-visually-hidden">search username or email</span><i class="ti ti-search" aria-hidden="true"></i><input id="admin-users-search" type="search" placeholder="search username or email" autocomplete="off"></label>
+          <label class="admin-users-filter" for="admin-users-role"><span>role</span><select id="admin-users-role"><option value="all">all roles</option><option value="user">user</option><option value="mod">mod</option><option value="admin">admin</option><option value="owner">owner</option></select></label>
+          <label class="admin-users-filter" for="admin-users-type"><span>account type</span><select id="admin-users-type"><option value="all">all types</option><option value="registered">registered</option><option value="guest">guest</option></select></label>
+          <label class="admin-users-filter" for="admin-users-sort"><span>sort</span><select id="admin-users-sort"><option value="online">online first</option><option value="asc">username a–z</option><option value="desc">username z–a</option></select></label>
+        </div>
+        <div id="admin-users-state" class="admin-users-state" role="status" aria-live="polite">loading users…</div>
+        <div class="admin-users-table-wrap" id="admin-users-table-wrap" hidden>
+          <table class="admin-users-table">
+            <thead><tr><th scope="col">user</th><th scope="col">role</th><th scope="col">presence</th><th scope="col">moderation</th><th scope="col"><span class="admin-visually-hidden">details</span></th></tr></thead>
+            <tbody id="admin-users-list"></tbody>
+          </table>
+        </div>
+        <footer class="admin-users-directory-footer"><p id="admin-users-results" role="status" aria-live="polite"></p><button type="button" id="admin-users-reset" hidden>clear filters</button></footer>
+      </section>
     </main>
+    <div id="admin-user-drawer-backdrop" class="admin-user-drawer-backdrop" hidden></div>
+    <dialog id="admin-user-drawer" class="admin-user-drawer" aria-modal="true" aria-labelledby="admin-user-drawer-title">
+      <header class="admin-user-drawer-header"><h3 id="admin-user-drawer-title">user details</h3><button type="button" id="admin-user-drawer-close" aria-label="close user details"><i class="ti ti-x" aria-hidden="true"></i></button></header>
+      <div id="admin-users-detail" class="admin-users-detail"></div>
+    </dialog>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/users.js"></script>
     <div id="modal-overlay" style="display: none;">
       <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-message">
         <p id="modal-message"></p>
         <input type="text" id="modal-input" aria-labelledby="modal-message" style="display: none;">
-
+        <select id="modal-select" aria-labelledby="modal-message" style="display: none;"></select>
         <div id="modal-actions"><button type="button" id="modal-cancel">cancel</button><button type="button" id="modal-confirm">confirm</button></div>
       </div>
     </div>

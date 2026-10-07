@@ -828,7 +828,7 @@ function buildUserList(channel = "main") {
 
   for (const [id, s] of io.sockets.sockets) {
     if (!s.username) continue;
-    if (s.currentChannel !== channel) continue;
+    if (channel !== null && s.currentChannel !== channel) continue;
     if (!onlineUsers.has(s.userEmail)) {
       onlineEmails.add(s.userEmail);
       onlineUsers.set(s.userEmail, {
@@ -904,9 +904,21 @@ async function getAllClerkUsers() {
   return adminClerkUsersCache.promise;
 }
 
-async function buildAdminUserList(channel = "main") {
+async function getActiveClerkSessions(userId) {
+  const sessions = [];
+  let offset = 0;
+  while (true) {
+    const page = await clerk.sessions.getSessionList({ userId, status: 'active', limit: 500, offset });
+    sessions.push(...page.data);
+    offset += page.data.length;
+    if (!page.data.length || offset >= page.totalCount) break;
+  }
+  return sessions;
+}
+
+async function buildAdminUserList() {
   const usersByEmail = new Map(
-    buildUserList(channel).map((user) => [user.email, user]),
+    buildUserList(null).map((user) => [user.email, user]),
   );
 
   for (const clerkUser of await getAllClerkUsers()) {
@@ -941,7 +953,16 @@ async function buildAdminUserList(channel = "main") {
     });
   }
 
-  return [...usersByEmail.values()];
+  return adminModerationFlags([...usersByEmail.values()]);
+}
+
+// Only admin responses include moderation flags; public channel lists stay unchanged.
+function adminModerationFlags(users) {
+  return users.map((user) => {
+    const mute = getMute(user.email);
+    const muted = !!mute && (mute.until === null || mute.until > Date.now());
+    return { ...user, banned: isBanned(user.email), muted, muteUntil: muted ? mute.until : null };
+  });
 }
 
 function emitUserList(channel = "main") {
@@ -955,11 +976,11 @@ function emitUserList(channel = "main") {
       s.username &&
       s.currentChannel === channel
     ) {
-      buildAdminUserList(channel)
+      buildAdminUserList()
         .then((adminUsers) => s.emit("adminUserlist", adminUsers))
         .catch((e) => {
           console.error("failed to load admin user list:", e);
-          s.emit("adminUserlist", users);
+          s.emit("adminUserlist", adminModerationFlags(buildUserList(null)));
         });
       s.emit('uRole', getRole(s.userEmail))
     }
@@ -1152,11 +1173,12 @@ io.on("connection", (socket) => {
   socket.on("getAdminUsers", async () => {
     if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
     try {
-      socket.emit("adminUserlist", await buildAdminUserList(socket.currentChannel));
+      socket.emit("adminUserlist", await buildAdminUserList());
     } catch (e) {
       console.error("failed to load admin user list:", e);
-      socket.emit("adminUserlist", buildUserList(socket.currentChannel));
+      socket.emit("adminUserlist", adminModerationFlags(buildUserList(null)));
     }
+    socket.emit('adminIdentity', { email: socket.userEmail, role: getRole(socket.userEmail) });
     socket.emit('uRole', getRole(socket.userEmail));
   });
 
@@ -2126,139 +2148,78 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
-  if (url.pathname === "/admin/verify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d })
+  if (["/admin/verify", "/admin/unverify", "/admin/redverify", "/admin/unredverify"].includes(url.pathname) && req.method === "POST") {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
+      let payload;
       try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null
-        const sessRole = sess ? getRole(sess.email) : 'user'
-
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'forbidden' }))
-          return
-        }
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'email required' }))
-          return
-        }
-
-        const currentRole = getRole(targetEmail)
-        if (!["mod", 'admin', 'owner'].includes(currentRole)) {
-          setRole(targetEmail, 'mod')
-        }
-        setVerified(targetEmail)
-
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ success: true }))
-      } catch (e) {
+        payload = JSON.parse(body);
+      } catch {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: 'invalid request' }));
+        return;
       }
-    })
-    return;
-  }
-
-  if (url.pathname === "/admin/unverify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d });
-    req.on('end', async () => {
+      const sess = payload?.session ? getSession(payload.session) : null;
+      if (!sess || getRole(sess.email) !== 'owner') {
+        res.writeHead(403, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'forbidden' }));
+        return;
+      }
+      if (typeof payload.email !== 'string' || !payload.email.trim()) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'email required' }));
+        return;
+      }
+      const targetEmail = normalizeEmail(payload.email);
+      const regular = ['/admin/verify', '/admin/unverify'].includes(url.pathname);
+      if (regular && targetEmail.endsWith('@guest')) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'guests cannot have moderator roles' }));
+        return;
+      }
+      const currentRole = getRole(targetEmail);
+      const newRole = url.pathname === '/admin/verify' && currentRole === 'user' ? 'mod'
+        : url.pathname === '/admin/unverify' && currentRole === 'mod' ? 'user' : currentRole;
       try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null;
-        const sessRole = sess ? getRole(sess.email) : 'user';
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "forbidden" }));
-          return
+        // Clerk remains the source of truth when verification changes a role.
+        // Sync it first so a failed request cannot leave a local promotion behind.
+        if (newRole !== currentRole) {
+          const list = await clerk.users.getUserList({ emailAddress: [targetEmail], limit: 1 });
+          const clerkUser = list.data?.[0];
+          if (!clerkUser) {
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'no Clerk account found' }));
+            return;
+          }
+          await clerk.users.updateUserMetadata(clerkUser.id, { publicMetadata: { role: newRole } });
+          setRole(targetEmail, newRole);
         }
+        if (url.pathname === '/admin/verify') setVerified(targetEmail);
+        if (url.pathname === '/admin/unverify') removeVerified(targetEmail);
+        if (url.pathname === '/admin/redverify') setRedVerified(targetEmail);
+        if (url.pathname === '/admin/unredverify') removeRedVerified(targetEmail);
 
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "email required" }));
-          return
+        const verified = isVerified(targetEmail);
+        const redVerified = isRedVerified(targetEmail);
+        forEachUserSocket(targetEmail, socket => {
+          socket.userRole = newRole;
+          socket.cachedVerified = verified;
+          socket.cachedRedVerified = redVerified;
+          socket.emit('uRole', newRole);
+        });
+        for (const socket of io.sockets.sockets.values()) {
+          if (['admin', 'owner'].includes(socket.userRole)) socket.emit('userVerificationChanged', targetEmail);
         }
-
-        const currentRole = getRole(targetEmail);
-        if (currentRole === "mod") {
-          setRole(targetEmail, 'user');
-        }
-        removeVerified(targetEmail);
-
+        emitAllUserLists();
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ success: true }));
-      } catch (e) {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid request' }));
+        res.end(JSON.stringify({ success: true, role: newRole, verified, redVerified }));
+      } catch (error) {
+        console.error('verification update failed:', error);
+        res.writeHead(500, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'could not update verification. try again.' }));
       }
-    })
-    return;
-  }
-
-  if (url.pathname === "/admin/redverify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d })
-    req.on('end', async () => {
-      try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null
-        const sessRole = sess ? getRole(sess.email) : 'user'
-
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'forbidden' }))
-          return
-        }
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'email required' }))
-          return
-        }
-
-        setRedVerified(targetEmail)
-
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify({ success: true }))
-      } catch (e) {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid request' }));
-      }
-    })
-    return;
-  }
-
-  if (url.pathname === "/admin/unredverify" && req.method === "POST") {
-    let body = ""
-    req.on('data', (d) => { body += d });
-    req.on('end', async () => {
-      try {
-        const { session: sessionId, email: targetEmail } = JSON.parse(body);
-        const sess = sessionId ? getSession(sessionId) : null;
-        const sessRole = sess ? getRole(sess.email) : 'user';
-        if (!sess || sessRole !== "owner") {
-          res.writeHead(403, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "forbidden" }));
-          return
-        }
-
-        if (!targetEmail) {
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: "email required" }));
-          return
-        }
-
-        removeRedVerified(targetEmail);
-
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ success: true }));
-      } catch (e) {
-        res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'invalid request' }));
-      }
-    })
+    });
     return;
   }
 
@@ -2352,7 +2313,7 @@ httpServer.on("request", async (req, res) => {
       const banned = isBanned(targetEmail)
       const banReason = banned ? getBanReason(targetEmail) : null
       const muteData = getMute(targetEmail)
-      const muted = !!muteData
+      const muted = !!muteData && (muteData.until === null || muteData.until > Date.now())
       const muteReason = muteData?.reason || null
       const muteUntil = muteData?.until || null
 
@@ -2387,7 +2348,8 @@ httpServer.on("request", async (req, res) => {
 
       let clerkId = null
       let lastSignInAt = null
-      let activeSessions = 0;
+      let activeSessions = null;
+      let clerkBanned = targetEmail.endsWith('@guest') ? false : null;
       let clerkUsername = null;
 
       if (!targetEmail.endsWith("@guest")) {
@@ -2407,6 +2369,7 @@ httpServer.on("request", async (req, res) => {
 
           if (clerkId) {
             const clerkUser = await clerk.users.getUser(clerkId);
+            clerkBanned = !!clerkUser.banned;
             clerkUsername =
               clerkUser.username ||
               [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
@@ -2418,10 +2381,10 @@ httpServer.on("request", async (req, res) => {
                 userId: clerkId,
                 status: 'active'
               });
-              activeSessions = sessionList.data?.length || 0;
+              activeSessions = sessionList.totalCount ?? sessionList.data?.length ?? 0;
             } catch (e) {
               console.error('failed to fetch sessions:', e);
-              activeSessions = 0;
+              activeSessions = null;
             }
 
             if (clerkUser.createdAt && clerkUser.createdAt < createdAt) {
@@ -2443,11 +2406,19 @@ httpServer.on("request", async (req, res) => {
         redVerified,
         guest: targetEmail.endsWith("@guest"),
         online,
+        avatar: getAvatar(targetEmail),
+        profile: {
+          bio: targetEmail.endsWith('@guest') ? "i'm a guest on chat™" : (profileData.bio || ''),
+          pronouns: targetEmail.endsWith('@guest') ? '' : (profileData.pronouns || ''),
+          status: profileData.status || '',
+          lastSeen: online ? null : profileData.lastSeen,
+        },
         clerkId,
         createdAt,
         lastSignInAt,
         messageCount,
         activeSessions,
+        clerkBanned,
         banned,
         banReason,
         muted,
@@ -2516,12 +2487,7 @@ httpServer.on("request", async (req, res) => {
       }
 
       try {
-        const sessionList = await clerk.sessions.getSessionList({
-          userId: clerkId,
-          status: 'active'
-        });
-
-        const sessions = (sessionList.data || []).map(s => ({
+        const sessions = (await getActiveClerkSessions(clerkId)).map(s => ({
           id: s.id,
           status: s.status,
           lastActiveAt: s.lastActiveAt,
@@ -3017,10 +2983,11 @@ httpServer.on("request", async (req, res) => {
         }
 
         try {
-          const clerkUser = await clerk.users.getUser(clerkId);
+          const activeSessions = await getActiveClerkSessions(clerkId);
           let revokedCount = 0;
+          let failedCount = 0;
 
-          for (const sess of clerkUser.sessions || []) {
+          for (const sess of activeSessions) {
             if (sess.status === "active") {
               try {
                 await clerk.sessions.revokeSession(sess.id);
@@ -3030,6 +2997,7 @@ httpServer.on("request", async (req, res) => {
                 })
                 revokedCount++;
               } catch (e) {
+                failedCount++;
                 console.error(`failed to revoke session ${sess.id}: `, e)
               }
             }
@@ -3041,8 +3009,10 @@ httpServer.on("request", async (req, res) => {
             s.disconnect()
           })
 
-          res.writeHead(200, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ success: true, revokedCount }));
+          res.writeHead(failedCount ? 500 : 200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify(failedCount
+            ? { error: `failed to revoke ${failedCount} session(s); ${revokedCount} revoked`, revokedCount, failedCount }
+            : { success: true, revokedCount }));
         } catch (e) {
           console.error("Failed to revoke sessions:", e);
           res.writeHead(500, { "content-type": "application/json" });

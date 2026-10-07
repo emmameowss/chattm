@@ -1,1152 +1,723 @@
 const session = localStorage.getItem('session');
 if (!session) window.location.href = '/';
 
-const socket = io(window.location.origin, {
-  auth: { session },
-  transports: ["websocket"]
-});
+const socket = io(window.location.origin, { auth: { session }, transports: ['websocket'] });
+const drawer = document.querySelector('#admin-user-drawer');
+const detail = document.querySelector('#admin-users-detail');
+const backdrop = document.querySelector('#admin-user-drawer-backdrop');
+const directory = document.querySelector('#admin-users-list');
+const state = document.querySelector('#admin-users-state');
+const results = document.querySelector('#admin-users-results');
+const refreshButton = document.querySelector('#admin-users-refresh');
+const searchInput = document.querySelector('#admin-users-search');
+const roleFilter = document.querySelector('#admin-users-role');
+const typeFilter = document.querySelector('#admin-users-type');
+const sortInput = document.querySelector('#admin-users-sort');
+const resetButton = document.querySelector('#admin-users-reset');
+const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+const pendingActions = new Set();
+let uRole = 'user';
+let ownEmail = null;
+let usersData = [];
+let selectedUser = null;
+let activeView = 'all';
+let activeDetailTab = 'profile';
+let loaded = false;
+let detailRequest = 0;
+let refreshTimer;
 
-let uRole = 'user'
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
 
-
-const logsTab = document.querySelector("#logs")
-
-logsTab.addEventListener('click', () => {
-  showToast('action logs have not been implemented yet, check back later', 'info')
-})
-
-function nameHash(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+function button(label, icon, handler, className = '') {
+  const node = element('button', className);
+  node.type = 'button';
+  if (label) node.dataset.focusKey = label;
+  if (icon) {
+    const glyph = element('i', `ti ti-${icon}`);
+    glyph.setAttribute('aria-hidden', 'true');
+    node.append(glyph, document.createTextNode(' '));
   }
-  return hash;
-}
-
-function getNameColor(name) {
-  if (!name) return "var(--muted)";
-  if (name.toLowerCase() === "emma") return "hotpink";
-  return `hsl(${nameHash(name) % 360}, 70%, 55%)`;
-}
-
-function makeBadge(src, size, tooltip) {
-  const wrap = document.createElement('span');
-  wrap.className = 'badge-wrap';
-  wrap.dataset.tooltip = tooltip;
-  const img = document.createElement('img');
-  img.src = src;
-  img.style.cssText = `width:${size}px;height:${size}px;vertical-align:middle;margin-left:4px;position:relative;top:-1px`;
-  wrap.appendChild(img);
-  return wrap;
-}
-
-function showModal({ message, withInput = false, defaultValue = '' }) {
-  return new Promise((resolve) => {
-    const overlay = document.querySelector('#modal-overlay');
-    const msgEl = document.querySelector('#modal-message');
-    const inputEl = document.querySelector('#modal-input');
-    const confirmBtn = document.querySelector('#modal-confirm');
-    const cancelBtn = document.querySelector('#modal-cancel');
-
-    msgEl.textContent = message;
-    inputEl.style.display = withInput ? "block" : "none";
-    inputEl.value = defaultValue;
-    overlay.style.display = "flex";
-    if (withInput) inputEl.focus();
-
-    function cleanUp(result) {
-      overlay.style.display = "none";
-      confirmBtn.removeEventListener('click', onConfirm);
-      cancelBtn.removeEventListener('click', onCancel);
-      if (withInput) inputEl.removeEventListener('keydown', onKey);
-      resolve(result);
-    }
-    function onConfirm() {
-      cleanUp(withInput ? inputEl.value : true);
-    }
-    function onCancel() {
-      cleanUp(withInput ? null : false);
-    }
-    function onKey(e) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        onConfirm();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-      }
-    }
-    confirmBtn.addEventListener('click', onConfirm);
-    cancelBtn.addEventListener('click', onCancel);
-    if (withInput) inputEl.addEventListener("keydown", onKey);
-  });
+  node.append(document.createTextNode(label));
+  if (handler) node.addEventListener('click', event => handler(event.currentTarget));
+  return node;
 }
 
 function showToast(message, type = 'info') {
-  const container = document.querySelector('#toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = message;
-  container.appendChild(toast);
+  const toast = element('div', `toast ${type}`, message);
+  document.querySelector('#toast-container').append(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
 
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(10px)';
-    toast.style.transition = 'opacity 0.2s, transform 0.2s';
-    setTimeout(() => toast.remove(), 200);
-  }, 3000);
+function showModal({ message, withInput = false, defaultValue = '', options = null, confirmLabel = 'confirm' }) {
+  return new Promise(resolve => {
+    const overlay = document.querySelector('#modal-overlay');
+    const input = document.querySelector('#modal-input');
+    const select = document.querySelector('#modal-select');
+    const confirm = document.querySelector('#modal-confirm');
+    const cancel = document.querySelector('#modal-cancel');
+    document.querySelector('#modal-message').textContent = message;
+    input.style.display = withInput ? 'block' : 'none';
+    input.value = defaultValue;
+    select.style.display = options ? 'block' : 'none';
+    select.replaceChildren();
+    options?.forEach(([value, label]) => {
+      const option = element('option', '', label);
+      option.value = value;
+      select.append(option);
+    });
+    if (options) select.value = defaultValue;
+    confirm.textContent = confirmLabel;
+    overlay.style.display = 'flex';
+    // admin-ui.js moves focus after making the underlying drawer inert.
+    function finish(value) {
+      overlay.style.display = 'none';
+      confirm.removeEventListener('click', onConfirm);
+      cancel.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKey);
+      resolve(value);
+    }
+    function onConfirm() { finish(options ? select.value : withInput ? input.value.trim() : true); }
+    function onCancel() { finish(null); }
+    function onKey(event) {
+      if (event.key === 'Enter') { event.preventDefault(); onConfirm(); }
+    }
+    confirm.addEventListener('click', onConfirm);
+    cancel.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKey);
+  });
 }
 
 function timeAgo(timestamp) {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (!timestamp) return 'never';
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
   if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  const years = Math.floor(months / 12);
-  return `${years}y ago`;
+  const units = [[31536000, 'y'], [2592000, 'mo'], [86400, 'd'], [3600, 'h'], [60, 'm']];
+  const [size, label] = units.find(([size]) => seconds >= size);
+  return `${Math.floor(seconds / size)}${label} ago`;
 }
 
-function formatDate(timestamp) {
-  return new Date(timestamp).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
+function formatDate(timestamp, withTime = false) {
+  if (!timestamp) return 'unavailable';
+  return new Date(timestamp).toLocaleString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+    ...(withTime ? { hour: 'numeric', minute: '2-digit' } : {})
   });
 }
 
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Copied to clipboard', 'success');
-  }).catch(() => {
-    showToast('Failed to copy', 'error');
+function avatar(user, className) {
+  const node = element('div', className);
+  node.setAttribute('aria-hidden', 'true');
+  const initial = (user.username || user.email || '?')[0].toUpperCase();
+  if (user.avatar) {
+    const img = element('img');
+    img.alt = '';
+    img.src = user.avatar;
+    img.addEventListener('error', () => node.replaceChildren(document.createTextNode(initial)), { once: true });
+    node.append(img);
+  } else {
+    node.textContent = initial;
+  }
+  return node;
+}
+
+function badge(label, variant = '') { return element('span', `admin-directory-badge ${variant}`, label); }
+function isMuted(user) { return !!user.muted && (!user.muteUntil || user.muteUntil > Date.now()); }
+function matchesView(user, view) {
+  return view === 'all' || (view === 'online' && user.online) ||
+    (view === 'muted' && isMuted(user)) || (view === 'banned' && user.banned);
+}
+
+function filteredUsers() {
+  const query = searchInput.value.trim().toLocaleLowerCase();
+  return usersData.filter(user =>
+    matchesView(user, activeView) &&
+    (!query || `${user.username} ${user.email}`.toLocaleLowerCase().includes(query)) &&
+    (roleFilter.value === 'all' || user.role === roleFilter.value) &&
+    (typeFilter.value === 'all' || user.guest === (typeFilter.value === 'guest'))
+  ).sort((a, b) => {
+    const byName = (a.username || a.email).localeCompare(b.username || b.email, undefined, { sensitivity: 'base', numeric: true }) || a.email.localeCompare(b.email);
+    if (sortInput.value === 'online') return Number(b.online) - Number(a.online) || byName;
+    return sortInput.value === 'desc' ? -byName : byName;
   });
 }
 
-async function fetchUserInfo(email) {
-  try {
-    const res = await fetch(`/admin/user/info?email=${encodeURIComponent(email)}`, {
-      credentials: 'same-origin'
+function showDirectoryState(title, message, retry = false) {
+  state.replaceChildren(element('strong', '', title), element('span', '', message));
+  if (retry) state.append(button('try again', 'refresh', requestUsers));
+  state.hidden = false;
+  document.querySelector('#admin-users-table-wrap').hidden = true;
+}
+
+function renderUsers() {
+  const focusedEmail = document.activeElement?.dataset.userOpen;
+  directory.replaceChildren();
+  document.querySelectorAll('[data-user-count]').forEach(node => {
+    node.textContent = loaded ? usersData.filter(user => matchesView(user, node.dataset.userCount)).length : '—';
+  });
+  resetButton.hidden = !(searchInput.value || activeView !== 'all' || roleFilter.value !== 'all' || typeFilter.value !== 'all' || sortInput.value !== 'online');
+  if (!loaded) return;
+  const visibleUsers = filteredUsers();
+  results.textContent = `showing ${visibleUsers.length} of ${usersData.length} ${usersData.length === 1 ? 'user' : 'users'}`;
+  if (!visibleUsers.length) {
+    showDirectoryState(usersData.length ? 'no matching users' : 'no users yet',
+      usersData.length ? 'try another search or clear your filters.' : 'accounts and connected guests will appear here.');
+    return;
+  }
+  state.hidden = true;
+  document.querySelector('#admin-users-table-wrap').hidden = false;
+  const fragment = document.createDocumentFragment();
+  visibleUsers.forEach(user => {
+    const row = element('tr', 'admin-directory-row');
+    row.dataset.email = user.email;
+    row.classList.toggle('selected', selectedUser?.email === user.email);
+    const identity = element('div', 'admin-directory-identity');
+    const info = element('div', 'admin-user-info');
+    info.append(element('span', 'admin-user-name', user.username || user.email.split('@')[0]),
+      element('span', 'admin-user-email', user.guest ? 'guest account' : user.email));
+    identity.append(avatar(user, 'admin-user-avatar'), info);
+    const cells = Array.from({ length: 5 }, () => element('td'));
+    cells[0].append(identity);
+    cells[1].append(badge(user.role || 'user', user.role !== 'user' ? 'staff' : ''));
+    cells[2].append(badge(user.online ? 'online' : 'offline', user.online ? 'online' : ''));
+    const moderation = element('div', 'admin-user-badges');
+    if (user.banned) moderation.append(badge('banned', 'banned'));
+    if (isMuted(user)) moderation.append(badge('muted', 'muted'));
+    if (!moderation.children.length) moderation.append(element('span', '', '—'));
+    cells[3].append(moderation);
+    const openButton = button('', 'chevron-right', trigger => openUser(user, trigger), 'admin-user-open');
+    openButton.dataset.userOpen = user.email;
+    openButton.setAttribute('aria-label', `view details for ${user.username || user.email}`);
+    openButton.setAttribute('aria-haspopup', 'dialog');
+    cells[4].append(openButton);
+    row.append(...cells);
+    row.addEventListener('click', event => {
+      if (!event.target.closest('button')) openUser(user, openButton);
     });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (e) {
-    console.error('failed to fetch user info: ', e);
-    return null
-  }
-}
-
-async function refreshDetailView() {
-  if (!selectedUser) return
-  const info = await fetchUserInfo(selectedUser.email)
-  if (info) {
-    selectedUser = { ...selectedUser, ...info };
-    lesbians(selectedUser);
-  }
-}
-
-async function banUser(email, username) {
-  const reason = await showModal({
-    message: `ban ${username}?\n\nreason:`,
-    withInput: true,
-    defaultValue: 'bad'
+    fragment.append(row);
   });
-  if (!reason) return
+  directory.append(fragment);
+  if (focusedEmail && !drawer.open) [...directory.querySelectorAll('[data-user-open]')]
+    .find(btn => btn.dataset.userOpen === focusedEmail)?.focus();
+}
 
-  const btn = event.target.closest('button');
-  btn.classList.add('loading');
-  btn.disabled = true;
-  const originalHTML = btn.innerHTML;
-  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> banning...';
+function finishRefresh() {
+  clearTimeout(refreshTimer);
+  refreshButton.disabled = false;
+  refreshButton.innerHTML = '<i class="ti ti-refresh" aria-hidden="true"></i> refresh';
+}
 
+function requestUsers() {
+  if (!socket.connected) {
+    showDirectoryState('connection lost', 'reconnecting to the server…', true);
+    return;
+  }
+  refreshButton.disabled = true;
+  refreshButton.innerHTML = '<i class="ti ti-loader admin-loading-spinner" aria-hidden="true"></i> refreshing…';
+  socket.emit('getAdminUsers');
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    finishRefresh();
+    if (!loaded) showDirectoryState('could not load users', 'the server did not respond. try again.', true);
+    else showToast('could not refresh users. try again.', 'error');
+  }, 10000);
+}
+
+async function readJson(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  if (!response.ok || data.error) throw new Error(data.error || 'request failed');
+  return data;
+}
+
+function openUser(user, trigger) {
+  activeDetailTab = 'profile';
+  selectedUser = user;
+  document.querySelectorAll('.admin-directory-row').forEach(row => row.classList.toggle('selected', row.dataset.email === user.email));
+  trigger?.focus();
+  if (!drawer.open) drawer.show();
+  backdrop.hidden = false;
+  document.body.classList.add('admin-drawer-open');
+  loadUser(user, true);
+}
+
+function closeUser() {
+  if (!drawer.open || !document.querySelector('#modal-overlay').style.display.includes('none') || document.querySelector('.admin-sessions-modal')) return;
+  drawer.close();
+  backdrop.hidden = true;
+  document.body.classList.remove('admin-drawer-open');
+  selectedUser = null;
+  detailRequest++;
+  document.querySelectorAll('.admin-directory-row.selected').forEach(row => row.classList.remove('selected'));
+}
+
+async function loadUser(user, showLoading = false) {
+  const request = ++detailRequest;
+  detail.setAttribute('aria-busy', 'true');
+  if (showLoading) {
+    detail.replaceChildren(element('div', 'admin-loading', 'loading user details…'));
+  }
   try {
-    const res = await fetch('/admin/user/ban', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session, email, reason })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast('user banned!', 'success');
-      await refreshDetailView()
-      socket.emit('getAdminUsers');
-    } else {
-      showToast(data.error || 'failed to ban user', 'error')
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-    btn.classList.remove('loading');
-    btn.disabled = false;
-    btn.innerHTML = originalHTML;
+    const info = await readJson(`/admin/user/info?email=${encodeURIComponent(user.email)}`, { credentials: 'same-origin' });
+    if (request !== detailRequest || !drawer.open || selectedUser?.email !== user.email) return;
+    selectedUser = { ...user, ...info };
+    renderDetail(selectedUser);
+  } catch (error) {
+    if (request !== detailRequest || !drawer.open) return;
+    if (showLoading) {
+      const empty = element('div', 'admin-users-detail-empty');
+      empty.append(element('strong', '', 'could not load user details'),
+        element('span', '', error.message), button('try again', 'refresh', () => loadUser(user, true)));
+      detail.replaceChildren(empty);
+    } else showToast('could not refresh user details', 'error');
+  } finally {
+    if (request === detailRequest) detail.removeAttribute('aria-busy');
   }
 }
 
-async function kickUser(email, username) {
-  const reason = await showModal({
-    message: `kick ${username}?\n\nreason:`,
-    withInput: true,
-    defaultValue: 'oops my finger slipped'
+function section(title, hint) {
+  const node = element('section', 'admin-detail-section');
+  node.append(element('h4', 'admin-detail-section-title', title));
+  if (hint) node.append(element('p', '', hint));
+  return node;
+}
+
+function field(parent, label, value) {
+  const node = element('div', 'admin-detail-field');
+  node.append(element('span', 'admin-detail-field-label', label));
+  const content = element('span', 'admin-detail-field-value');
+  if (value instanceof Node) content.append(value);
+  else content.textContent = value;
+  node.append(content);
+  parent.append(node);
+}
+
+function moderationNotice(parent, label, reason, variant) {
+  const box = element('div', `admin-mod-status-box ${variant}`);
+  box.append(element('strong', '', label), element('p', '', reason || 'no reason provided'));
+  parent.append(box);
+}
+
+function canModerate(user) {
+  return ['admin', 'owner'].includes(uRole) && user.email !== ownEmail &&
+    roleValues[user.role || 'user'] < roleValues[uRole];
+}
+
+function detailTabs(content) {
+  const names = ['profile', 'moderation', 'account', 'sessions'];
+  const nav = element('div', 'admin-detail-tabs');
+  nav.setAttribute('role', 'tablist');
+  nav.setAttribute('aria-label', 'user details');
+  const body = element('div', 'admin-detail-panels');
+  const panels = {};
+  const tabs = [];
+  function selectTab(name, focus = false) {
+    activeDetailTab = name;
+    tabs.forEach(tab => {
+      const selected = tab.dataset.detailTab === name;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      panels[tab.dataset.detailTab].hidden = !selected;
+    });
+    body.scrollTop = 0;
+    if (focus) tabs.find(tab => tab.dataset.detailTab === name)?.focus();
+  }
+  names.forEach((name, index) => {
+    const tab = button(name, null, () => selectTab(name));
+    tab.id = `admin-detail-tab-${name}`;
+    tab.dataset.detailTab = name;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', `admin-detail-panel-${name}`);
+    const panel = element('div', 'admin-detail-panel');
+    panel.id = `admin-detail-panel-${name}`;
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', tab.id);
+    panel.tabIndex = 0;
+    panels[name] = panel;
+    tabs.push(tab);
+    tab.addEventListener('keydown', event => {
+      let next;
+      if (event.key === 'ArrowRight') next = (index + 1) % names.length;
+      if (event.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = names.length - 1;
+      if (next === undefined) return;
+      event.preventDefault();
+      selectTab(names[next], true);
+    });
+    nav.append(tab);
+    body.append(panel);
   });
-  if (!reason) return
-
-  const btn = event.target.closest('button');
-  btn.classList.add('loading');
-  btn.disabled = true;
-  const originalHTML = btn.innerHTML;
-  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> kicking...';
-
-  try {
-    const res = await fetch('/admin/user/kick', {
-      method: "POST",
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session, email, reason })
-    });
-    const data = await res.json()
-    if (data.success) {
-      showToast(data.kicked ? 'user kicked' : 'user was offline', 'success')
-      await refreshDetailView()
-      socket.emit('getAdminUsers');
-    } else {
-      showToast(data.error || 'failed to kick', 'error')
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-    btn.classList.remove('loading');
-    btn.disabled = false;
-    btn.innerHTML = originalHTML;
-  }
+  content.append(nav, body);
+  selectTab(activeDetailTab);
+  return panels;
 }
 
-async function muteUser(email, username) {
-  const durationChoice = await showModal({
-    message: `mute ${username}?\n\n duration: 15m, 1h, 24h, forever, or custom`,
-    withInput: true,
-    defaultValue: '1h'
-  });
-  if (!durationChoice) return
-
-  let duration;
-  const choice = durationChoice.toLowerCase().trim();
-  if (choice === "15m") duration = 15;
-  else if (choice === '1h') duration = 60;
-  else if (choice === '24h') duration = 1440;
-  else if (choice === 'forever') duration = null;
-  else {
-    duration = parseInt(choice);
-    if (isNaN(duration) || duration <= 0) {
-      showToast('invalid duration', 'error');
-      return
-    }
-  }
-
-  const reason = await showModal({
-    message: 'reason:',
-    withInput: true,
-    defaultValue: 'not meowing enough'
-  })
-  if (!reason) return
-
-  const btn = event.target.closest('button');
-  btn.classList.add('loading');
-  btn.disabled = true;
-  const originalHTML = btn.innerHTML;
-  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> muting...';
-
-  try {
-    const res = await fetch('/admin/user/mute', {
-      method: "POST",
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session, email, duration, reason })
-    });
-    const data = await res.json()
-    if (data.success) {
-      showToast('user muted', 'success');
-      await refreshDetailView()
-      socket.emit('getAdminUsers')
-    } else {
-      showToast(data.error || 'failed to mute user', 'error')
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-    btn.classList.remove('loading');
-    btn.disabled = false;
-    btn.innerHTML = originalHTML;
-  }
-}
-
-async function unmuteUser(email, username, buttonElement) {
+async function changeVerification(user, red, btn) {
+  const enabled = red ? user.redVerified : user.verified;
+  const label = red ? 'red verification' : 'regular verification';
+  let impact = 'the role stays unchanged.';
+  if (!red && !enabled && user.role === 'user') impact = 'this also promotes the user to mod.';
+  if (!red && enabled && user.role === 'mod') impact = 'this also changes the role from mod to user.';
   const confirmed = await showModal({
-    message: `unmute ${username}?`
+    message: `${enabled ? 'remove' : 'add'} ${label} for ${user.username}?\n\n${impact}`,
+    confirmLabel: enabled ? 'remove verification' : 'verify user'
   });
   if (!confirmed) return;
+  const action = red ? (enabled ? 'unredverify' : 'redverify') : (enabled ? 'unverify' : 'verify');
+  await performAction(`/admin/${action}`, { email: user.email }, btn,
+    `${label} ${enabled ? 'removed' : 'added'}`, user);
+}
 
-  const btn = buttonElement || event.target.closest('button');
-  btn.classList.add('loading');
-  btn.disabled = true;
-  const originalHTML = btn.innerHTML;
-  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> unmuting...';
+function renderDetail(user) {
+  const content = element('div', 'admin-users-detailed-content');
+  const header = element('div', 'admin-detail-header');
+  const identity = element('div', 'admin-detail-info');
+  identity.append(element('div', 'admin-detail-name', user.username),
+    element('div', 'admin-detail-email', user.guest ? 'guest account' : user.email));
+  const badges = element('div', 'admin-user-badges admin-detail-badges');
+  badges.append(badge(user.role, user.role !== 'user' ? 'staff' : ''),
+    badge(user.online ? 'online' : 'offline', user.online ? 'online' : ''));
+  if (user.guest) badges.append(badge('guest'));
+  if (user.verified) badges.append(badge('verified', 'staff'));
+  if (user.redVerified) badges.append(badge('red verified', 'red-verified'));
+  identity.append(badges);
+  header.append(avatar(user, 'admin-detail-avatar'), identity);
+  content.append(header);
+  const panels = detailTabs(content);
+  const profile = section('profile details');
+  field(profile, 'username', user.username);
+  field(profile, 'pronouns', user.profile?.pronouns || 'not set');
+  field(profile, 'status', user.profile?.status || 'not set');
+  field(profile, 'last seen', user.online ? 'online now' : user.profile?.lastSeen ? formatDate(user.profile.lastSeen, true) : 'unavailable');
+  const bio = element('div', 'admin-detail-bio');
+  bio.append(element('span', 'admin-detail-field-label', 'bio'),
+    element('p', 'admin-profile-bio', user.profile?.bio || 'no bio yet.'));
+  profile.append(bio);
+  if (user.guest) profile.append(element('p', '', 'guest accounts do not have a saved bio or pronouns.'));
+  panels.profile.append(profile);
 
-  try {
-    const res = await fetch('/admin/user/unmute', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session, email })
+  const verification = section('verification', uRole === 'owner'
+    ? 'regular verification promotes users to mod. removing it changes mods back to users. red verification leaves roles unchanged.'
+    : 'only the owner can change verification.');
+  [false, true].forEach(red => {
+    const enabled = red ? user.redVerified : user.verified;
+    const row = element('div', 'admin-verification-row');
+    const info = element('div', 'admin-verification-info');
+    info.append(element('strong', '', red ? 'red verification' : 'regular verification'),
+      badge(enabled ? 'verified' : 'not verified', enabled ? (red ? 'red-verified' : 'staff') : ''));
+    row.append(info);
+    if (uRole === 'owner') {
+      const control = button(enabled ? 'remove' : 'verify', enabled ? 'shield-x' : 'shield-check',
+        btn => changeVerification(user, red, btn));
+      control.id = red ? 'admin-red-verification' : 'admin-regular-verification';
+      control.setAttribute('aria-label', `${enabled ? 'remove' : 'add'} ${red ? 'red' : 'regular'} verification`);
+      control.disabled = !red && user.guest;
+      row.append(control);
+    }
+    verification.append(row);
+  });
+  if (user.guest && uRole === 'owner') verification.append(element('p', '', 'regular verification is unavailable for guests because guests cannot have moderator roles.'));
+  panels.profile.append(verification);
+
+  const moderation = section('moderation');
+  if (user.banned) moderationNotice(moderation, 'chat ban active', user.banReason, 'danger');
+  if (isMuted(user)) moderationNotice(moderation,
+    user.muteUntil ? `muted until ${formatDate(user.muteUntil, true)}` : 'muted permanently', user.muteReason, 'warning');
+  const actions = element('div', 'admin-detail-actions');
+  const permitted = canModerate(user);
+  const ban = button(user.banned ? 'unban user' : 'ban user', 'ban',
+    btn => moderateUser(user, user.banned ? 'unban' : 'ban', btn), user.banned ? 'positive' : 'destructive');
+  // A Clerk ban cannot be lifted through the chat ban endpoint.
+  ban.disabled = user.banned ? (!['admin', 'owner'].includes(uRole) || user.clerkBanned !== false) : !permitted;
+  const mute = button(isMuted(user) ? 'unmute user' : 'mute user', isMuted(user) ? 'volume' : 'volume-3',
+    btn => moderateUser(user, isMuted(user) ? 'unmute' : 'mute', btn), isMuted(user) ? 'positive' : 'moderate');
+  mute.disabled = isMuted(user) ? !['admin', 'owner'].includes(uRole) : !permitted;
+  const kick = button('kick user', 'user-x', btn => moderateUser(user, 'kick', btn), 'moderate');
+  kick.disabled = !permitted || !user.online;
+  actions.append(mute, kick, ban);
+  moderation.append(actions);
+  if (!permitted) moderation.append(element('p', '', 'moderation is available for users with a lower role than yours.'));
+  if (user.banned && user.clerkBanned === true) moderation.append(element('p', '', 'this account is also banned in Clerk. manage its account ban in the Clerk dashboard.'));
+  if (user.banned && user.clerkBanned == null) moderation.append(element('p', '', 'account ban status is unavailable. refresh details before unbanning.'));
+  panels.moderation.append(moderation);
+
+  const account = section('account details');
+  field(account, 'account type', user.guest ? 'guest' : 'registered');
+  field(account, 'joined', formatDate(user.createdAt));
+  field(account, 'total messages', Number(user.messageCount || 0).toLocaleString());
+  panels.account.append(account);
+
+  if (uRole === 'owner' && !user.guest) {
+    const roles = section('role management');
+    const controls = element('div', 'admin-role-selector');
+    const label = element('label', '', 'role');
+    label.htmlFor = 'role-select';
+    const select = element('select');
+    select.id = 'role-select';
+    Object.keys(roleValues).forEach(role => {
+      const option = element('option', '', role);
+      option.value = role;
+      select.append(option);
     });
-    const data = await res.json();
-    if (data.success) {
-      showToast('user unmuted', 'success');
-      await refreshDetailView();
-      socket.emit('getAdminUsers');
-    } else {
-      showToast(data.error || 'failed to unmute user', 'error');
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error');
-    btn.classList.remove('loading');
-    btn.disabled = false;
-    btn.innerHTML = originalHTML;
-  }
-}
-
-async function changeUserRole(email, username) {
-  const roleSelect = document.querySelector('#role-select')
-  const newRole = roleSelect.value
-  const currentRole = selectedUser.role
-
-  if (newRole === currentRole) {
-    showToast('role unchanged', 'info')
-    return
-  }
-
-  const btn = event.target.closest('button')
-  btn.classList.add('loading')
-  btn.disabled = true
-
-  try {
-    const res = await fetch('/admin/user/role', {
-      method: "POST",
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify({session, email, role: newRole})
+    select.value = user.role;
+    select.disabled = ownEmail === user.email;
+    const update = button('update', 'check', async btn => {
+      const role = select.value;
+      const confirmed = await showModal({ message: `change ${user.username}'s role from ${user.role} to ${role}?`, confirmLabel: 'update role' });
+      if (confirmed) performAction('/admin/user/role', { email: user.email, role }, btn, 'role updated', user);
     });
-    const data = await res.json()
-
-    if (data.success) {
-      showToast(`role updated to ${newRole}`, 'success')
-      await refreshDetailView()
-    } else {
-      showToast(data.error || 'failed to update role', 'error')
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-  } finally {
-    btn.classList.remove('loading')
-    btn.disabled = false;
-  }
-}
-
-async function viewUserSessions(email, clerkId) {
-  const modal = document.createElement('div')
-  modal.className = 'admin-sessions-modal'
-
-  const content = document.createElement('div')
-  content.className = 'admin-sessions-modal-content'
-
-  const header = document.createElement('div')
-  header.className = 'admin-sessions-modal-header'
-
-  const title = document.createElement('div')
-  title.className = 'admin-sessions-modal-title'
-  title.textContent = 'active sessions'
-  header.appendChild(title)
-
-  const closeBtn = document.createElement('button')
-  closeBtn.className = 'admin-sessions-modal-close'
-  closeBtn.innerHTML = '<i class="ti ti-x"</i>'
-  closeBtn.onclick = () => modal.remove()
-  header.appendChild(closeBtn)
-
-  content.appendChild(header)
-
-  const body = document.createElement('div')
-  body.className = 'admin-sessions-modal-body'
-  body.innerHTML = '<div class="admin-sessions-loading">loading sessions...</div>'
-  content.appendChild(body)
-
-  const footer = document.createElement('div')
-  footer.className = 'admin-sessions-modal-footer'
-
-  const revokeAllBtn = document.createElement('button')
-  revokeAllBtn.className = 'admin-sessions-revoke-all-btn'
-  revokeAllBtn.innerHTML = '<i class="ti ti-logout"></i> revoke all sessions'
-  revokeAllBtn.onclick = () => revokeAllSessions(email, clerkId, modal)
-  revokeAllBtn.disabled = true
-  footer.appendChild(revokeAllBtn)
-
-  content.appendChild(footer)
-
-  modal.appendChild(content)
-  document.body.appendChild(modal)
-
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal && !document.querySelector('#modal-overlay[style*="flex"]')) modal.remove()
-  })
-
-  try {
-    const res = await fetch(`/admin/user/sessions?email=${encodeURIComponent(email)}`, {
-      credentials: 'same-origin'
-    });
-    const data = await res.json()
-
-    if (!res.ok || !data.sessions) {
-      body.innerHTML = '<div class="admin-sessions-empty">Failed to load sessions</div>';
-      return;
-    }
-
-    if (data.sessions.length === 0) {
-      body.innerHTML = '<div class="admin-sessions-empty">No active sessions</div>';
-      return;
-    }
-
-    const list = document.createElement('div')
-    list.className = 'admin-sessions-list'
-
-    data.sessions.forEach(sess => {
-      const item = document.createElement('div')
-      item.className = 'admin-session-item'
-
-      const itemHeader = document.createElement('div')
-      itemHeader.className = 'admin-session-header'
-
-      const info = document.createElement('div')
-      info.className = 'admin-session-info'
-
-      const id = document.createElement('div')
-      id.className = 'admin-session-id'
-      id.textContent = sess.id
-      info.appendChild(id)
-
-      const meta = document.createElement('div')
-      meta.className = 'admin-session-meta'
-
-      if (sess.lastActiveAt) {
-        const lastActive = document.createElement('span')
-        lastActive.className = 'admin-session-meta-item'
-        lastActive.innerHTML = '<i class="ti ti-clock></i> ${timeAgo(sess.lastActiveAt)}'
-        meta.appendChild(lastActive)
-      }
-
-      if (sess.clientType) {
-        const client = document.createElement('span')
-        client.className = 'admin-session-meta-item'
-        client.innerHTML = `<i class="ti ti-device-${sess.clientType === 'mobile' ? 'mobile' : 'laptop'}"></i> ${sess.clientType}`;
-        meta.appendChild(client)
-      }
-
-      info.appendChild(meta)
-      itemHeader.appendChild(info)
-
-      const actions = document.createElement('div')
-      actions.className = 'admin-session-actions'
-
-      const revokeBtn = document.createElement('button')
-      revokeBtn.className = 'admin-session-revoke-btn'
-      revokeBtn.innerHTML = '<i class="ti ti-logout"></i> revoke'
-      revokeBtn.onclick = () => revokeSession(email, sess.id, item, revokeAllBtn, data.sessions.length, modal)
-      actions.appendChild(revokeBtn)
-
-      itemHeader.appendChild(actions)
-      item.appendChild(itemHeader)
-      list.appendChild(item)
-    })
-
-    body.innerHTML = ''
-    body.appendChild(list)
-    revokeAllBtn.disabled = false
-
-  } catch (e) {
-    body.innerHTML = '<div class="admin-sessions-empty">Error loading sessions</div>';
-    console.error('failed to fetch sessions:', e);
-  }
-}
-
-async function revokeSession(email, sessionId, itemElement, revokeAllBtn, totalSessions, modal) {
-  modal.style.display = 'none';
-
-  const confirmed = await showModal({
-    message: 'revoke session?',
-    withInput: false
-  })
-
-  if (!confirmed) {
-    modal.style.display = 'flex';
-    return;
+    update.disabled = select.disabled || select.value === user.role;
+    select.addEventListener('change', () => { update.disabled = select.disabled || select.value === user.role; });
+    controls.append(label, select, update);
+    roles.append(controls);
+    if (ownEmail === user.email) roles.append(element('p', '', 'you cannot change your own role.'));
+    panels.account.append(roles);
   }
 
-  modal.style.display = 'flex';
-
-  const btn = itemElement.querySelector('.admin-session-revoke-btn')
-  btn.disabled = true
-  btn.innerHTML = '<i class="ti ti-loader"></i> revoking...';
-
-  try {
-    const res = await fetch('/admin/user/revoke-session', {
-      method: 'POST',
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify({session, email, sessionId})
-    });
-    const data = await res.json()
-
-    if (data.success) {
-      showToast('session revoked', 'success')
-      itemElement.remove()
-
-      const remaining = document.querySelectorAll('.admin-session-item').length
-      if (remaining === 0) {
-        document.querySelector('.admin-sessions-modal-body').innerHTML =
-          '<div class="admin-sessions-empty">No active sessions</div>';
-        revokeAllBtn.disabled = true
-      }
-
-      await refreshDetailView()
-    } else {
-      showToast(data.error || 'failed to revoke session', 'error')
-      btn.disabled = false
-      btn.innerHTML = '<i class="ti ti-logout"></i> revoke'
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-    btn.disabled = false
-    btn.innerHTML = '<i class="ti ti-logout"></i> revoke'
-  }
-}
-
-async function revokeAllSessions(email, clerkId, modal) {
-  modal.style.display = 'none';
-
-  const confirmed = await showModal({
-    message: 'revoke all sessions for this user?',
-    withInput: false
-  })
-
-  if (!confirmed) {
-    modal.style.display = 'flex';
-    return;
-  }
-
-  modal.style.display = 'flex';
-
-  const btn = modal.querySelector('.admin-sessions-revoke-all-btn')
-  btn.disabled = true
-  btn.innerHTML = '<i class="ti ti-loader"></i> revoking...'
-
-  try {
-    const res = await fetch('/admin/user/revoke-all-sessions', {
-      method: "POST",
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify({session,email})
-    })
-    const data = await res.json()
-
-    if (data.success) {
-      showToast(`revoked ${data.count} session(s)`, 'success')
-      modal.remove()
-      await refreshDetailView()
-    } else {
-      showToast(data.error || 'failed to revoke sessions', 'error')
-      btn.disabled = false
-      btn.innerHTML = '<i class="ti ti-logout></i> revoke all sessions'
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-    btn.disabled = false
-    btn.innerHTML = '<i class="ti ti-logout></i> revoke all sessions'
-  }
-}
-
-async function banClerkAccount(email, username, clerkId) {
-  const confirmed = await showModal({
-    message: 'ban clerk account? this decision cannot be reversed from the chat™ admin panel.',
-    withInput: false
-  })
-  if (!confirmed) return
-
-  const btn = event.target.closest('button')
-  btn.classList.add('loading')
-  btn.disabled = true
-  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> banning account...';
-
-  try {
-    const res = await fetch('/admin/user/ban-clerk', {
-      method: "POST",
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify({session,email,clerkId})
-    })
-    const data = await res.json()
-
-    if (data.success) {
-      showToast('clerk account has been banned', 'success')
-      await refreshDetailView()
-    } else {
-      showToast(data.error || 'failed to ban clerk account', 'error')
-      btn.classList.remove('loading');
-      btn.disabled = false;
-      btn.innerHTML = '<i class="ti ti-ban"></i> ban clerk account';
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-    btn.classList.remove('loading');
-    btn.disabled = false;
-    btn.innerHTML = '<i class="ti ti-ban"></i> ban clerk account';
-  }
-}
-
-async function unbanUser(email, username) {
-  const confirmed = await showModal({
-    message: `unban ${username}?`,
-    withInput: false
-  })
-  if (!confirmed) return
-
-  const btn = event.target.closest('button');
-  btn.classList.add('loading');
-  btn.disabled = true;
-  const originalHTML = btn.innerHTML;
-  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner"></i> unbanning...';
-
-  try {
-    const res = await fetch('/admin/user/unban', {
-      method: "POST",
-      headers: {'content-type': 'application/json'},
-      body: JSON.stringify({session, email})
-    })
-    const data = await res.json()
-    if (data.success) {
-      showToast('user unbanned', 'success')
-      await refreshDetailView()
-      socket.emit('getAdminUsers')
-    } else {
-      showToast(data.error || 'failed to unban user', 'error')
-      btn.classList.remove('loading')
-      btn.disabled = false
-      btn.innerHTML = originalHTML
-    }
-  } catch (e) {
-    showToast('error: ' + e.message, 'error')
-    btn.classList.remove('loading')
-    btn.disabled = false
-    btn.innerHTML = originalHTML
-  }
-}
-
-async function fetchClerkStatus(email) {
-  try {
-    const res = await fetch(`/admin/user/clerk-status?email=${encodeURIComponent(email)}`, {
-      credentials: 'same-origin'
-    });
-    if (!res.ok) return false
-    const data = await res.json()
-    return data.clerkBanned || false
-  } catch (e) {
-    console.error('failed to fetch: ', e)
-    return false
-  }
-}
-
-
-let selectedUser = null;
-let usersData = [];
-
-function renderUsers(users) {
-  usersData = users;
-  const sidebar = document.querySelector('#admin-users-sidebar');
-  sidebar.innerHTML = '';
-  const hca = users.filter((u) => !u.guest);
-  const guests = users.filter((u) => u.guest);
-
-  function section(label, arr) {
-    if (!arr.length) return;
-    const header = document.createElement('div');
-    header.className = "admin-user-section";
-    header.textContent = `${label} (${arr.length})`;
-    sidebar.appendChild(header);
-
-    for (const u of arr) {
-      const row = document.createElement("div");
-      row.className = "admin-user-row";
-      if (selectedUser && selectedUser.email === u.email) {
-        row.classList.add('selected');
-      }
-
-      const avatar = document.createElement("div");
-      avatar.className = "admin-user-avatar";
-      if (u.avatar) {
-        const img = document.createElement("img");
-        img.src = u.avatar;
-        avatar.appendChild(img);
-      } else {
-        avatar.textContent = (u.username || "?")[0].toUpperCase();
-        avatar.style.backgroundColor = `hsl(${nameHash(u.username) % 360}, 55%, 38%)`;
-        avatar.style.color = "#fff";
-      }
-      row.appendChild(avatar);
-
-      const info = document.createElement('div');
-      info.className = 'admin-user-info';
-
-      const nameWrapper = document.createElement('div');
-      nameWrapper.className = "admin-user-name";
-      nameWrapper.style.color = getNameColor(u.username);
-      nameWrapper.textContent = u.username;
-
-      if (u.role === "owner") {
-        const badge = makeBadge(
-          "https://cdn.chattm.app/verified_owner.png",
-          14,
-          "this user is the owner of chat™"
-        );
-        nameWrapper.appendChild(badge);
-      } else if (u.role === "mod" || u.role === "admin") {
-        const badge = makeBadge(
-          "https://cdn.chattm.app/verified.png",
-          14,
-          "this user is a moderator or admin"
-        );
-        nameWrapper.appendChild(badge);
-      }
-
-      if (u.redVerified) {
-        const badge = makeBadge(
-          "https://cdn.chattm.app/verified_red.png",
-          14,
-          'meow'
-        );
-        nameWrapper.appendChild(badge);
-      }
-      info.appendChild(nameWrapper);
-
-      const email = document.createElement('div');
-      email.className = 'admin-user-email';
-      email.textContent = u.email;
-      info.appendChild(email);
-
-      row.appendChild(info);
-
-      row.addEventListener('click', () => {
-        selectedUser = u;
-        renderUsers(usersData);
-        lesbians(u);
+  if (!user.guest) {
+    const sessions = section('sessions');
+    field(sessions, 'last sign in', timeAgo(user.lastSignInAt));
+    field(sessions, 'active sessions', user.activeSessions == null ? 'unavailable' : String(user.activeSessions));
+    field(sessions, 'account status', user.clerkBanned == null ? 'unavailable' : user.clerkBanned ? 'banned in Clerk' : 'active');
+    if (user.clerkId) {
+      const identifier = element('span', 'admin-clerk-id', user.clerkId);
+      const copy = button('', 'copy', async () => {
+        try { await navigator.clipboard.writeText(user.clerkId); showToast('Clerk ID copied', 'success'); }
+        catch { showToast('could not copy Clerk ID', 'error'); }
       });
-      sidebar.appendChild(row);
+      copy.setAttribute('aria-label', 'copy Clerk ID');
+      identifier.append(copy);
+      field(account, 'Clerk ID', identifier);
+      sessions.append(button('view active sessions', 'device-laptop', () => viewUserSessions(user), 'admin-sessions-btn'));
+    } else sessions.append(element('p', '', 'account details are unavailable. try refreshing this user.'));
+    panels.sessions.append(sessions);
+    if (uRole === 'owner' && user.clerkId) {
+      const danger = section('account ban', 'blocks this account from signing in. account bans must be reversed in the Clerk dashboard.');
+      danger.classList.add('admin-account-danger');
+      const banAccount = button(user.clerkBanned ? 'account banned' : 'ban Clerk account', 'ban', async btn => {
+        const confirmed = await showModal({ message: `ban ${user.username}'s Clerk account?\n\nthis blocks sign-in. you can only reverse it in the Clerk dashboard.`, confirmLabel: 'ban account' });
+        if (confirmed) performAction('/admin/user/ban-clerk', { email: user.email, clerkId: user.clerkId }, btn, 'account banned', user);
+      }, 'admin-ban-clerk-btn');
+      banAccount.disabled = !permitted || user.clerkBanned !== false;
+      danger.append(banAccount);
+      panels.moderation.append(danger);
     }
-  }
-
-  section('accounts', hca);
-  section('guests', guests);
-}
-
-async function lesbians(user) {
-  const detail = document.querySelector('#admin-users-detail')
-  detail.innerHTML = '<div class="admin-loading">Loading...</div>';
-
-  const userInfo = await fetchUserInfo(user.email);
-  if (!userInfo) {
-    detail.innerHTML = '<div class="admin-users-detail-empty">Failed to load user details</div>';
-    return;
-  }
-
-  const fullUser = { ...user, ...userInfo };
-  selectedUser = fullUser
-
-  detail.innerHTML = ''
-  const content = document.createElement('div')
-  content.className = 'admin-users-detailed-content'
-
-  const header = document.createElement('div')
-  header.className = 'admin-detail-header'
-
-  const avatar = document.createElement('div')
-  avatar.className = 'admin-detail-avatar';
-  if (fullUser.avatar) {
-    const img = document.createElement('img')
-    img.src = fullUser.avatar
-    avatar.appendChild(img)
   } else {
-    avatar.textContent = (fullUser.username || "?")[0].toUpperCase();
-    avatar.style.backgroundColor = `hsl(${nameHash(fullUser.username) % 360}, 55%, 38%)`;
-    avatar.style.color = "#fff";
+    panels.sessions.append(section('sessions', 'guest accounts do not have Clerk sessions.'));
   }
-  header.appendChild(avatar)
-
-  const info = document.createElement('div')
-  info.className = 'admin-detail-info'
-
-  const name = document.createElement('div')
-  name.className = 'admin-detail-name'
-  name.style.color = getNameColor(fullUser.username)
-  name.textContent = fullUser.username
-
-  if (fullUser.role === "owner") {
-    name.appendChild(makeBadge(
-      "https://cdn.chattm.app/verified_owner.png",
-      20,
-      "this user is the owner of chat™"
-    ));
-  } else if (fullUser.role === "admin" || fullUser.role === "mod") {
-    name.appendChild(makeBadge(
-      "https://cdn.chattm.app/verified.png",
-      20,
-      "this user has been verified"
-    ));
-  }
-
-  if (fullUser.redVerified) {
-    name.appendChild(makeBadge(
-      "https://cdn.chattm.app/verified_red.png",
-      20,
-      "meow"
-    ));
-  }
-
-  if (fullUser.guest) {
-    const guestText = document.createElement('span');
-    guestText.style.cssText = 'font-size: 11px; color: var(--muted); padding: 2px 6px; background: var(--bg); border-radius: 3px; text-transform: uppercase; font-weight: 600; margin-left: 8px;';
-    guestText.textContent = 'guest';
-    name.appendChild(guestText);
-  }
-
-  info.appendChild(name);
-
-  const email = document.createElement('div')
-  email.className = 'admin-detail-email'
-  email.textContent = fullUser.email
-  info.appendChild(email)
-
-  header.appendChild(info)
-  content.appendChild(header)
-
-  if (fullUser.banned || fullUser.muted) {
-    const modStatusSection = document.createElement('div')
-    modStatusSection.className = 'admin-detail-section'
-
-    const modStatusTitle = document.createElement('div')
-    modStatusTitle.className = 'admin-detail-section-title'
-    modStatusTitle.textContent = 'moderation status'
-    modStatusSection.appendChild(modStatusTitle)
-
-    if (fullUser.banned) {
-      const bannedBox = document.createElement('div')
-      bannedBox.className = 'admin-mod-status-box danger'
-      bannedBox.innerHTML = `<strong>banned</strong><br>${fullUser.banReason || 'no reason provided'}`
-      modStatusSection.appendChild(bannedBox)
+  const footer = element('div', 'admin-detail-footer');
+  footer.append(button('refresh details', 'refresh', async btn => {
+    if (btn.getAttribute('aria-busy') === 'true') return;
+    btn.setAttribute('aria-busy', 'true');
+    await loadUser(user);
+    if (btn.isConnected) {
+      btn.removeAttribute('aria-busy');
     }
-
-    if (fullUser.muted) {
-      const mutedBox = document.createElement('div');
-      mutedBox.className = 'admin-mod-status-box warning';
-      const until = fullUser.muteUntil ? ` until ${formatDate(fullUser.muteUntil)}` : ' (permanent)';
-      mutedBox.innerHTML = `<strong>muted${until}</strong><br>${fullUser.muteReason || 'no reason provided'}`;
-      modStatusSection.appendChild(mutedBox);
-    }
-    content.appendChild(modStatusSection)
+  }));
+  content.append(footer);
+  const previousControl = detail.contains(document.activeElement) ? document.activeElement : null;
+  const scrollTop = detail.querySelector('.admin-detail-panels')?.scrollTop || 0;
+  detail.replaceChildren(content);
+  content.querySelector('.admin-detail-panels').scrollTop = scrollTop;
+  // Live socket updates replace these controls; never leave focus on a detached node.
+  if (previousControl) {
+    const replacement = previousControl.id ? document.getElementById(previousControl.id)
+      : [...detail.querySelectorAll('[data-focus-key]')].find(node => node.dataset.focusKey === previousControl.dataset.focusKey);
+    (replacement && !replacement.closest('[hidden]') ? replacement
+      : detail.querySelector('[role="tab"][aria-selected="true"]')).focus();
   }
+}
 
-  const sectionsGrid = document.createElement('div')
-  sectionsGrid.className = 'admin-users-sections-grid'
-
-  const accountSection = document.createElement('div')
-    accountSection.className = 'admin-detail-section'
-
-    const accountTitle = document.createElement('div')
-    accountTitle.className = 'admin-detail-section-title'
-    accountTitle.textContent = 'account info'
-    accountSection.appendChild(accountTitle)
-
-    const accountFields = [
-      { label: 'role', value: fullUser.role || 'user' },
-      { label: 'status', value: fullUser.online ? 'online' : 'offline' },
-      { label: 'account type', value: fullUser.guest ? 'guest' : 'registered' },
-      { label: 'verified', value: (fullUser.role === 'mod' || fullUser.role === 'admin' || fullUser.role === 'owner' || fullUser.redVerified) ? 'yes' : 'no' },
-      { label: 'joined', value: formatDate(fullUser.createdAt) },
-      { label: 'total messages', value: fullUser.messageCount.toLocaleString() },
-    ];
-
-    accountFields.forEach(({label,value}) => {
-      const field = document.createElement('div')
-      field.className = 'admin-detail-field'
-
-      const fieldLabel = document.createElement('span')
-      fieldLabel.className = 'admin-detail-field-label'
-      fieldLabel.textContent = label
-      field.appendChild(fieldLabel)
-
-      const fieldValue = document.createElement('span')
-      fieldValue.className = 'admin-detail-field-value'
-      fieldValue.textContent = value
-      field.appendChild(fieldValue)
-
-      accountSection.appendChild(field)
-    })
-
-    sectionsGrid.appendChild(accountSection)
-
-  if (!fullUser.guest && fullUser.clerkId) {
-      const clerkSection = document.createElement('div');
-      clerkSection.className = 'admin-detail-section';
-
-      const clerkTitle = document.createElement('div');
-      clerkTitle.className = 'admin-detail-section-title';
-      clerkTitle.textContent = 'clerk info';
-      clerkSection.appendChild(clerkTitle);
-
-      const clerkIdField = document.createElement('div');
-      clerkIdField.className = 'admin-detail-field';
-
-      const clerkIdLabel = document.createElement('span');
-      clerkIdLabel.className = 'admin-detail-field-label';
-      clerkIdLabel.textContent = 'clerk id';
-      clerkIdField.appendChild(clerkIdLabel);
-
-      const clerkIdValue = document.createElement('span');
-      clerkIdValue.className = 'admin-clerk-id';
-      clerkIdValue.textContent = fullUser.clerkId.slice(0, 20) + '...';
-
-      const copyBtn = document.createElement('button');
-      copyBtn.innerHTML = '<i class="ti ti-copy"></i>';
-      copyBtn.onclick = () => copyToClipboard(fullUser.clerkId);
-      clerkIdValue.appendChild(copyBtn);
-
-      clerkIdField.appendChild(clerkIdValue);
-      clerkSection.appendChild(clerkIdField);
-
-      const clerkFields = [
-        { label: 'active sessions', value: fullUser.activeSessions.toString() },
-        { label: 'last sign in', value: fullUser.lastSignInAt ? timeAgo(fullUser.lastSignInAt) : 'never' },
-      ];
-
-      clerkFields.forEach(({ label, value }) => {
-        const field = document.createElement('div');
-        field.className = 'admin-detail-field';
-
-        const fieldLabel = document.createElement('span');
-        fieldLabel.className = 'admin-detail-field-label';
-        fieldLabel.textContent = label;
-          field.appendChild(fieldLabel);
-
-          const fieldValue = document.createElement('span');
-          fieldValue.className = 'admin-detail-field-value';
-          fieldValue.textContent = value;
-          field.appendChild(fieldValue);
-
-        clerkSection.appendChild(field);
-      });
-
-      const viewSessionsBtn = document.createElement('button')
-      viewSessionsBtn.className = 'admin-sessions-btn'
-      viewSessionsBtn.innerHTML = '<i class="ti ti-device-laptop"></i> view active sessions'
-      viewSessionsBtn.onclick = () => viewUserSessions(fullUser.email, fullUser.clerkId)
-      clerkSection.appendChild(viewSessionsBtn)
-
-      sectionsGrid.appendChild(clerkSection);
-  }
-
-  const actionsSection = document.createElement('div');
-    actionsSection.className = 'admin-detail-section';
-
-    const actionsTitle = document.createElement('div');
-    actionsTitle.className = 'admin-detail-section-title';
-    actionsTitle.textContent = 'mod actions';
-    actionsSection.appendChild(actionsTitle);
-
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'admin-detail-actions';
-
-    if (uRole === "owner" && !fullUser.guest && fullUser.clerkId && !fullUser.banned) {
-      const banClerkSection = document.createElement('div');
-      banClerkSection.className = 'admin-ban-clerk-section';
-
-      const banClerkBtn = document.createElement('button');
-      banClerkBtn.className = 'admin-ban-clerk-btn';
-      banClerkBtn.innerHTML = '<i class="ti ti-ban"></i> ban clerk account';
-      banClerkBtn.onclick = () => banClerkAccount(fullUser.email, fullUser.username, fullUser.clerkId);
-
-
-      actionsDiv.appendChild(banClerkBtn)
-    }
-
-    if (fullUser.banned) {
-      const clerkBanned = await fetchClerkStatus(fullUser.email)
-
-      if (!clerkBanned) {
-        const unbanBtn = document.createElement('button');
-        unbanBtn.className = 'positive';
-        unbanBtn.innerHTML = '<i class="ti ti-ban"></i> unban user';
-        unbanBtn.onclick = () => unbanUser(fullUser.email, fullUser.username);
-        actionsDiv.appendChild(unbanBtn);
-      } else {
-        const bannedMsg = document.createElement('div');
-        bannedMsg.style.cssText = 'padding: 10px 12px; background: var(--danger-dim); border: 1px solid var(--danger); border-radius: var(--radius); color: var(--danger); font-size: 12px; text-align: center;';
-        bannedMsg.innerHTML = '<i class="ti ti-ban"></i> clerk account banned - cannot unban';
-        actionsDiv.appendChild(bannedMsg);
+async function moderateUser(user, action, btn) {
+  const payload = { email: user.email };
+  if (action === 'mute') {
+    const choice = await showModal({ message: `mute ${user.username}\n\nchoose a duration:`,
+      options: [['15', '15 minutes'], ['60', '1 hour'], ['1440', '24 hours'], ['forever', 'permanently'], ['custom', 'custom minutes']], defaultValue: '60', confirmLabel: 'next' });
+    if (choice === null) return;
+    if (choice === 'custom') {
+      const minutes = await showModal({ message: 'mute duration in minutes:', withInput: true, defaultValue: '60', confirmLabel: 'next' });
+      if (minutes === null) return;
+      if (!/^\d+$/.test(minutes) || !Number.isSafeInteger(Number(minutes)) || Number(minutes) <= 0) {
+        showToast('enter a positive whole number of minutes', 'error'); return;
       }
-    } else {
-      const banBtn = document.createElement('button');
-      banBtn.className = 'destructive';
-      banBtn.innerHTML = '<i class="ti ti-ban"></i> ban user';
-      banBtn.onclick = () => banUser(fullUser.email, fullUser.username);
-      actionsDiv.appendChild(banBtn);
-    }
-
-    const kickBtn = document.createElement('button');
-    kickBtn.className = 'moderate';
-    kickBtn.innerHTML = '<i class="ti ti-user-x"></i> kick user';
-    kickBtn.onclick = () => kickUser(fullUser.email, fullUser.username);
-    actionsDiv.appendChild(kickBtn);
-
-    if (fullUser.muted) {
-      const unmuteBtn = document.createElement('button');
-      unmuteBtn.className = 'positive';
-      unmuteBtn.innerHTML = '<i class="ti ti-volume"></i> unmute user';
-      unmuteBtn.onclick = (e) => unmuteUser(fullUser.email, fullUser.username, e.currentTarget);
-      actionsDiv.appendChild(unmuteBtn);
-    } else {
-      const muteBtn = document.createElement('button');
-      muteBtn.className = 'moderate';
-      muteBtn.innerHTML = '<i class="ti ti-volume-3"></i> mute user';
-      muteBtn.onclick = () => muteUser(fullUser.email, fullUser.username);
-      actionsDiv.appendChild(muteBtn);
-    }
-
-    actionsSection.appendChild(actionsDiv);
-    sectionsGrid.appendChild(actionsSection);
-
-  // Role management section
-  if (uRole === "owner" && !fullUser.guest) {
-    const roleSection = document.createElement('div')
-    roleSection.className = 'admin-detail-section'
-
-    const roleTitle = document.createElement('div')
-    roleTitle.className = 'admin-detail-section-title'
-    roleTitle.textContent = 'role management'
-    roleSection.appendChild(roleTitle)
-
-    const roleSelector = document.createElement('div')
-    roleSelector.className = 'admin-role-selector'
-
-    const roleLabel = document.createElement('label')
-    roleLabel.textContent = 'role:'
-    roleSelector.appendChild(roleLabel)
-
-    const roleSelect = document.createElement('select')
-    roleSelect.id = 'role-select'
-    const roles = ["user", 'mod', 'admin', 'owner']
-    roles.forEach(role => {
-      const option = document.createElement('option')
-      option.value = role
-      option.textContent = role
-      if (role === fullUser.role) option.selected = true
-      roleSelect.appendChild(option)
-    })
-    roleSelector.appendChild(roleSelect)
-
-    const changeRoleBtn = document.createElement('button')
-    changeRoleBtn.innerHTML = '<i class="ti ti-check"></i> update';
-    changeRoleBtn.onclick = () => changeUserRole(fullUser.email, fullUser.username)
-    roleSelector.appendChild(changeRoleBtn)
-
-    roleSection.appendChild(roleSelector)
-    sectionsGrid.appendChild(roleSection)
+      payload.duration = Number(minutes);
+    } else payload.duration = choice === 'forever' ? null : Number(choice);
   }
-
-    content.appendChild(sectionsGrid);
-    detail.appendChild(content);
-}
-socket.on('adminUserlist', (users) => {
-  renderUsers(users);
-  if (selectedUser) {
-    const updated = users.find(u => u.email === selectedUser.email);
-    if (updated) {
-      refreshDetailView();
-    }
+  if (['ban', 'kick', 'mute'].includes(action)) {
+    const reason = await showModal({ message: `${action} ${user.username}?\n\nreason:`, withInput: true, confirmLabel: `${action} user` });
+    if (reason === null) return;
+    payload.reason = reason || 'no reason given';
+  } else {
+    const confirmed = await showModal({ message: `${action} ${user.username}?`, confirmLabel: `${action} user` });
+    if (!confirmed) return;
   }
-});
-
-socket.on('connect', () => {
-  socket.emit('getAdminUsers');
-});
-
-socket.on('uRole', (role) => {
-  uRole = role
-})
-
-// Auto-refresh on user data changes
-socket.on('userBanned', (bannedEmail) => {
-  if (selectedUser && selectedUser.email === bannedEmail) {
-    refreshDetailView();
-  }
-});
-
-socket.on('userUnbanned', (unbannedEmail) => {
-  if (selectedUser && selectedUser.email === unbannedEmail) {
-    refreshDetailView();
-  }
-});
-
-socket.on('userMuted', (mutedEmail) => {
-  if (selectedUser && selectedUser.email === mutedEmail) {
-    refreshDetailView();
-  }
-});
-
-socket.on('userUnmuted', (unmutedEmail) => {
-  if (selectedUser && selectedUser.email === unmutedEmail) {
-    refreshDetailView();
-  }
-});
-
-socket.on('userRoleChanged', (changedEmail) => {
-  if (selectedUser && selectedUser.email === changedEmail) {
-    refreshDetailView();
-  }
-});
-
-socket.on('commandError', (msg) => showToast(msg, 'error'));
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', addDevBadge);
-} else {
-  addDevBadge();
+  await performAction(`/admin/user/${action}`, payload, btn, `user ${ { ban: 'banned', unban: 'unbanned', kick: 'kicked', mute: 'muted', unmute: 'unmuted' }[action] }`, user);
 }
 
-function addDevBadge() {
-  const h = location.hostname;
-  if (["beta.chattm.app", "localhost", "127.0.0.1"].includes(h)) {
-    const h1 = document.querySelector("h1");
-    if (h1 && !h1.querySelector(".dev-badge")) {
-      const badge = document.createElement("span");
-      badge.className = "dev-badge";
-      badge.textContent = h === "beta.chattm.app" ? "beta" : "dev";
-      badge.title =
-        h === "beta.chattm.app"
-          ? "this is a beta instance of chat™, updates are done on every push to dev"
-          : "this is a dev instance of chat™";
-      h1.appendChild(badge);
+async function performAction(url, payload, btn, successMessage, user) {
+  if (pendingActions.has(user.email)) {
+    showToast('an action for this user is already in progress');
+    return null;
+  }
+  pendingActions.add(user.email);
+  const originalContent = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.setAttribute('aria-busy', 'true');
+  btn.innerHTML = '<i class="ti ti-loader admin-loading-spinner" aria-hidden="true"></i> working…';
+  try {
+    const data = await readJson(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ session, ...payload }) });
+    if (!data.success) throw new Error('action failed');
+    showToast(url.endsWith('/kick') && !data.kicked ? 'user was offline' : successMessage, 'success');
+    requestUsers();
+    if (drawer.open && selectedUser?.email === user.email) await loadUser(selectedUser);
+    return data;
+  } catch (error) {
+    showToast(error.message, 'error');
+    return null;
+  } finally {
+    pendingActions.delete(user.email);
+    btn.classList.remove('loading');
+    btn.removeAttribute('aria-busy');
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.innerHTML = originalContent;
     }
   }
+}
+
+async function viewUserSessions(user) {
+  if (document.querySelector('.admin-sessions-modal')) return;
+  const modal = element('div', 'admin-sessions-modal');
+  const content = element('div', 'admin-sessions-modal-content');
+  const header = element('div', 'admin-sessions-modal-header');
+  header.append(element('div', 'admin-sessions-modal-title', 'active sessions'));
+  const close = button('', 'x', () => modal.remove(), 'admin-sessions-modal-close');
+  close.setAttribute('aria-label', 'close active sessions');
+  header.append(close);
+  const body = element('div', 'admin-sessions-modal-body');
+  const footer = element('div', 'admin-sessions-modal-footer');
+  const revokeAll = button('revoke all sessions', 'logout', async btn => {
+    const confirmed = await showModal({ message: `revoke all sessions for ${user.username}?`, confirmLabel: 'revoke all' });
+    if (!confirmed) return;
+    const data = await performAction('/admin/user/revoke-all-sessions', { email: user.email, clerkId: user.clerkId }, btn, 'all sessions revoked', user);
+    if (data) await loadSessions();
+  }, 'admin-sessions-revoke-all-btn');
+  revokeAll.disabled = true;
+  footer.append(revokeAll);
+  content.append(header, body, footer);
+  modal.append(content);
+  document.body.append(modal);
+  modal.addEventListener('click', event => {
+    if (event.target === modal && document.querySelector('#modal-overlay').style.display === 'none') modal.remove();
+  });
+  async function loadSessions() {
+    if (body.contains(document.activeElement)) close.focus();
+    body.replaceChildren(element('div', 'admin-sessions-loading', 'loading sessions…'));
+    revokeAll.disabled = true;
+    try {
+      const data = await readJson(`/admin/user/sessions?email=${encodeURIComponent(user.email)}`, { credentials: 'same-origin' });
+      if (!modal.isConnected) return;
+      if (!Array.isArray(data.sessions)) throw new Error('could not load sessions');
+      body.replaceChildren();
+      if (!data.sessions.length) {
+        body.append(element('div', 'admin-sessions-empty', 'no active sessions')); return;
+      }
+      const list = element('div', 'admin-sessions-list');
+      data.sessions.forEach(sess => {
+        const item = element('div', 'admin-session-item');
+        const itemHeader = element('div', 'admin-session-header');
+        const info = element('div', 'admin-session-info');
+        info.append(element('div', 'admin-session-id', sess.id));
+        const meta = element('div', 'admin-session-meta');
+        if (sess.lastActiveAt) meta.append(element('span', 'admin-session-meta-item', `active ${timeAgo(sess.lastActiveAt)}`));
+        if (sess.clientType) meta.append(element('span', 'admin-session-meta-item', sess.clientType));
+        info.append(meta);
+        const revoke = button('revoke', 'logout', async btn => {
+          const confirmed = await showModal({ message: 'revoke this session?', confirmLabel: 'revoke session' });
+          if (!confirmed) return;
+          const data = await performAction('/admin/user/revoke-session', { email: user.email, sessionId: sess.id }, btn, 'session revoked', user);
+          if (data) await loadSessions();
+        }, 'admin-session-revoke-btn');
+        itemHeader.append(info, revoke);
+        item.append(itemHeader);
+        list.append(item);
+      });
+      body.append(list);
+      revokeAll.disabled = user.email === ownEmail;
+    } catch (error) {
+      if (modal.isConnected) body.replaceChildren(element('div', 'admin-sessions-empty', error.message), button('try again', 'refresh', loadSessions));
+    }
+  }
+  await loadSessions();
+}
+
+searchInput.addEventListener('input', renderUsers);
+[roleFilter, typeFilter, sortInput].forEach(input => input.addEventListener('change', renderUsers));
+document.querySelectorAll('[data-user-view]').forEach(btn => btn.addEventListener('click', () => {
+  activeView = btn.dataset.userView;
+  document.querySelectorAll('[data-user-view]').forEach(view => view.setAttribute('aria-pressed', String(view === btn)));
+  renderUsers();
+}));
+resetButton.addEventListener('click', () => {
+  searchInput.value = '';
+  roleFilter.value = typeFilter.value = 'all';
+  sortInput.value = 'online';
+  activeView = 'all';
+  document.querySelectorAll('[data-user-view]').forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.userView === 'all')));
+  renderUsers();
+  searchInput.focus();
+});
+refreshButton.addEventListener('click', requestUsers);
+document.querySelector('#admin-user-drawer-close').addEventListener('click', closeUser);
+backdrop.addEventListener('click', closeUser);
+drawer.addEventListener('cancel', event => { event.preventDefault(); closeUser(); });
+document.querySelector('#logs').addEventListener('click', () => showToast('action logs have not been implemented yet, check back later'));
+
+socket.on('adminUserlist', users => {
+  if (!Array.isArray(users)) return;
+  usersData = users;
+  loaded = true;
+  finishRefresh();
+  renderUsers();
+  if (selectedUser && drawer.open) {
+    const updated = users.find(user => user.email === selectedUser.email);
+    if (updated) loadUser({ ...selectedUser, ...updated });
+  }
+});
+socket.on('connect', requestUsers);
+socket.on('disconnect', () => { finishRefresh(); showDirectoryState('connection lost', 'reconnecting to the server…', true); });
+socket.on('connect_error', () => { finishRefresh(); showDirectoryState('could not connect', 'check your connection or sign in again.', true); });
+socket.on('init', data => { uRole = data.role || 'user'; });
+socket.on('adminIdentity', data => {
+  ownEmail = data.email;
+  uRole = data.role;
+  if (selectedUser?.messageCount !== undefined) renderDetail(selectedUser);
+});
+socket.on('uRole', role => { uRole = role; if (selectedUser?.messageCount !== undefined) renderDetail(selectedUser); });
+['userBanned', 'userUnbanned', 'userMuted', 'userUnmuted', 'userRoleChanged', 'userVerificationChanged'].forEach(name => {
+  socket.on(name, email => {
+    if (selectedUser?.email === email && drawer.open) loadUser(selectedUser);
+    requestUsers();
+  });
+});
+socket.on('commandError', message => showToast(message, 'error'));
+// Expiring mutes should disappear from badges and counts without a page reload.
+setInterval(() => {
+  const expired = usersData.filter(user => user.muted && user.muteUntil && user.muteUntil <= Date.now());
+  if (!loaded || !expired.length) return;
+  expired.forEach(user => { user.muted = false; });
+  renderUsers();
+  if (selectedUser && expired.some(user => user.email === selectedUser.email)) loadUser(selectedUser);
+}, 10000);
+
+if (['beta.chattm.app', 'localhost', '127.0.0.1'].includes(location.hostname)) {
+  const brand = document.querySelector('.admin-brand h1');
+  const badge = element('span', 'dev-badge', location.hostname === 'beta.chattm.app' ? 'beta' : 'dev');
+  brand.append(badge);
 }
