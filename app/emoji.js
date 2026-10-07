@@ -27,17 +27,25 @@ function showModal({message, withInput = false, defaultValue = '', previewUrl = 
         msgEl.textContent = message
         inputEl.style.display = withInput ? 'block' : 'none'
         inputEl.value = defaultValue
-        overlay.style.display = 'flex'
+        if (window.openAdminModal) window.openAdminModal(overlay)
+        else overlay.style.display = 'flex'
         if (withInput) inputEl.focus()
 
+        let closing = false
         function cleanUp(result) {
-            preview.hidden = true
-            preview.removeAttribute('src')
-            overlay.style.display = 'none'
-            confirmBtn.removeEventListener('click', onConfirm)
-            cancelBtn.removeEventListener('click', onCancel)
-            if (withInput) inputEl.removeEventListener('keydown', onKey)
-            resolve(result)
+            if (closing) return
+            closing = true
+            const finish = () => {
+                preview.hidden = true
+                preview.removeAttribute('src')
+                overlay.style.display = 'none'
+                confirmBtn.removeEventListener('click', onConfirm)
+                cancelBtn.removeEventListener('click', onCancel)
+                if (withInput) inputEl.removeEventListener('keydown', onKey)
+                resolve(result)
+            }
+            if (window.closeAdminModal) window.closeAdminModal(overlay, finish)
+            else finish()
         }
         function onConfirm() {
             cleanUp(withInput ? inputEl.value : true)
@@ -61,6 +69,7 @@ function showModal({message, withInput = false, defaultValue = '', previewUrl = 
 }
 
 function showToast(message, type = 'info') {
+    if (window.showAdminToast) return window.showAdminToast(message, type)
     const container = document.querySelector('#toast-container')
     const toast = document.createElement('div')
     toast.className = `toast ${type}`

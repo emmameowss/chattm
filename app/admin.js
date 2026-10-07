@@ -24,7 +24,7 @@ async function loadChannels() {
     }
   } catch (e) {
     console.error('failed to load channels:', e)
-    showModal('failed to load channels:' + e.message, 'error')
+    showToast('failed to load channels: ' + e.message, 'error')
     availableChannels = ['main']
   }
 }
@@ -52,16 +52,24 @@ function showModal({ message, withInput = false, withSelect = false, selectOptio
       selectEl.value = defaultValue || selectOptions[0];
     }
 
-    overlay.style.display = "flex";
+    if (window.openAdminModal) window.openAdminModal(overlay);
+    else overlay.style.display = "flex";
     if (withInput) inputEl.focus();
     if (withSelect) selectEl.focus();
 
+    let closing = false;
     function cleanUp(result) {
-      overlay.style.display = "none";
-      confirmBtn.removeEventListener('click', onConfirm);
-      cancelBtn.removeEventListener('click', onCancel);
-      if (withInput) inputEl.removeEventListener('keydown', onKey);
-      resolve(result);
+      if (closing) return;
+      closing = true;
+      const finish = () => {
+        overlay.style.display = "none";
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        if (withInput) inputEl.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      if (window.closeAdminModal) window.closeAdminModal(overlay, finish);
+      else finish();
     }
     function onConfirm() {
       if (withInput) {
@@ -91,6 +99,7 @@ function showModal({ message, withInput = false, withSelect = false, selectOptio
 }
 
 function showToast(message, type = 'info') {
+  if (window.showAdminToast) return window.showAdminToast(message, type);
   const container = document.querySelector('#toast-container');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;

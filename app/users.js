@@ -61,6 +61,7 @@ function button(label, icon, handler, className = '') {
 }
 
 function showToast(message, type = 'info') {
+  if (window.showAdminToast) return window.showAdminToast(message, type);
   const toast = element('div', `toast ${type}`, message);
   document.querySelector('#toast-container').append(toast);
   setTimeout(() => toast.remove(), 4000);
@@ -85,14 +86,22 @@ function showModal({ message, withInput = false, defaultValue = '', options = nu
     });
     if (options) select.value = defaultValue;
     confirm.textContent = confirmLabel;
-    overlay.style.display = 'flex';
+    if (window.openAdminModal) window.openAdminModal(overlay);
+    else overlay.style.display = 'flex';
     // admin-ui.js moves focus after making the underlying drawer inert.
+    let closing = false;
     function finish(value) {
-      overlay.style.display = 'none';
-      confirm.removeEventListener('click', onConfirm);
-      cancel.removeEventListener('click', onCancel);
-      input.removeEventListener('keydown', onKey);
-      resolve(value);
+      if (closing) return;
+      closing = true;
+      const complete = () => {
+        overlay.style.display = 'none';
+        confirm.removeEventListener('click', onConfirm);
+        cancel.removeEventListener('click', onCancel);
+        input.removeEventListener('keydown', onKey);
+        resolve(value);
+      };
+      if (window.closeAdminModal) window.closeAdminModal(overlay, complete);
+      else complete();
     }
     function onConfirm() { finish(options ? select.value : withInput ? input.value.trim() : true); }
     function onCancel() { finish(null); }
