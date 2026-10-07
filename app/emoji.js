@@ -195,14 +195,16 @@ function releasePreview() {
     previewUrl = null
 }
 
-function closeEmoji() {
+function closeEmoji(animate = false) {
     if (busy || document.querySelector('#modal-overlay').style.display !== 'none') return
-    drawer.close()
-    backdrop.hidden = true
-    document.body.classList.remove('admin-drawer-open')
-    selectedEmoji = null
-    releasePreview()
-    renderEmojis()
+    window.closeAdminDrawer(drawer, () => {
+        drawer.close()
+        backdrop.hidden = true
+        document.body.classList.remove('admin-drawer-open')
+        selectedEmoji = null
+        releasePreview()
+        renderEmojis()
+    }, animate === true)
 }
 
 function openEmoji(emoji = null) {
@@ -359,7 +361,7 @@ async function deleteEmoji(emoji) {
 document.querySelector('#admin-emoji-add').addEventListener('click', () => openEmoji())
 document.querySelector('#admin-emoji-refresh').addEventListener('click', loadEmojis)
 document.querySelector('#admin-emoji-drawer-close').addEventListener('click', closeEmoji)
-backdrop.addEventListener('click', closeEmoji)
+backdrop.addEventListener('click', () => closeEmoji(true))
 drawer.addEventListener('cancel', event => { event.preventDefault(); closeEmoji() })
 search.addEventListener('input', renderEmojis)
 sort.addEventListener('change', renderEmojis)

@@ -9,6 +9,31 @@
   let returnFocus = null;
   let lastActivation = null;
   const focusOrigins = new WeakMap();
+  const drawerExits = new WeakMap();
+
+  // Keep focus and the backdrop in place until an outside-click exit finishes.
+  window.closeAdminDrawer = (drawer, finish, animate = false) => {
+    const pending = drawerExits.get(drawer);
+    if (animate && pending) return;
+    pending?.cancel();
+    drawerExits.delete(drawer);
+    if (!animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finish();
+      return;
+    }
+
+    const animation = drawer.animate([
+      { transform: getComputedStyle(drawer).transform },
+      { transform: 'translate3d(100%, 0, 0)' }
+    ], { duration: 160, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+    drawerExits.set(drawer, animation);
+    animation.onfinish = () => {
+      if (drawerExits.get(drawer) !== animation) return;
+      drawerExits.delete(drawer);
+      finish();
+      animation.cancel();
+    };
+  };
 
   // Page scripts focus inputs synchronously, before the observer sees a dialog.
   document.addEventListener('click', event => {
@@ -26,25 +51,34 @@
       .filter(element => !element.disabled && visible(element));
   }
 
-  function enhance() {
-    document.querySelectorAll(rowSelector).forEach(row => {
+  function within(root, selector) {
+    const matches = [...root.querySelectorAll(selector)];
+    if (root.matches?.(selector)) matches.unshift(root);
+    return matches;
+  }
+
+  function enhanceContent(root) {
+    within(root, rowSelector).forEach(row => {
       row.setAttribute('role', 'button');
       row.tabIndex = 0;
       row.setAttribute('aria-pressed', String(row.classList.contains('selected')));
     });
-    document.querySelectorAll('.admin-clerk-id button').forEach(button => {
+    within(root, '.admin-clerk-id button').forEach(button => {
       button.setAttribute('aria-label', 'copy ' + (button.closest('#admin-emoji-detail') ? 'emoji URL' : 'Clerk ID'));
     });
-    const sessionsDialog = document.querySelector('.admin-sessions-modal-content');
-    if (sessionsDialog) {
+    within(root, '.admin-sessions-modal-content').forEach(sessionsDialog => {
       sessionsDialog.setAttribute('role', 'dialog');
       sessionsDialog.setAttribute('aria-modal', 'true');
       sessionsDialog.setAttribute('aria-label', 'active sessions');
       sessionsDialog.querySelector('.admin-sessions-modal-close')?.setAttribute('aria-label', 'close active sessions');
-    }
+    });
+  }
 
-    const dialog = visible(overlay) ? document.querySelector('#modal-box')
-      : visible(sessionsDialog) ? sessionsDialog : drawer?.open ? drawer : null;
+  function enhance() {
+    const sessionsDialog = document.querySelector('.admin-sessions-modal-content');
+
+    const dialog = overlay && overlay.style.display !== 'none' && !overlay.hidden ? document.querySelector('#modal-box')
+      : sessionsDialog || (drawer?.open ? drawer : null);
     if (dialog === activeDialog) {
       if (dialog && !dialog.contains(document.activeElement)) {
         (dialog.querySelector('#modal-cancel, .admin-sessions-modal-close, #admin-user-drawer-close, #admin-emoji-drawer-close') || focusable(dialog)[0])?.focus();
@@ -127,16 +161,29 @@
       const list = row.parentElement;
       row.click();
       // Page scripts recreate the list on selection; keep keyboard focus there.
+      enhanceContent(list);
       enhance();
       list.querySelector('.selected')?.focus();
     }
   }, true);
 
-  new MutationObserver(enhance).observe(document.body, {
+  new MutationObserver(records => {
+    const added = new Set();
+    records.forEach(record => record.addedNodes.forEach(node => {
+      if (node.nodeType === 1 && node.isConnected) added.add(node);
+    }));
+    added.forEach(node => {
+      let ancestor = node.parentElement;
+      while (ancestor && !added.has(ancestor)) ancestor = ancestor.parentElement;
+      if (!ancestor) enhanceContent(node);
+    });
+    enhance();
+  }).observe(document.body, {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ['style', 'open', 'hidden']
   });
+  enhanceContent(document);
   enhance();
 })();

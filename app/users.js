@@ -245,14 +245,16 @@ function openUser(user, trigger) {
   loadUser(user, true);
 }
 
-function closeUser() {
+function closeUser(animate = false) {
   if (!drawer.open || !document.querySelector('#modal-overlay').style.display.includes('none') || document.querySelector('.admin-sessions-modal')) return;
-  drawer.close();
-  backdrop.hidden = true;
-  document.body.classList.remove('admin-drawer-open');
-  selectedUser = null;
-  detailRequest++;
-  document.querySelectorAll('.admin-directory-row.selected').forEach(row => row.classList.remove('selected'));
+  window.closeAdminDrawer(drawer, () => {
+    drawer.close();
+    backdrop.hidden = true;
+    document.body.classList.remove('admin-drawer-open');
+    selectedUser = null;
+    detailRequest++;
+    document.querySelectorAll('.admin-directory-row.selected').forEach(row => row.classList.remove('selected'));
+  }, animate === true);
 }
 
 async function loadUser(user, showLoading = false) {
@@ -675,7 +677,7 @@ resetButton.addEventListener('click', () => {
 });
 refreshButton.addEventListener('click', requestUsers);
 document.querySelector('#admin-user-drawer-close').addEventListener('click', closeUser);
-backdrop.addEventListener('click', closeUser);
+backdrop.addEventListener('click', () => closeUser(true));
 drawer.addEventListener('cancel', event => { event.preventDefault(); closeUser(); });
 document.querySelector('#logs').addEventListener('click', () => showToast('action logs have not been implemented yet, check back later'));
 
