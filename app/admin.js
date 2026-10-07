@@ -232,14 +232,29 @@ document.querySelector('#owner-mutechat-btn').addEventListener('click', async ()
   }
 });
 
-document.querySelector('#owner-maintenance-btn').addEventListener('click', async () => {
-  const reason = await showModal({
-    message: "maintenance reason (leave blank to turn off)",
-    withInput: true,
-    defaultValue: ''
-  });
-  if (reason === null) return;
+document.querySelector('#owner-maintenance-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
   try {
+    const statusRes = await fetch('/maintenance', { cache: 'no-store' });
+    if (!statusRes.ok) throw new Error('failed to fetch maintenance status');
+    const status = await statusRes.json();
+    updateMaintenanceStatus(status.maintenance, status.reason);
+
+    let reason = '';
+    if (status.maintenance) {
+      const confirmed = await showModal({ message: 'disable maintenance mode?' });
+      if (!confirmed) return;
+    } else {
+      const input = await showModal({ message: 'maintenance reason', withInput: true });
+      if (input === null) return;
+      reason = input.trim();
+      if (!reason) {
+        showToast('enter a reason to enable maintenance', 'error');
+        return;
+      }
+    }
+
     const res = await fetch('/admin/maintenance', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -254,6 +269,8 @@ document.querySelector('#owner-maintenance-btn').addEventListener('click', async
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error');
+  } finally {
+    button.disabled = false;
   }
 });
 
