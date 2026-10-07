@@ -1398,7 +1398,6 @@ io.on("connection", (socket) => {
     socket.handshake.address;
   console.log(`${socket.userEmail} connected`);
   if (!socket.userEmail.endsWith("@guest")) setLastSeen(socket.userEmail);
-  emitOnlineUserCount();
   // everyone starts in the default channel
   socket.currentChannel = "main";
   socket.join(roomOf("main"));
@@ -1439,6 +1438,7 @@ io.on("connection", (socket) => {
     if (saved) socket.username = saved;
     socket.emit("savedUsername", saved);
   }
+  emitOnlineUserCount();
   socket.cachedAvatar = getAvatar(socket.userEmail);
   socket.cachedColor = getColor(socket.userEmail);
   socket.cachedVerified = isVerified(socket.userEmail);
@@ -2670,7 +2670,9 @@ httpServer.on("request", async (req, res) => {
       : req.method === "POST" && action === "note" ? "report.note"
         : req.method === "POST" && action === "status" ? "report.status_change" : null;
     if (!user || !["mod", "admin", "owner"].includes(role)) {
-      if (user && mutationAction) recordReportAction(user, role, mutationAction, `report #${reportId}`, "denied", { reportId, failure: "forbidden" });
+      if (user && mutationAction && checkRateLimit(user.email, "report-denied-audit", 1, 60_000)) {
+        recordReportAction(user, role, mutationAction, `report #${reportId}`, "denied", { reportId, failure: "forbidden" });
+      }
       sendJson(res, 403, { error: "forbidden" });
       return;
     }
