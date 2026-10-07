@@ -14,7 +14,12 @@ const roleFilter = document.querySelector('#admin-users-role');
 const typeFilter = document.querySelector('#admin-users-type');
 const sortInput = document.querySelector('#admin-users-sort');
 const resetButton = document.querySelector('#admin-users-reset');
+const pagination = document.querySelector('#admin-users-pagination');
+const previousPageButton = document.querySelector('#admin-users-prev');
+const nextPageButton = document.querySelector('#admin-users-next');
+const pageLabel = document.querySelector('#admin-users-page');
 const roleValues = { user: 0, mod: 1, admin: 2, owner: 3 };
+const pageSize = 50;
 const pendingActions = new Set();
 let uRole = 'user';
 let ownEmail = null;
@@ -23,8 +28,16 @@ let selectedUser = null;
 let activeView = 'all';
 let activeDetailTab = 'profile';
 let loaded = false;
+let currentPage = 1;
+let totalPages = 1;
+let totalMatches = 0;
+let totalUsers = 0;
+let userCounts = {};
+let listPartial = false;
+let listRequestId = 0;
 let detailRequest = 0;
 let refreshTimer;
+let searchTimer;
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -127,52 +140,41 @@ function avatar(user, className) {
 
 function badge(label, variant = '') { return element('span', `admin-directory-badge ${variant}`, label); }
 function isMuted(user) { return !!user.muted && (!user.muteUntil || user.muteUntil > Date.now()); }
-function matchesView(user, view) {
-  return view === 'all' || (view === 'online' && user.online) ||
-    (view === 'muted' && isMuted(user)) || (view === 'banned' && user.banned) ||
-    (view === 'hidden' && user.hidden);
-}
-
-function filteredUsers() {
-  const query = searchInput.value.trim().toLocaleLowerCase();
-  return usersData.filter(user =>
-    matchesView(user, activeView) &&
-    (!query || `${user.username} ${user.email}`.toLocaleLowerCase().includes(query)) &&
-    (roleFilter.value === 'all' || user.role === roleFilter.value) &&
-    (typeFilter.value === 'all' || user.guest === (typeFilter.value === 'guest'))
-  ).sort((a, b) => {
-    const byName = (a.username || a.email).localeCompare(b.username || b.email, undefined, { sensitivity: 'base', numeric: true }) || a.email.localeCompare(b.email);
-    if (sortInput.value === 'online') return Number(b.online) - Number(a.online) || byName;
-    return sortInput.value === 'desc' ? -byName : byName;
-  });
-}
 
 function showDirectoryState(title, message, retry = false) {
   state.replaceChildren(element('strong', '', title), element('span', '', message));
   if (retry) state.append(button('try again', 'refresh', requestUsers));
   state.hidden = false;
   document.querySelector('#admin-users-table-wrap').hidden = true;
+  pagination.hidden = true;
 }
 
 function renderUsers() {
   const focusedEmail = document.activeElement?.dataset.userOpen;
   directory.replaceChildren();
   document.querySelectorAll('[data-user-count]').forEach(node => {
-    node.textContent = loaded ? usersData.filter(user => matchesView(user, node.dataset.userCount)).length : '—';
+    node.textContent = loaded ? (userCounts[node.dataset.userCount] ?? 0).toLocaleString() : '—';
   });
-  resetButton.hidden = !(searchInput.value || activeView !== 'all' || roleFilter.value !== 'all' || typeFilter.value !== 'all' || sortInput.value !== 'online');
+  resetButton.hidden = !(searchInput.value.trim() || activeView !== 'all' || roleFilter.value !== 'all' || typeFilter.value !== 'all' || sortInput.value !== 'online');
   if (!loaded) return;
-  const visibleUsers = filteredUsers();
-  results.textContent = `showing ${visibleUsers.length} of ${usersData.length} ${usersData.length === 1 ? 'user' : 'users'}`;
-  if (!visibleUsers.length) {
-    showDirectoryState(usersData.length ? 'no matching users' : 'no users yet',
-      usersData.length ? 'try another search or clear your filters.' : 'accounts and connected guests will appear here.');
+  const start = totalMatches ? (currentPage - 1) * pageSize + 1 : 0;
+  const end = totalMatches ? start + usersData.length - 1 : 0;
+  results.textContent = totalMatches
+    ? `showing ${start}–${end} of ${totalMatches.toLocaleString()} matches · ${totalUsers.toLocaleString()} total users${listPartial ? ' · Clerk directory unavailable' : ''}`
+    : `0 matches · ${totalUsers.toLocaleString()} total users${listPartial ? ' · Clerk directory unavailable' : ''}`;
+  pageLabel.textContent = `page ${currentPage} of ${totalPages}`;
+  previousPageButton.disabled = currentPage <= 1;
+  nextPageButton.disabled = currentPage >= totalPages;
+  pagination.hidden = totalPages <= 1 || totalMatches === 0;
+  if (!usersData.length) {
+    showDirectoryState(totalUsers ? 'no matching users' : listPartial ? 'directory is incomplete' : 'no users yet',
+      totalUsers ? 'try another search or clear your filters.' : listPartial ? 'the server could not load Clerk accounts. refresh to try again.' : 'accounts and connected guests will appear here.');
     return;
   }
   state.hidden = true;
   document.querySelector('#admin-users-table-wrap').hidden = false;
   const fragment = document.createDocumentFragment();
-  visibleUsers.forEach(user => {
+  usersData.forEach(user => {
     const row = element('tr', 'admin-directory-row');
     row.dataset.email = user.email;
     row.classList.toggle('selected', selectedUser?.email === user.email);
@@ -214,15 +216,30 @@ function finishRefresh() {
 }
 
 function requestUsers() {
+  clearTimeout(searchTimer);
   if (!socket.connected) {
     showDirectoryState('connection lost', 'reconnecting to the server…', true);
     return;
   }
+  const requestId = ++listRequestId;
   refreshButton.disabled = true;
   refreshButton.innerHTML = '<i class="ti ti-loader admin-loading-spinner" aria-hidden="true"></i> refreshing…';
-  socket.emit('getAdminUsers');
+  previousPageButton.disabled = true;
+  nextPageButton.disabled = true;
+  socket.emit('getAdminUsers', {
+    requestId,
+    query: searchInput.value.trim(),
+    view: activeView,
+    role: roleFilter.value,
+    type: typeFilter.value,
+    sort: sortInput.value,
+    page: currentPage,
+    pageSize,
+    selectedEmail: selectedUser?.email || null,
+  });
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(() => {
+    if (requestId !== listRequestId) return;
     finishRefresh();
     if (!loaded) showDirectoryState('could not load users', 'the server did not respond. try again.', true);
     else showToast('could not refresh users. try again.', 'error');
@@ -672,12 +689,20 @@ async function viewUserSessions(user) {
   await loadSessions();
 }
 
-searchInput.addEventListener('input', renderUsers);
-[roleFilter, typeFilter, sortInput].forEach(input => input.addEventListener('change', renderUsers));
+searchInput.addEventListener('input', () => {
+  currentPage = 1;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(requestUsers, 220);
+});
+[roleFilter, typeFilter, sortInput].forEach(input => input.addEventListener('change', () => {
+  currentPage = 1;
+  requestUsers();
+}));
 document.querySelectorAll('[data-user-view]').forEach(btn => btn.addEventListener('click', () => {
   activeView = btn.dataset.userView;
   document.querySelectorAll('[data-user-view]').forEach(view => view.setAttribute('aria-pressed', String(view === btn)));
-  renderUsers();
+  currentPage = 1;
+  requestUsers();
 }));
 resetButton.addEventListener('click', () => {
   searchInput.value = '';
@@ -685,8 +710,19 @@ resetButton.addEventListener('click', () => {
   sortInput.value = 'online';
   activeView = 'all';
   document.querySelectorAll('[data-user-view]').forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.userView === 'all')));
-  renderUsers();
+  currentPage = 1;
+  requestUsers();
   searchInput.focus();
+});
+previousPageButton.addEventListener('click', () => {
+  if (currentPage <= 1) return;
+  currentPage--;
+  requestUsers();
+});
+nextPageButton.addEventListener('click', () => {
+  if (currentPage >= totalPages) return;
+  currentPage++;
+  requestUsers();
 });
 refreshButton.addEventListener('click', requestUsers);
 document.querySelector('#admin-user-drawer-close').addEventListener('click', closeUser);
@@ -694,17 +730,24 @@ backdrop.addEventListener('click', () => closeUser(true));
 drawer.addEventListener('cancel', event => { event.preventDefault(); closeUser(); });
 document.querySelector('#logs').addEventListener('click', () => showToast('action logs have not been implemented yet, check back later'));
 
-socket.on('adminUserlist', users => {
-  if (!Array.isArray(users)) return;
-  usersData = users;
+socket.on('adminUserlist', response => {
+  if (!response || !Array.isArray(response.users) || response.requestId !== listRequestId) return;
+  usersData = response.users;
+  currentPage = response.page || 1;
+  totalPages = response.totalPages || 1;
+  totalMatches = response.total || 0;
+  totalUsers = response.totalUsers || 0;
+  userCounts = response.counts || {};
+  listPartial = !!response.partial;
   loaded = true;
   finishRefresh();
   renderUsers();
   if (selectedUser && drawer.open) {
-    const updated = users.find(user => user.email === selectedUser.email);
+    const updated = response.selectedUser;
     if (updated) loadUser({ ...selectedUser, ...updated });
   }
 });
+socket.on('adminUsersChanged', requestUsers);
 socket.on('connect', requestUsers);
 socket.on('disconnect', () => { finishRefresh(); showDirectoryState('connection lost', 'reconnecting to the server…', true); });
 socket.on('connect_error', () => { finishRefresh(); showDirectoryState('could not connect', 'check your connection or sign in again.', true); });
@@ -722,15 +765,6 @@ socket.on('uRole', role => { uRole = role; if (selectedUser?.messageCount !== un
   });
 });
 socket.on('commandError', message => showToast(message, 'error'));
-// Expiring mutes should disappear from badges and counts without a page reload.
-setInterval(() => {
-  const expired = usersData.filter(user => user.muted && user.muteUntil && user.muteUntil <= Date.now());
-  if (!loaded || !expired.length) return;
-  expired.forEach(user => { user.muted = false; });
-  renderUsers();
-  if (selectedUser && expired.some(user => user.email === selectedUser.email)) loadUser(selectedUser);
-}, 10000);
-
 if (['beta.chattm.app', 'localhost', '127.0.0.1'].includes(location.hostname)) {
   const brand = document.querySelector('.admin-brand h1');
   const badge = element('span', 'dev-badge', location.hostname === 'beta.chattm.app' ? 'beta' : 'dev');

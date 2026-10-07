@@ -856,6 +856,11 @@ setInterval(() => {
       }
     }
   }
+  if (expired.length) {
+    for (const s of io.sockets.sockets.values()) {
+      if (["admin", "owner"].includes(s.userRole)) s.emit("adminUsersChanged");
+    }
+  }
 }, 10 * 1000);
 
 const roomOf = (ch) => "channel:" + ch;
@@ -1024,6 +1029,60 @@ function adminModerationFlags(users) {
   });
 }
 
+function paginateAdminUsers(users, request = {}) {
+  const views = new Set(["all", "online", "muted", "banned", "hidden"]);
+  const roles = new Set(["user", "mod", "admin", "owner"]);
+  const view = views.has(request.view) ? request.view : "all";
+  const role = roles.has(request.role) ? request.role : "all";
+  const type = ["guest", "registered"].includes(request.type) ? request.type : "all";
+  const sort = ["online", "asc", "desc"].includes(request.sort) ? request.sort : "online";
+  const query = typeof request.query === "string" ? request.query.trim().toLocaleLowerCase() : "";
+  const pageSizeValue = Number(request.pageSize);
+  const pageSize = Number.isFinite(pageSizeValue) ? Math.max(10, Math.min(100, Math.floor(pageSizeValue))) : 50;
+  const requestedPage = Number(request.page);
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1;
+  const selectedEmail = typeof request.selectedEmail === "string" ? normalizeEmail(request.selectedEmail) : null;
+  const selectedUser = selectedEmail ? users.find(user => user.email === selectedEmail) ?? null : null;
+  const counts = {
+    all: users.length,
+    online: users.filter(user => user.online).length,
+    muted: users.filter(user => user.muted).length,
+    banned: users.filter(user => user.banned).length,
+    hidden: users.filter(user => user.hidden).length,
+  };
+  const visibleUsers = users.filter(user => {
+    if (view === "online" && !user.online) return false;
+    if (view === "muted" && !user.muted) return false;
+    if (view === "banned" && !user.banned) return false;
+    if (view === "hidden" && !user.hidden) return false;
+    if (role !== "all" && user.role !== role) return false;
+    if (type === "guest" && !user.guest) return false;
+    if (type === "registered" && user.guest) return false;
+    if (query && !`${user.username} ${user.email}`.toLocaleLowerCase().includes(query)) return false;
+    return true;
+  });
+  const byName = (a, b) =>
+    (a.username || a.email).localeCompare(b.username || b.email, undefined, { sensitivity: "base", numeric: true }) ||
+    a.email.localeCompare(b.email);
+  visibleUsers.sort((a, b) => sort === "online"
+    ? Number(b.online) - Number(a.online) || byName(a, b)
+    : sort === "desc" ? -byName(a, b) : byName(a, b));
+  const totalPages = Math.max(1, Math.ceil(visibleUsers.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const requestId = Number.isSafeInteger(request.requestId) ? request.requestId : null;
+  return {
+    users: visibleUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    total: visibleUsers.length,
+    totalUsers: users.length,
+    page: currentPage,
+    pageSize,
+    totalPages,
+    counts,
+    requestId,
+    selectedUser,
+  };
+}
+
 function emitUserList(channel = "main") {
   const users = buildUserList(channel);
   const publicUsers = users.map(({ email, ...rest }) => rest);
@@ -1035,12 +1094,7 @@ function emitUserList(channel = "main") {
       s.username &&
       s.currentChannel === channel
     ) {
-      buildAdminUserList()
-        .then((adminUsers) => s.emit("adminUserlist", adminUsers))
-        .catch((e) => {
-          console.error("failed to load admin user list:", e);
-          s.emit("adminUserlist", adminModerationFlags(buildUserList(null)));
-        });
+      s.emit("adminUsersChanged");
       s.emit('uRole', getRole(s.userEmail))
     }
   }
@@ -1229,14 +1283,19 @@ io.on("connection", (socket) => {
     socket.emit("savedProfile", getProfileData(socket.userEmail));
   });
 
-  socket.on("getAdminUsers", async () => {
+  socket.on("getAdminUsers", async (request = {}) => {
     if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
+    const filters = request && typeof request === "object" && !Array.isArray(request) ? request : {};
+    let users;
+    let partial = false;
     try {
-      socket.emit("adminUserlist", await buildAdminUserList());
+      users = await buildAdminUserList();
     } catch (e) {
       console.error("failed to load admin user list:", e);
-      socket.emit("adminUserlist", adminModerationFlags(buildUserList(null)));
+      users = adminModerationFlags(buildUserList(null, true));
+      partial = true;
     }
+    socket.emit("adminUserlist", { ...paginateAdminUsers(users, filters), partial });
     socket.emit('adminIdentity', { email: socket.userEmail, role: getRole(socket.userEmail) });
     socket.emit('uRole', getRole(socket.userEmail));
   });

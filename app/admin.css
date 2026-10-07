@@ -383,6 +383,9 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-users-page .admin-users-state strong { color: var(--text); font-size: 15px; font-weight: 500; }
 .admin-users-page .admin-users-directory-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 12px 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 .admin-users-page .admin-users-directory-footer p { margin: 0; }
+.admin-users-page .admin-users-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-left: auto; }
+.admin-users-page .admin-users-pagination button { min-height: 32px; padding: 5px 9px; border-color: var(--border); background: var(--surface); }
+.admin-users-page .admin-users-pagination span { min-width: 72px; text-align: center; font-family: var(--font-mono); }
 .admin-users-page #admin-users-reset { background: none; border-color: var(--border); }
 .admin-users-page .admin-user-drawer-backdrop { position: fixed; inset: 0; z-index: 1900; background: #0009; }
 .admin-users-page .admin-user-drawer { position: fixed; inset: 0 0 0 auto; width: min(560px, 100%); height: 100dvh; max-width: 100%; max-height: 100dvh; margin: 0; padding: 0; border: 0; border-left: 1px solid var(--border); border-radius: 0; background: var(--surface); color: var(--text); box-shadow: -12px 0 32px #0005; z-index: 2000; overflow: hidden; }
