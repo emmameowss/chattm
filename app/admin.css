@@ -81,7 +81,6 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     letter-spacing: 0;
 }
 .admin-page .dev-badge { margin-left: 8px; letter-spacing: 0; font-family: var(--font-mono); }
-.admin-page .admin-brand-caption { color: var(--muted); font-size: 12px; }
 .admin-page .admin-nav {
     flex: 1;
     flex-direction: column;
@@ -115,25 +114,17 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-page .admin-nav a.active { color: var(--pink); background: var(--pink-dim); border-color: #3b262e; font-weight: 500; }
 .admin-page .admin-nav-back { margin: auto 0 0; }
 .admin-page .admin-nav-soon { margin-left: auto; padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; line-height: 16px; }
-.admin-page .admin-sidebar-footer { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding: 16px 8px 0; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; }
-.admin-page .admin-sidebar-mark { font-size: 18px; color: #777; }
 .admin-page .admin-main { max-width: 1496px; margin-left: 216px; padding: 32px 40px; }
-.admin-page .admin-page-header { margin-bottom: 32px; }
-.admin-page .admin-breadcrumb { display: flex; gap: 12px; color: var(--muted); font-size: 12px; margin-bottom: 24px; }
-.admin-page .admin-breadcrumb span { color: #555; }
-.admin-page .admin-page-header h2 { font-size: 32px; font-weight: 600; letter-spacing: -1.1px; line-height: 1.25; margin-bottom: 8px; }
-.admin-page .admin-page-header p { color: var(--muted); font-size: 14px; max-width: 640px; }
-.admin-page .admin-main-footer { display: flex; justify-content: space-between; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.admin-page .admin-page-header { margin-bottom: 24px; }
+.admin-page .admin-page-header h2 { font-size: 32px; font-weight: 600; letter-spacing: -1.1px; line-height: 1.25; margin: 0; }
+.admin-page .admin-page-header p { color: var(--muted); font-size: 14px; max-width: 640px; margin-top: 8px; }
 
 .admin-page #admin-actions-content { gap: 24px; }
 .admin-page .admin-sections-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 24px; }
 .admin-page .admin-section { min-width: 0; padding: 24px; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .admin-page #admin-actions-content > .admin-section:last-child { max-width: none; }
-.admin-page .admin-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.admin-page .admin-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .admin-page .admin-section-title { color: var(--text); font-size: 15px; font-weight: 500; text-transform: none; letter-spacing: -.2px; margin: 0; }
-.admin-page .admin-section-heading > i { color: var(--muted); font-size: 18px; }
-.admin-page .admin-section-caption { color: var(--muted); font-size: 12px; }
-.admin-page .admin-section-description { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
 .admin-page .admin-metrics-section { background: none; border: 0; padding: 0; }
 .admin-page .admin-metrics-section .admin-section-heading { margin-bottom: 14px; }
 .admin-page .admin-stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
@@ -191,7 +182,6 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-page .admin-overview-activity .admin-stat-row:last-child { padding-right: 0; }
 .admin-page .admin-resources-section .admin-quick-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .admin-page .admin-resources-section .admin-link { padding: 0; border: 0; min-width: 0; }
-.admin-page .admin-resources-section .admin-section-description { margin-bottom: 20px; }
 
 @media (min-width: 701px) and (max-width: 1250px) {
     .admin-page .admin-overview-activity { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
@@ -209,13 +199,10 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-page .admin-resources-section .admin-link:last-child { padding-bottom: 0; }
 }
 
-.admin-page .admin-workspace-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
-.admin-page .admin-workspace-label span:first-child { color: var(--text); font-weight: 500; }
-.admin-page .admin-users-container { gap: 0; height: calc(100dvh - 222px); min-height: 440px; max-height: none; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.admin-page .admin-users-container { gap: 0; height: calc(100dvh - 157px); min-height: 440px; max-height: none; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 .admin-page .admin-users-sidebar { width: 288px; max-height: none; padding: 12px; background: #0f0f0f; border: 0; border-right: 1px solid var(--border); border-radius: 0; overscroll-behavior: contain; }
 .admin-page .admin-users-detail { min-width: 0; padding: 28px; background: none; border: 0; border-radius: 0; overflow-y: auto; overscroll-behavior: contain; }
 .admin-page .admin-users-detail-empty { min-height: 160px; padding: 24px; flex-direction: column; gap: 8px; color: var(--muted); font-size: 13px; }
-.admin-page .admin-users-detail-empty > i { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 12px; color: var(--pink); background: #171215; font-size: 28px; }
 .admin-page .admin-users-detail-empty strong { color: var(--text); font-weight: 500; font-size: 15px; }
 .admin-page .admin-user-section { padding: 12px 10px; font-family: var(--font-mono); color: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: .06em; }
 .admin-page .admin-user-row, .admin-page .admin-emoji-row { padding: 10px; border: 1px solid transparent; border-radius: 6px; min-height: 56px; }
@@ -276,6 +263,7 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 
 @media (min-width: 901px) and (max-width: 1150px) {
     .admin-page .admin-main { padding: 28px 24px; }
+    .admin-page .admin-users-container { height: calc(100dvh - 149px); }
     .admin-page .admin-users-sidebar { width: 240px; }
     .admin-page .admin-users-detail { padding: 24px; }
     .admin-page .admin-stat-row { padding: 16px 12px; }
@@ -285,14 +273,12 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-page .admin-shell-sidebar { position: static; width: 100%; padding: 16px 24px 0; border-right: 0; border-bottom: 1px solid var(--border); overflow: visible; }
     .admin-page .admin-brand { display: flex; align-items: center; gap: 16px; padding: 0 0 16px; }
     .admin-page .admin-brand h1 { font-size: 22px; }
-    .admin-page .admin-brand-caption { border-left: 1px solid var(--border); padding-left: 16px; }
     .admin-page .admin-nav { flex-direction: row; align-items: center; gap: 8px; padding-bottom: 12px; }
     .admin-page .admin-nav-tabs { flex-direction: row; gap: 4px; }
     .admin-page .admin-nav :is(a, button) { width: auto; padding: 0 10px; font-size: 13px; }
     .admin-page .admin-nav-back { margin: 0 0 0 auto; }
-    .admin-page .admin-sidebar-footer { display: none; }
     .admin-page .admin-main { margin: 0; padding: 28px 24px; }
-    .admin-page .admin-users-container { height: calc(100dvh - 310px); }
+    .admin-page .admin-users-container { height: calc(100dvh - 267px); }
     .admin-page .admin-users-sidebar { width: 240px; }
     .admin-page .admin-users-detail { padding: 24px; }
     .admin-page .admin-stat-row { padding: 16px 12px; }
@@ -315,7 +301,6 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-page .admin-overview-activity .admin-stat-row { padding: 16px 12px; }
     .admin-page .admin-overview-activity .admin-stat-row:first-child { padding-left: 12px; }
     .admin-page .admin-overview-activity .admin-stat-row:last-child { padding-right: 12px; }
-    .admin-page .admin-workspace-label span:last-child { display: none; }
 }
 @media (max-width: 540px) {
     .admin-page .admin-shell-sidebar { padding: 12px 16px 0; }
@@ -326,7 +311,6 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-page .admin-nav-back { font-size: 12px; height: 32px; min-height: 32px; }
     .admin-page .admin-main { padding: 24px 16px; }
     .admin-page .admin-page-header { margin-bottom: 24px; }
-    .admin-page .admin-breadcrumb { margin-bottom: 16px; }
     .admin-page .admin-page-header h2 { font-size: 28px; }
     .admin-page .admin-page-header p { font-size: 13px; }
     .admin-page .admin-users-detail { padding: 20px; }
