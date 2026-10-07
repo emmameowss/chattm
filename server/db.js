@@ -362,9 +362,10 @@ const stmts = {
   setRole: db.prepare(`INSERT OR REPLACE INTO roles (email, role) VALUES (?, ?)`),
 
   // hidden_users
-  isHidden: db.prepare(`SELECT 1 FROM hidden_users WHERE email = ?`),
+  isHidden: db.prepare(`SELECT 1 FROM hidden_users WHERE lower(email) = lower(?)`),
+  getHiddenUsers: db.prepare(`SELECT DISTINCT lower(email) AS email FROM hidden_users ORDER BY lower(email)`),
   setHidden: db.prepare(`INSERT OR IGNORE INTO hidden_users (email) VALUES (?)`),
-  removeHidden: db.prepare(`DELETE FROM hidden_users WHERE email = ?`)
+  removeHidden: db.prepare(`DELETE FROM hidden_users WHERE lower(email) = lower(?)`)
 };
 
 // ─── Message API ─────────────────────────────────────────────────────────────
@@ -732,12 +733,16 @@ export function isHidden(email) {
   return !!stmts.isHidden.get(email)
 }
 
+export function getHiddenUsers() {
+  return stmts.getHiddenUsers.all().map(row => row.email.toLowerCase())
+}
+
 export function setHidden(email) {
-  stmts.setHidden.run(email)
+  stmts.setHidden.run(String(email).trim().toLowerCase())
 }
 
 export function removeHidden(email) {
-  stmts.removeHidden.run(email)
+  stmts.removeHidden.run(String(email).trim().toLowerCase())
 }
 
 // ─── Migration from legacy files ─────────────────────────────────────────────

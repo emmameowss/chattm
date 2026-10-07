@@ -129,7 +129,8 @@ function badge(label, variant = '') { return element('span', `admin-directory-ba
 function isMuted(user) { return !!user.muted && (!user.muteUntil || user.muteUntil > Date.now()); }
 function matchesView(user, view) {
   return view === 'all' || (view === 'online' && user.online) ||
-    (view === 'muted' && isMuted(user)) || (view === 'banned' && user.banned);
+    (view === 'muted' && isMuted(user)) || (view === 'banned' && user.banned) ||
+    (view === 'hidden' && user.hidden);
 }
 
 function filteredUsers() {
@@ -187,6 +188,7 @@ function renderUsers() {
     const moderation = element('div', 'admin-user-badges');
     if (user.banned) moderation.append(badge('banned', 'banned'));
     if (isMuted(user)) moderation.append(badge('muted', 'muted'));
+    if (user.hidden) moderation.append(badge('hidden'));
     if (!moderation.children.length) moderation.append(element('span', '', '—'));
     cells[3].append(moderation);
     const openButton = button('', 'chevron-right', trigger => openUser(user, trigger), 'admin-user-open');
@@ -387,6 +389,7 @@ function renderDetail(user) {
   if (user.guest) badges.append(badge('guest'));
   if (user.verified) badges.append(badge('verified', 'staff'));
   if (user.redVerified) badges.append(badge('red verified', 'red-verified'));
+  if (user.hidden) badges.append(badge('hidden'));
   identity.append(badges);
   header.append(avatar(user, 'admin-detail-avatar'), identity);
   content.append(header);
@@ -447,6 +450,16 @@ function renderDetail(user) {
   if (user.banned && user.clerkBanned === true) moderation.append(element('p', '', 'this account is also banned in Clerk. manage its account ban in the Clerk dashboard.'));
   if (user.banned && user.clerkBanned == null) moderation.append(element('p', '', 'account ban status is unavailable. refresh details before unbanning.'));
   panels.moderation.append(moderation);
+
+  const visibility = section('directory visibility', 'hidden users do not appear in public user lists.');
+  const visibilityButton = button(user.hidden ? 'show in user lists' : 'hide from user lists',
+    user.hidden ? 'eye' : 'eye-off', btn => performAction(
+      user.hidden ? '/admin/unhide' : '/admin/hide',
+      { email: user.email }, btn,
+      user.hidden ? 'user is visible in public lists' : 'user hidden from public lists', user
+    ), user.hidden ? 'positive' : 'moderate');
+  visibility.append(visibilityButton);
+  panels.moderation.append(visibility);
 
   const account = section('account details');
   field(account, 'account type', user.guest ? 'guest' : 'registered');

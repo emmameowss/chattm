@@ -78,6 +78,7 @@ import {
   setRole,
   getRole,
   isHidden,
+  getHiddenUsers,
   setHidden,
   removeHidden,
 } from "./db.js";
@@ -863,7 +864,7 @@ function emitAllUserLists() {
   for (const c of listChannels()) emitUserList(c.name);
 }
 
-function buildUserList(channel = "main") {
+function buildUserList(channel = "main", includeHidden = false) {
   const onlineEmails = new Set();
   const onlineUsers = new Map();
 
@@ -908,7 +909,7 @@ function buildUserList(channel = "main") {
     });
   }
 
-  return users.filter((u) => !isHidden(u.email));
+  return includeHidden ? users : users.filter((u) => !isHidden(u.email));
 }
 
 let adminClerkUsersCache = { expiresAt: 0, users: null, promise: null };
@@ -959,7 +960,7 @@ async function getActiveClerkSessions(userId) {
 
 async function buildAdminUserList() {
   const usersByEmail = new Map(
-    buildUserList(null).map((user) => [user.email, user]),
+    buildUserList(null, true).map((user) => [user.email, user]),
   );
 
   for (const clerkUser of await getAllClerkUsers()) {
@@ -994,6 +995,23 @@ async function buildAdminUserList() {
     });
   }
 
+  for (const email of getHiddenUsers()) {
+    if (!email.endsWith("@guest") || usersByEmail.has(email)) continue;
+    usersByEmail.set(email, {
+      username: getStoredUsername(email) ?? email.slice(0, -"@guest".length),
+      email,
+      color: getColor(email) ?? null,
+      avatar: getAvatar(email) ?? null,
+      guest: true,
+      isOwner: false,
+      role: "user",
+      verified: false,
+      redVerified: false,
+      status: "offline",
+      online: false,
+    });
+  }
+
   return adminModerationFlags([...usersByEmail.values()]);
 }
 
@@ -1002,7 +1020,7 @@ function adminModerationFlags(users) {
   return users.map((user) => {
     const mute = getMute(user.email);
     const muted = !!mute && (mute.until === null || mute.until > Date.now());
-    return { ...user, banned: isBanned(user.email), muted, muteUntil: muted ? mute.until : null };
+    return { ...user, banned: isBanned(user.email), muted, muteUntil: muted ? mute.until : null, hidden: isHidden(user.email) };
   });
 }
 
@@ -2375,13 +2393,14 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
-        if (!targetEmail) {
+        if (typeof targetEmail !== 'string' || !targetEmail.trim()) {
           res.writeHead(400, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'email required' }));
           return
         }
 
-        setHidden(targetEmail)
+        setHidden(normalizeEmail(targetEmail))
+        emitAllUserLists()
 
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
@@ -2407,13 +2426,14 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
-        if (!targetEmail) {
+        if (typeof targetEmail !== 'string' || !targetEmail.trim()) {
           res.writeHead(400, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'email required' }));
           return
         }
 
-        removeHidden(targetEmail)
+        removeHidden(normalizeEmail(targetEmail))
+        emitAllUserLists()
 
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
@@ -2540,6 +2560,7 @@ httpServer.on("request", async (req, res) => {
         email: targetEmail,
         username,
         role,
+        hidden: isHidden(normalizeEmail(targetEmail)),
         verified,
         redVerified,
         guest: targetEmail.endsWith("@guest"),
