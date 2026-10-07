@@ -882,6 +882,14 @@ if (session) {
   socket.on("emojiUpdate", (map) => {
     customEmoji = map;
     renderEmojiPicker();
+    document.querySelectorAll("img.custom-emoji").forEach(image => {
+      const shortcode = image.alt;
+      if (Object.hasOwn(map, shortcode)) {
+        image.src = map[shortcode];
+      } else {
+        image.replaceWith(document.createTextNode(shortcode));
+      }
+    });
   });
 
   emojiBtn.addEventListener("click", (e) => {

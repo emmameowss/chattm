@@ -5,7 +5,7 @@ import formidable from "formidable";
 import { createClerkClient, verifyToken } from "@clerk/backend";
 import fetch from "node-fetch";
 import { randomBytes } from "crypto";
-import { readFile, appendFile } from "fs/promises";
+import { readFile, appendFile, unlink } from "fs/promises";
 import { extname, isAbsolute, normalize, resolve, sep } from "path";
 import { execSync } from "child_process";
 import { randomUUID } from "crypto";
@@ -122,8 +122,49 @@ const clerkAuthorizedParties = (process.env.CLERK_AUTHORIZED_PARTIES || "")
 // migrate from legacy files on first run
 await migrateFromFiles();
 
+// Serialize library changes and storage sync so a reload cannot race an upload.
+let emojiMutation = Promise.resolve();
+
+async function withEmojiMutation(action) {
+  const previous = emojiMutation;
+  let release;
+  emojiMutation = new Promise(resolve => { release = resolve; });
+  await previous;
+  try {
+    return await action();
+  } finally {
+    release();
+  }
+}
+
+function syncEmojisFromS3() {
+  return withEmojiMutation(syncEmojisFromS3Unlocked);
+}
+
+function emojiStorageKey(publicUrl) {
+  const prefix = (process.env.AWS_S3_PUBLIC_URL || '').replace(/\/+$/, '') + '/';
+  if (!publicUrl.startsWith(prefix)) throw new Error('invalid emoji storage URL');
+  const key = publicUrl.slice(prefix.length).split('?')[0];
+  if (!key.startsWith('emojis/')) throw new Error('invalid emoji storage key');
+  return key;
+}
+
+function emojiImageType(buffer) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return {mime: 'image/png', ext: '.png'};
+  }
+  const gif = buffer.subarray(0, 6).toString('ascii');
+  if (gif === 'GIF87a' || gif === 'GIF89a') return {mime: 'image/gif', ext: '.gif'};
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+      && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return {mime: 'image/webp', ext: '.webp'};
+  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) {
+    return {mime: 'image/jpeg', ext: '.jpg'};
+  }
+  return null;
+}
+
 // sync emojis from S3 emojis/ folder into DB on startup
-async function syncEmojisFromS3() {
+async function syncEmojisFromS3Unlocked() {
   if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) return;
   try {
     const existing = getCustomEmoji();
@@ -1984,69 +2025,138 @@ httpServer.on("request", async (req, res) => {
     return
   }
 
-  if (url.pathname === "/admin/emoji/delete" && req.method === "POST") {
-    let body = ''
-    req.on('data', (chunk) => (body += chunk))
-    req.on('end', async () => {
+  if (["/admin/emoji/add", "/admin/emoji/replace"].includes(url.pathname) && req.method === "POST") {
+    const user = getRequestUser(req);
+    const send = (status, data) => {
+      res.writeHead(status, {"content-type": "application/json"});
+      res.end(JSON.stringify(data));
+    };
+    if (!user || !["admin", "owner"].includes(getRole(user.email))) {
+      send(403, {success: false, error: "forbidden"});
+      return;
+    }
+    if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) {
+      send(503, {success: false, error: "emoji storage is not configured"});
+      return;
+    }
+    if (!checkRateLimit(user.email, "admin-emoji-upload", 30, 60 * 60 * 1000)) {
+      send(429, {success: false, error: "too many emoji uploads, try again later"});
+      return;
+    }
+    const replacing = url.pathname === "/admin/emoji/replace";
+    const maxFileSize = 2 * 1024 * 1024;
+    const form = formidable({maxFiles: 1, maxFileSize, maxTotalFileSize: maxFileSize,
+      maxFields: 1, maxFieldsSize: 1024, allowEmptyFiles: false, minFileSize: 1});
+    const tempFiles = new Set();
+    form.on("fileBegin", (_name, file) => tempFiles.add(file.filepath));
+    form.parse(req, async (err, fields, files) => {
       try {
-        const { session, shortcode } = JSON.parse(body)
-        const sess = getSession(session)
-        const sessRole = sess ? getRole(sess.email) : 'user'
-
-        if (!sessRole || !['admin', 'owner'].includes(sessRole)) {
-          res.writeHead(403, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'forbidden'}))
-          return
+        if (err) {
+          send(400, {success: false, error: "upload one image up to 2 MB"});
+          return;
         }
-
-        const emojis = getCustomEmoji()
-        if (!emojis[shortcode]) {
-          res.writeHead(404, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'emoji not found'}))
-          return
+        const file = files.file?.[0];
+        const input = fields.shortcode?.[0];
+        if (!file || Object.values(files).flat().length !== 1 || typeof input !== "string") {
+          send(400, {success: false, error: "an image and shortcode are required"});
+          return;
         }
-
-        const url = emojis[shortcode]
-        
-        if (!process.env.AWS_S3_PUBLIC_URL) {
-          console.error('AWS_S3_PUBLIC_URL not configured')
-          res.writeHead(500, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'S3 not configured'}))
-          return
+        const name = replacing ? input : input.trim().toLowerCase();
+        const shortcode = ":" + name + ":";
+        if (!replacing && !/^[a-z0-9_]{1,32}$/.test(name)) {
+          send(400, {success: false, error: "use 1–32 lowercase letters, numbers, or underscores"});
+          return;
         }
-        
-        const publicUrlPrefix = process.env.AWS_S3_PUBLIC_URL + '/'
-        if (!url.startsWith(publicUrlPrefix)) {
-          console.error('Emoji URL does not match expected S3 public URL format:', url)
-          res.writeHead(500, {'content-type': 'application/json'})
-          res.end(JSON.stringify({success: false, error: 'invalid emoji URL format'}))
-          return
+        const body = await readFile(file.filepath);
+        const type = emojiImageType(body);
+        if (!type || body.length > maxFileSize || file.mimetype !== type.mime) {
+          send(400, {success: false, error: "upload a PNG, GIF, WebP, or JPEG image up to 2 MB"});
+          return;
         }
-        
-        const s3Key = url.replace(publicUrlPrefix, '')
-
-        try {
-          await s3.send(new DeleteObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: s3Key
+        await withEmojiMutation(async () => {
+          // Check again after upload parsing and while holding the mutation queue.
+          const currentUser = getRequestUser(req);
+          if (!currentUser || !["admin", "owner"].includes(getRole(currentUser.email))) {
+            send(403, {success: false, error: "forbidden"});
+            return;
+          }
+          const existing = getCustomEmoji();
+          const currentUrl = Object.hasOwn(existing, shortcode) ? existing[shortcode] : null;
+          if (replacing ? !currentUrl : !!currentUrl) {
+            send(replacing ? 404 : 409, {success: false,
+              error: replacing ? "emoji not found" : "that shortcode is already in use"});
+            return;
+          }
+          const key = replacing ? emojiStorageKey(currentUrl) : "emojis/" + name + type.ext;
+          await s3.send(new PutObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET, Key: key, Body: body,
+            ContentType: type.mime, CacheControl: "no-cache",
           }));
-        } catch (e) {
-          console.error('failed to delete:', e)
-        }
-
-        removeCustomEmoji(shortcode)
-
-        io.emit('emojiUpdate', getCustomEmoji())
-
-        res.writeHead(200, {'content-type': 'application/json'})
-        res.end(JSON.stringify({success: true}))
+          const publicUrl = process.env.AWS_S3_PUBLIC_URL.replace(/\/+$/, "") + "/" + key + "?v=" + randomUUID();
+          addCustomEmoji(shortcode, publicUrl);
+          io.emit("emojiUpdate", getCustomEmoji());
+          send(200, {success: true, emoji: {shortcode, url: publicUrl}});
+        });
       } catch (e) {
-        console.error('error deleting emoji:', e)
-        res.writeHead(500, {'content-type': 'application/json'})
-        res.end(JSON.stringify({success: false, error: 'internal error'}))
+        console.error("emoji upload failed:", e);
+        if (!res.writableEnded) send(500, {success: false, error: "failed to save emoji"});
+      } finally {
+        await Promise.allSettled([...tempFiles].map(path => unlink(path)));
       }
-    })
-    return
+    });
+    return;
+  }
+
+  if (url.pathname === "/admin/emoji/delete" && req.method === "POST") {
+    const send = (status, data) => {
+      res.writeHead(status, {"content-type": "application/json"});
+      res.end(JSON.stringify(data));
+    };
+    let body = "";
+    let tooLarge = false;
+    req.on("data", chunk => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 4096) {
+        tooLarge = true;
+        send(413, {success: false, error: "request too large"});
+      }
+    });
+    req.on("end", async () => {
+      if (tooLarge) return;
+      let payload;
+      try { payload = JSON.parse(body); }
+      catch { send(400, {success: false, error: "invalid request"}); return; }
+      try {
+        await withEmojiMutation(async () => {
+          const sess = typeof payload?.session === "string" ? getSession(payload.session) : null;
+          if (!sess || !["admin", "owner"].includes(getRole(sess.email))) {
+            send(403, {success: false, error: "forbidden"});
+            return;
+          }
+          const shortcode = payload.shortcode;
+          const existing = getCustomEmoji();
+          if (typeof shortcode !== "string" || !Object.hasOwn(existing, shortcode)) {
+            send(404, {success: false, error: "emoji not found"});
+            return;
+          }
+          if (!process.env.AWS_S3_BUCKET || !process.env.AWS_S3_PUBLIC_URL) {
+            send(503, {success: false, error: "emoji storage is not configured"});
+            return;
+          }
+          await s3.send(new DeleteObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET, Key: emojiStorageKey(existing[shortcode]),
+          }));
+          removeCustomEmoji(shortcode);
+          io.emit("emojiUpdate", getCustomEmoji());
+          send(200, {success: true});
+        });
+      } catch (e) {
+        console.error("error deleting emoji:", e);
+        send(500, {success: false, error: "failed to delete emoji; try again"});
+      }
+    });
+    return;
   }
 
   if (url.pathname === "/admin/mutechat" && req.method === "POST") {

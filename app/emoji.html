@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/admin.css">
     <script src="/admin-ui.js" defer></script>
   </head>
-  <body class="admin-page">
+  <body class="admin-page admin-users-page admin-emoji-page">
     <a class="admin-skip-link" href="#admin-main">skip to content</a>
     <aside class="admin-shell-sidebar">
       <div class="admin-brand"><h1>chat™</h1></div>
@@ -28,25 +28,39 @@
       </nav>
     </aside>
     <main id="admin-main" class="admin-main" tabindex="-1">
-      <header class="admin-page-header">
-        <h2>emoji</h2>
-        <p>view and manage custom emoji.</p>
-      </header>
-<div class="admin-users-container">
-      <div class="admin-users-sidebar" role="region" aria-label="Emoji library" id="admin-emoji-sidebar">
-
-      </div>
-      <div class="admin-users-detail" role="region" aria-label="Emoji details" id="admin-emoji-detail">
-        <div class='admin-users-detail-empty'>
-          <strong>select an emoji</strong>
+      <header class="admin-page-header admin-users-page-header">
+        <div><h2>emoji</h2><p>add, replace, and manage custom emoji.</p></div>
+        <div class="admin-emoji-header-actions">
+          <button type="button" id="admin-emoji-refresh"><i class="ti ti-refresh" aria-hidden="true"></i> refresh</button>
+          <button type="button" id="admin-emoji-add" class="admin-emoji-primary"><i class="ti ti-plus" aria-hidden="true"></i> add emoji</button>
         </div>
-      </div>
-    </div>
+      </header>
+      <section class="admin-section admin-users-directory" aria-label="Emoji directory">
+        <div class="admin-users-views"><span id="admin-emoji-count">custom emoji</span></div>
+        <div class="admin-users-toolbar admin-emoji-toolbar">
+          <label class="admin-users-search" for="admin-emoji-search"><span class="admin-visually-hidden">search shortcode</span><i class="ti ti-search" aria-hidden="true"></i><input id="admin-emoji-search" type="search" placeholder="search shortcode" autocomplete="off"></label>
+          <label class="admin-users-filter" for="admin-emoji-sort"><span>sort</span><select id="admin-emoji-sort"><option value="asc">shortcode a–z</option><option value="desc">shortcode z–a</option></select></label>
+        </div>
+        <div id="admin-emoji-state" class="admin-users-state" role="status" aria-live="polite">loading emoji…</div>
+        <div id="admin-emoji-table-wrap" class="admin-users-table-wrap" hidden>
+          <table class="admin-users-table admin-emoji-table">
+            <thead><tr><th scope="col">emoji / shortcode</th><th scope="col"><span class="admin-visually-hidden">details</span></th></tr></thead>
+            <tbody id="admin-emoji-list"></tbody>
+          </table>
+        </div>
+        <footer class="admin-users-directory-footer"><p id="admin-emoji-results" role="status" aria-live="polite"></p><button type="button" id="admin-emoji-reset" hidden>clear filters</button></footer>
+      </section>
     </main>
+    <div id="admin-emoji-drawer-backdrop" class="admin-user-drawer-backdrop" hidden></div>
+    <dialog id="admin-emoji-drawer" class="admin-user-drawer" aria-modal="true" aria-labelledby="admin-emoji-drawer-title">
+      <header class="admin-user-drawer-header"><h3 id="admin-emoji-drawer-title">emoji details</h3><button type="button" id="admin-emoji-drawer-close" aria-label="close emoji details"><i class="ti ti-x" aria-hidden="true"></i></button></header>
+      <div id="admin-emoji-detail" class="admin-users-detail"></div>
+    </dialog>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/emoji.js"></script>
     <div id="modal-overlay" style="display: none;">
       <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-message">
+        <img id="modal-emoji-preview" alt="" hidden>
         <p id="modal-message"></p>
         <input type="text" id="modal-input" aria-labelledby="modal-message" style="display: none;">
 

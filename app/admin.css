@@ -449,3 +449,37 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-users-page .admin-user-open, .admin-users-page #admin-user-drawer-close { width: 44px; min-height: 44px; }
     .admin-users-page .admin-users-search input, .admin-users-page select { font-size: 16px; }
 }
+
+
+/* Emoji directory reuses the users page's directory and drawer layout. */
+.admin-emoji-page .admin-emoji-header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-emoji-page .admin-emoji-primary { border: 1px solid var(--pink); background: var(--pink); color: var(--bg); }
+.admin-emoji-page .admin-emoji-primary:hover:not(:disabled) { border-color: #ffd2dc; background: #ffd2dc; color: var(--bg); }
+.admin-emoji-page .admin-emoji-toolbar { grid-template-columns: minmax(180px, 1fr) minmax(130px, 180px); }
+.admin-emoji-page #admin-emoji-list { display: table-row-group; max-width: none; }
+.admin-emoji-page .admin-emoji-table th:first-child { width: 90%; }
+.admin-emoji-page .admin-emoji-table th:last-child { width: 10%; }
+.admin-emoji-page #admin-emoji-drawer-close { display: flex; align-items: center; justify-content: center; width: 40px; padding: 6px; background: none; border-color: var(--border); }
+.admin-emoji-page #admin-emoji-detail { flex: 1; min-height: 0; padding: 24px; overflow-y: auto; }
+.admin-emoji-page .admin-emoji-form { display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
+.admin-emoji-page .admin-emoji-form input { width: 100%; margin: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+.admin-emoji-page .admin-emoji-form input:read-only { color: var(--muted); }
+.admin-emoji-page .admin-emoji-editor-preview { display: flex; align-items: center; justify-content: center; min-height: 180px; padding: 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--muted); text-align: center; }
+.admin-emoji-page .admin-emoji-editor-preview img { display: block; width: 120px; height: 120px; object-fit: contain; }
+.admin-emoji-page .admin-emoji-help { margin: 0; color: var(--muted); font-size: 12px; }
+.admin-emoji-page .admin-emoji-error { margin: 0; color: var(--danger); font-size: 13px; }
+.admin-emoji-page .admin-emoji-error:empty { display: none; }
+.admin-emoji-page .admin-emoji-detail-actions { display: flex; flex-wrap: wrap; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); }
+.admin-emoji-page .admin-emoji-detail-actions .destructive { flex-basis: 100%; margin-top: 8px; }
+@media (max-width: 700px) {
+    .admin-emoji-page .admin-users-page-header { align-items: flex-start; flex-wrap: wrap; }
+    .admin-emoji-page .admin-emoji-toolbar { grid-template-columns: minmax(0, 1fr); }
+    .admin-emoji-page .admin-emoji-table { min-width: 280px; }
+    .admin-emoji-page .admin-emoji-table th:first-child { width: 80%; }
+    .admin-emoji-page .admin-emoji-table th:last-child { width: 20%; }
+}
+@media (pointer: coarse) {
+    .admin-emoji-page #admin-emoji-drawer-close { width: 44px; min-height: 44px; }
+}
+
+.admin-emoji-page #modal-emoji-preview { width: 64px; height: 64px; object-fit: contain; margin: 0 auto; }
