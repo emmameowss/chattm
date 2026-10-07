@@ -137,7 +137,11 @@ function updateMaintenanceStatus(maintenance, reason) {
 
 let chatMutedb = false;
 
-socket.on("init", ({ chatMuted }) => {
+socket.on("init", ({ chatMuted, role }) => {
+  const isOwner = role === 'owner';
+  document.querySelector('#owner-mutechat-btn').hidden = !isOwner;
+  document.querySelector('#owner-maintenance-btn').hidden = !isOwner;
+  document.querySelector('#admin-clear-btn').hidden = !['admin', 'owner'].includes(role);
   chatMutedb = chatMuted;
   updateChatMuteStatus(chatMuted);
 
@@ -231,12 +235,14 @@ socket.on('usercount', (count) => {
 
 loadStats();
 
-document.querySelector('#owner-mutechat-btn').addEventListener('click', async () => {
+document.querySelector('#owner-mutechat-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
   try {
     const res = await fetch('/admin/mutechat', {
       method: "POST",
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session }),
+      body: JSON.stringify({ session, muted: !chatMutedb }),
     });
     const data = await res.json();
     if (data.success) {
@@ -248,6 +254,8 @@ document.querySelector('#owner-mutechat-btn').addEventListener('click', async ()
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error');
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -293,16 +301,23 @@ document.querySelector('#owner-maintenance-btn').addEventListener('click', async
   }
 });
 
-document.querySelector('#owner-clear-btn').addEventListener('click', async () => {
-  const channel = await showModal({
-    message: 'select channel to clear:',
-    withSelect: true,
-    selectOptions: availableChannels,
-    defaultValue: 'main'
-  })
-  if (!channel) return
-
+document.querySelector('#admin-clear-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  if (button.disabled) return;
+  button.disabled = true;
   try {
+    const channel = await showModal({
+      message: 'select channel to clear:',
+      withSelect: true,
+      selectOptions: availableChannels,
+      defaultValue: 'main'
+    });
+    if (!channel) return;
+    const confirmed = await showModal({
+      message: `permanently clear all message history in #${channel}?`,
+    });
+    if (!confirmed) return;
+
     const res = await fetch('/admin/clear', {
       method: "POST",
       headers: {'content-type': 'application/json'},
@@ -316,16 +331,23 @@ document.querySelector('#owner-clear-btn').addEventListener('click', async () =>
     }
   } catch (e) {
     showToast('error: ' + e.message, 'error')
+  } finally {
+    button.disabled = false;
   }
 });
 
-document.querySelector('#owner-refresh-version-btn').addEventListener('click', async () => {
+document.querySelector('#admin-refresh-version-btn').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
   try {
     showToast('refreshing version status...', 'info');
-    await fetch('/version?refresh=1');
+    const res = await fetch('/version?refresh=1');
+    if (!res.ok) throw new Error(`version refresh failed (${res.status})`);
     showToast('version status refreshed', 'success');
   } catch (e) {
     showToast('failed to refresh version', 'error');
+  } finally {
+    button.disabled = false;
   }
 });
 

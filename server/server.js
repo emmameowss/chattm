@@ -2181,7 +2181,7 @@ httpServer.on("request", async (req, res) => {
     req.on('data', (d) => { body += d })
     req.on('end', async () => {
       try {
-        const { session: sessionId } = JSON.parse(body)
+        const { session: sessionId, muted: requestedMuted } = JSON.parse(body)
         const sess = sessionId ? getSession(sessionId) : null
         const sessRole = sess ? getRole(sess.email) : "user"
         if (!sess || sessRole !== "owner") {
@@ -2190,7 +2190,13 @@ httpServer.on("request", async (req, res) => {
           return
         }
 
-        chatMuted = !chatMuted
+        if (typeof requestedMuted !== "boolean") {
+          res.writeHead(400, { "content-type": "application/json" })
+          res.end(JSON.stringify({ error: "muted state required" }))
+          return
+        }
+
+        chatMuted = requestedMuted
         setSetting("chat_muted", chatMuted ? "1" : "0")
         if (chatMuted) {
           io.emit('mutechat', 'chat has been muted')
@@ -2262,6 +2268,11 @@ httpServer.on("request", async (req, res) => {
         }
 
         const targetChannel = channel || 'main'
+        if (typeof targetChannel !== 'string' || !channelExists(targetChannel)) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: 'invalid channel' }))
+          return
+        }
         clearMessages(targetChannel)
         io.to(roomOf(targetChannel)).emit('clear')
 
