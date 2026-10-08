@@ -810,8 +810,3 @@ socket.on('uRole', role => { uRole = role; if (selectedUser?.messageCount !== un
   });
 });
 socket.on('commandError', message => showToast(message, 'error'));
-if (['beta.chattm.app', 'localhost', '127.0.0.1'].includes(location.hostname)) {
-  const brand = document.querySelector('.admin-brand h1');
-  const badge = element('span', 'dev-badge', location.hostname === 'beta.chattm.app' ? 'beta' : 'dev');
-  brand.append(badge);
-}

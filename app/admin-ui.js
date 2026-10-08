@@ -1,5 +1,17 @@
 // Shared presentation and keyboard behavior; moderation stays in the page scripts.
 (() => {
+  const hostname = location.hostname;
+  const brand = document.querySelector('.admin-brand h1');
+  if (['beta.chattm.app', 'localhost', '127.0.0.1'].includes(hostname) && brand && !brand.querySelector('.dev-badge')) {
+    const badge = document.createElement('span');
+    badge.className = 'dev-badge';
+    badge.textContent = hostname === 'beta.chattm.app' ? 'beta' : 'dev';
+    badge.title = hostname === 'beta.chattm.app'
+      ? 'this is a beta instance of chat™, updates are done on every push to dev'
+      : 'this is a dev instance of chat™';
+    brand.append(badge);
+  }
+
   const rowSelector = '.admin-user-row, .admin-emoji-row, .admin-log-row, .admin-report-row';
   const overlay = document.querySelector('#modal-overlay');
   const main = document.querySelector('.admin-main');
