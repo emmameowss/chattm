@@ -2,8 +2,23 @@
   window.bindVerificationNotifications = socket => {
     const notices = new Map();
     function remove(id) {
-      notices.get(id)?.remove();
-      notices.delete(id);
+      const toast = notices.get(id);
+      if (!toast || toast.dataset.closing) return;
+      toast.dataset.closing = 'true';
+      toast.style.pointerEvents = 'none';
+      const finish = () => {
+        toast.remove();
+        notices.delete(id);
+      };
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        finish();
+        return;
+      }
+      const animation = toast.animate([
+        { opacity: 1, transform: 'translateX(0) scale(1)' },
+        { opacity: 0, transform: 'translateX(12px) scale(.98)' }
+      ], { duration: 180, easing: 'ease-in', fill: 'forwards' });
+      animation.finished.then(finish, finish);
     }
     function show(notification, live = false) {
       if (!notification?.id || notices.has(notification.id)) return;

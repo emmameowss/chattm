@@ -715,3 +715,11 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-page .toast.red-verification { border-color: #8f3743; background: linear-gradient(135deg, #3d0a0f, #5a151c); color: #ffe3e7; }
 
 .admin-page .verification-toast { display: grid; }
+
+.admin-users-page .admin-detail-tabs { overflow-x: auto; }
+.admin-users-page .admin-detail-tabs button { flex: 1 0 auto; padding-inline: 10px; }
+.admin-user-timeline-entry { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.admin-user-timeline-entry:last-child { border-bottom: 0; }
+.admin-user-timeline-meta { color: var(--muted); font-size: 11px; }
+.admin-user-timeline-entry p { margin: 0; white-space: pre-wrap; }
+.admin-user-timeline-entry a { color: var(--pink); }

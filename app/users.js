@@ -341,7 +341,7 @@ function canModerate(user) {
 }
 
 function detailTabs(content) {
-  const names = ['profile', 'moderation', 'account', 'sessions'];
+  const names = ['profile', 'moderation', 'reports', 'activity', 'account', 'sessions'];
   const nav = element('div', 'admin-detail-tabs');
   nav.setAttribute('role', 'tablist');
   nav.setAttribute('aria-label', 'user details');
@@ -429,6 +429,7 @@ function renderDetail(user) {
   const panels = detailTabs(content);
   const profile = section('profile details');
   field(profile, 'username', user.username);
+  field(profile, 'joined', user.createdAt ? `${formatDate(user.createdAt, true)}${user.joinedEstimated ? ' (estimated from first public message)' : ''}` : 'unavailable');
   field(profile, 'pronouns', user.profile?.pronouns || 'not set');
   field(profile, 'status', user.profile?.status || 'not set');
   field(profile, 'last seen', user.online ? 'online now' : user.profile?.lastSeen ? formatDate(user.profile.lastSeen, true) : 'unavailable');
@@ -486,7 +487,7 @@ function renderDetail(user) {
   if (user.guest && uRole === 'owner') verification.append(element('p', '', 'regular verification is unavailable for guest accounts.'));
   panels.profile.append(verification);
 
-  const moderation = section('moderation');
+  const moderation = section('quick actions');
   if (user.banned) moderationNotice(moderation, 'chat ban active', user.banReason, 'danger');
   if (isMuted(user)) moderationNotice(moderation,
     user.muteUntil ? `muted until ${formatDate(user.muteUntil, true)}` : 'muted permanently', user.muteReason, 'warning');
@@ -503,6 +504,17 @@ function renderDetail(user) {
   kick.disabled = !permitted || !user.online;
   actions.append(mute, kick, ban);
   moderation.append(actions);
+  const shortcuts = section('quick actions');
+  const shortcutActions = element('div', 'admin-detail-actions');
+  for (const [original, action, icon] of [[mute, isMuted(user) ? 'unmute' : 'mute', 'volume-3'],
+    [kick, 'kick', 'user-x'], [ban, user.banned ? 'unban' : 'ban', 'ban']]) {
+    const shortcut = button(original.textContent, icon, btn => moderateUser(user, action, btn),
+      action === 'ban' ? 'destructive' : 'moderate');
+    shortcut.disabled = original.disabled;
+    shortcutActions.append(shortcut);
+  }
+  shortcuts.append(shortcutActions);
+  panels.profile.append(shortcuts);
   if (!permitted) moderation.append(element('p', '', 'moderation is available for users with a lower role than yours.'));
   if (user.banned && user.clerkBanned === true) moderation.append(element('p', '', 'this account is also banned in Clerk. manage its account ban in the Clerk dashboard.'));
   if (user.banned && user.clerkBanned == null) moderation.append(element('p', '', 'account ban status is unavailable. refresh details before unbanning.'));
@@ -518,9 +530,52 @@ function renderDetail(user) {
   visibility.append(visibilityButton);
   panels.moderation.append(visibility);
 
+  const history = section('moderation history', 'latest 50 recorded actions; older actions may no longer be retained.');
+  for (const entry of user.moderationHistory || []) {
+    const row = element('article', 'admin-user-timeline-entry');
+    row.append(element('strong', '', entry.action.replaceAll('user.', '').replaceAll('_', ' ')),
+      element('span', 'admin-user-timeline-meta', `${formatDate(entry.time)} · ${entry.actor} (${entry.role}) · ${entry.outcome}`));
+    if (entry.reason) row.append(element('p', '', entry.reason));
+    if (entry.duration != null) row.append(element('span', '', `duration: ${entry.duration} minutes`));
+    history.append(row);
+  }
+  if (!user.moderationHistory?.length) history.append(element('p', '', 'no recorded moderation actions.'));
+  panels.moderation.append(history);
+
+  const reports = section('reports against this user', 'latest 50 reports. open a report to review its evidence and outcome.');
+  for (const report of user.reports || []) {
+    const row = element('article', 'admin-user-timeline-entry');
+    const link = element('a', '', `report #${report.id} · ${report.reason.replaceAll('_', ' ')}`);
+    link.href = `/admin/reports?report=${encodeURIComponent(report.id)}`;
+    row.append(link, element('span', 'admin-user-timeline-meta', `${formatDate(report.created_at)} · ${report.status} · ${report.target_type.replaceAll('_', ' ')}`));
+    reports.append(row);
+  }
+  if (!user.reports?.length) reports.append(element('p', '', 'no reports against this user.'));
+  panels.reports.append(reports);
+
+  const activity = section('public activity', 'latest 50 available channel messages. deleted messages are not included.');
+  for (const message of user.publicActivity || []) {
+    const row = element('article', 'admin-user-timeline-entry');
+    row.append(element('span', 'admin-user-timeline-meta', `${formatDate(message.time)} · #${message.channel_name || message.channel || 'main'}`));
+    if (message.text) row.append(element('p', 'admin-user-activity-text', message.text));
+    if (message.image) {
+      try {
+        const url = new URL(message.image, location.origin);
+        if (['http:', 'https:'].includes(url.protocol)) {
+          const link = element('a', '', 'view attachment');
+          link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          row.append(link);
+        }
+      } catch {}
+    }
+    activity.append(row);
+  }
+  if (!user.publicActivity?.length) activity.append(element('p', '', 'no available public messages.'));
+  panels.activity.append(activity);
+
   const account = section('account details');
   field(account, 'account type', user.guest ? 'guest' : 'registered');
-  field(account, 'joined', formatDate(user.createdAt));
+  field(account, 'joined', user.createdAt ? `${formatDate(user.createdAt)}${user.joinedEstimated ? ' (estimated)' : ''}` : 'unavailable');
   field(account, 'total messages', Number(user.messageCount || 0).toLocaleString());
   panels.account.append(account);
 

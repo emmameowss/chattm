@@ -461,3 +461,6 @@ reportReset.addEventListener('click', () => {
 });
 
 requestReports();
+
+const linkedReportId = new URLSearchParams(location.search).get('report');
+if (linkedReportId && /^\d+$/.test(linkedReportId)) openReport({ id: linkedReportId });

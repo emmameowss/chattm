@@ -451,7 +451,7 @@ const commands = {
       target.emit("kicked", kickReason);
       target.skipLeaveMessage = true;
       target.disconnect();
-      recordStaffAction(socket, "kick", { target: targetUsername, details: { reason: kickReason } });
+      recordStaffAction(socket, "kick", { target: target.userEmail, details: { reason: kickReason } });
       socket.emit("commandError", `kicked ${targetUsername}`, 'success');
       await appendFile(
         "kicks.log",
@@ -3518,12 +3518,13 @@ httpServer.on("request", async (req, res) => {
       ).get(targetEmail)?.count || 0;
 
       const profileData = getProfileData(targetEmail)
-      let createdAt = profileData?.lastSeen || Date.now()
+      let createdAt = null
+      let joinedEstimated = true
 
       const firstMessage = db.prepare(
         "SELECT MIN(time) as first FROM messages WHERE owner_email = ?"
       ).get(targetEmail)
-      if (firstMessage?.first && firstMessage.first < createdAt) {
+      if (firstMessage?.first) {
         createdAt = firstMessage.first
       }
 
@@ -3568,8 +3569,9 @@ httpServer.on("request", async (req, res) => {
               activeSessions = null;
             }
 
-            if (clerkUser.createdAt && clerkUser.createdAt < createdAt) {
+            if (clerkUser.createdAt) {
               createdAt = clerkUser.createdAt
+              joinedEstimated = false
             }
           }
         } catch (e) {
@@ -3595,8 +3597,23 @@ httpServer.on("request", async (req, res) => {
           status: profileData.status || '',
           lastSeen: online ? null : profileData.lastSeen,
         },
+        moderationHistory: db.prepare(`SELECT id, occurred_at, actor_username, actor_role, action, outcome, details_json
+          FROM action_logs WHERE target = ? COLLATE NOCASE AND category IN ('moderation', 'verification', 'accounts')
+          ORDER BY occurred_at DESC, id DESC LIMIT 50`).all(targetEmail).map(row => {
+            let details = {}; try { details = JSON.parse(row.details_json || '{}'); } catch {}
+            return { id: row.id, time: row.occurred_at, actor: row.actor_username || 'staff',
+              role: row.actor_role, action: row.action, outcome: row.outcome,
+              reason: details.reason || '', duration: details.duration };
+          }),
+        reports: db.prepare(`SELECT id, created_at, status, target_type, reason FROM reports
+          WHERE target_email = ? COLLATE NOCASE ORDER BY created_at DESC, id DESC LIMIT 50`).all(targetEmail),
+        publicActivity: db.prepare(`SELECT m.id, m.time, m.text, m.image, m.channel, c.name AS channel_name
+          FROM messages m LEFT JOIN channels c ON c.name = m.channel
+          WHERE m.owner_email = ? AND COALESCE(m.system, 0) = 0
+          ORDER BY m.time DESC LIMIT 50`).all(targetEmail),
         clerkId,
         createdAt,
+        joinedEstimated,
         lastSignInAt,
         messageCount,
         activeSessions,
