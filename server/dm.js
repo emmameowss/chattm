@@ -43,9 +43,10 @@ export function createDmService(deps) {
   }
   function summary(conversation, email) {
     const other = peer(conversation, email);
-    const profile = identity(other);
+    const profile = { ...identity(other), ...deps.peerProfile?.(other) };
     return { id: conversation.id, peer: { username: profile.username, avatar: profile.avatar,
-      color: profile.color, isOwner: profile.isToken, verified: profile.verified, redVerified: profile.redVerified },
+      color: profile.color, isOwner: profile.isToken, verified: profile.verified, redVerified: profile.redVerified,
+      pronouns: profile.pronouns || "", status: profile.status || "online", online: !!profile.online },
       updatedAt: conversation.updated_at, latestSeq: conversation.latest_seq,
       unread: conversation.unread || 0, blockedByMe: store.hasBlock(email, other),
       blocked: store.hasBlock(email, other) || store.hasBlock(other, email) };

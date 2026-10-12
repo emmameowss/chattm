@@ -412,6 +412,59 @@ if (session) {
     document.querySelector('#message-form button[type="submit"]').disabled = !!disabled;
     document.querySelector("#attach-btn").disabled = !!disabled;
   }
+  function makeDmAvatar(peer) {
+    const avatar = document.createElement(peer.avatar ? "img" : "span");
+    avatar.className = "dm-avatar" + (peer.avatar ? "" : " dm-avatar-placeholder");
+    if (peer.avatar) {
+      avatar.src = peer.avatar;
+      avatar.alt = "";
+    } else {
+      avatar.textContent = (peer.username || "?")[0];
+      avatar.style.backgroundColor = `hsl(${nameHash(peer.username || "?") % 360}, 55%, 38%)`;
+      avatar.setAttribute("aria-hidden", "true");
+    }
+    return avatar;
+  }
+  function appendDmName(container, peer) {
+    const name = document.createElement("span");
+    name.className = "dm-name";
+    name.textContent = peer.username;
+    if (peer.redVerified) applyRedVerifiedColor(name);
+    else applyFlagColor(name, peer.color || getNameColor(peer.username));
+    container.appendChild(name);
+    if (peer.isOwner) {
+      container.appendChild(makeBadge("https://cdn.chattm.app/verified_owner.png", 11,
+        "this user is verified to be the owner of chat™"));
+    } else if (peer.redVerified) {
+      container.appendChild(makeRedCheckBadge(11));
+    } else if (peer.verified) {
+      container.appendChild(makeBadge("https://cdn.chattm.app/verified.png", 11,
+        "this user has been verified"));
+    }
+  }
+  function renderDmPeer(peer) {
+    const button = document.querySelector("#dm-peer-btn");
+    button.replaceChildren(makeDmAvatar(peer));
+    const details = document.createElement("span");
+    details.className = "dm-peer-details";
+    const nameRow = document.createElement("span");
+    nameRow.className = "dm-peer-name";
+    appendDmName(nameRow, peer);
+    const metadata = document.createElement("span");
+    metadata.className = "dm-peer-meta";
+    if (peer.pronouns) {
+      const pronouns = document.createElement("span");
+      pronouns.className = "dm-peer-pronouns";
+      pronouns.textContent = peer.pronouns;
+      metadata.append(pronouns, document.createTextNode(" · "));
+    }
+    const status = peer.online ? peer.status || "online" : "offline";
+    const statusText = status === "offline" ? "Offline" : statusLabel(status);
+    metadata.append(statusDot(status), document.createTextNode(statusText));
+    details.append(nameRow, metadata);
+    button.append(details);
+    button.setAttribute("aria-label", `view ${peer.username}'s profile${peer.pronouns ? `, ${peer.pronouns}` : ""}, ${statusText}`);
+  }
   function renderDmList() {
     document.querySelector("#direct-messages").hidden = !dmAvailable;
     document.documentElement.classList.toggle("dm-enabled", dmAvailable);
@@ -428,28 +481,8 @@ if (session) {
       item.type = "button";
       item.className = "channel-item dm-item" + (conversation.id === currentDm ? " active" : "");
       item.setAttribute("aria-label", `${conversation.peer.username}${conversation.unread ? `, ${conversation.unread} unread messages` : ""}`);
-      if (conversation.peer.avatar) {
-        const avatar = document.createElement("img");
-        avatar.src = conversation.peer.avatar;
-        avatar.alt = "";
-        avatar.className = "dm-avatar";
-        item.appendChild(avatar);
-      }
-      const name = document.createElement("span");
-      name.className = "dm-name";
-      name.textContent = conversation.peer.username;
-      if (conversation.peer.redVerified) applyRedVerifiedColor(name);
-      else applyFlagColor(name, conversation.peer.color || getNameColor(conversation.peer.username));
-      item.appendChild(name);
-      if (conversation.peer.isOwner) {
-        item.appendChild(makeBadge("https://cdn.chattm.app/verified_owner.png", 11,
-          "this user is verified to be the owner of chat™"));
-      } else if (conversation.peer.redVerified) {
-        item.appendChild(makeRedCheckBadge(11));
-      } else if (conversation.peer.verified) {
-        item.appendChild(makeBadge("https://cdn.chattm.app/verified.png", 11,
-          "this user has been verified"));
-      }
+      item.appendChild(makeDmAvatar(conversation.peer));
+      appendDmName(item, conversation.peer);
       if (conversation.unread) {
         const badge = document.createElement("span");
         badge.className = "dm-unread";
@@ -462,7 +495,7 @@ if (session) {
     const conversation = activeDm();
     document.querySelector("#dm-header").hidden = !conversation;
     if (conversation) {
-      document.querySelector("#dm-peer-btn").textContent = conversation.peer.username;
+      renderDmPeer(conversation.peer);
       document.querySelector("#dm-block-btn").textContent = conversation.blockedByMe ? "unblock" : "block";
       document.querySelector("#dm-block-status").textContent = conversation.blocked ? "messaging is blocked" : "";
       onlineUsernames = [conversation.peer.username];

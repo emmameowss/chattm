@@ -1432,6 +1432,11 @@ const directMessages = createDmService({
   identity: email => ({ username: getStoredUsername(email) || "unknown", avatar: getAvatar(email) || null,
     color: getColor(email) || null, verified: isVerified(email), redVerified: isRedVerified(email),
     isToken: getRole(email) === "owner" }),
+  peerProfile: email => {
+    const profile = getProfileData(email);
+    return { pronouns: profile.pronouns || "", status: profile.status || "online",
+      online: [...io.sockets.sockets.values()].some(socket => socket.userEmail === email && socket.username) };
+  },
   leaveChannel(socket) {
     const previous = socket.currentChannel;
     if (previous) {
@@ -1509,6 +1514,7 @@ io.on("connection", (socket) => {
     const s = String(status ?? "").slice(0, 100);
     setProfileStatus(socket.userEmail, s);
     socket.cachedStatus = s;
+    refreshDmProfiles();
     emitUserList(socket.currentChannel);
     socket.emit("savedProfile", getProfileData(socket.userEmail));
   });
@@ -1524,6 +1530,7 @@ io.on("connection", (socket) => {
     if (socket.userEmail.endsWith("@guest")) return;
     const p = String(pronouns ?? "").slice(0, 40);
     setProfilePronouns(socket.userEmail, p);
+    refreshDmProfiles();
     socket.emit("savedProfile", getProfileData(socket.userEmail));
   });
 
@@ -1675,6 +1682,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    refreshDmProfiles();
     emitOnlineUserCount();
     emitUserList(socket.currentChannel);
   });
