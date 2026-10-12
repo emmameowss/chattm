@@ -612,6 +612,7 @@ if (session) {
     const button = event.currentTarget;
     const targetUsername = button.dataset.targetUsername;
     if (!targetUsername) return;
+    document.querySelector("#profile-more-actions").open = false;
     button.disabled = true;
     try {
       let conversation = dmConversations.find(c => c.peer.username.toLowerCase() === targetUsername.toLowerCase());
@@ -850,8 +851,20 @@ if (session) {
 
   // profile panel
   const profilePanel = document.querySelector("#profile-panel");
+  const profileMoreActions = document.querySelector("#profile-more-actions");
+  profileMoreActions.addEventListener("keydown", event => {
+    if (event.key === "Escape" && profileMoreActions.open) {
+      event.preventDefault();
+      event.stopPropagation();
+      profileMoreActions.open = false;
+      profileMoreActions.querySelector("summary").focus();
+    }
+  });
 
   function openProfile(targetUsername, editMode = false) {
+    profileMoreActions.open = false;
+    profileMoreActions.hidden = true;
+    document.querySelector("#profile-primary-actions").hidden = true;
     profilePanel.style.display = "block";
     document.querySelector("#profile-backdrop").style.display = "block";
     profilePanel.dataset.profileUsername = targetUsername;
@@ -1034,6 +1047,8 @@ if (session) {
     blockButton.dataset.targetUsername = data.username;
     updateProfileBlockButton();
     reportButton.hidden = isOwnProfile;
+    document.querySelector("#profile-primary-actions").hidden = isOwnProfile;
+    profileMoreActions.hidden = reportButton.hidden && blockButton.hidden;
     reportButton.dataset.targetUsername = data.username;
     if (isOwnProfile) {
       myVerified = data.verified;
@@ -1154,6 +1169,9 @@ if (session) {
     });
 
   function closeProfile() {
+    profileMoreActions.open = false;
+    profileMoreActions.hidden = true;
+    document.querySelector("#profile-primary-actions").hidden = true;
     profilePanel.style.display = "none";
     document.querySelector("#profile-backdrop").style.display = "none";
     document.querySelector("#profile-edit").style.display = "none";
@@ -1168,6 +1186,7 @@ if (session) {
   document.querySelector("#profile-report-btn").addEventListener("click", (event) => {
     event.stopPropagation();
     const targetUsername = event.currentTarget.dataset.targetUsername;
+    profileMoreActions.open = false;
     if (targetUsername) openReportForm({ targetUsername });
   });
 
@@ -1176,6 +1195,7 @@ if (session) {
     .addEventListener("click", closeProfile);
 
   document.addEventListener("click", (e) => {
+    if (!profileMoreActions.contains(e.target)) profileMoreActions.open = false;
     // close any open status dropdown
     const dropdown = document.querySelector(".status-dropdown");
     if (

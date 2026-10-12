@@ -167,11 +167,16 @@
                 ></textarea>
             </div>
             <div id="profile-actions">
-                <button type="button" id="profile-dm-btn" class="profile-report-btn" hidden><i class="ti ti-message"></i> message</button>
-                <button type="button" id="profile-block-btn" hidden><i class="ti ti-ban" aria-hidden="true"></i> block</button>
-                <button type="button" id="profile-report-btn" class="profile-report-btn" hidden>
-                    <i class="ti ti-flag"></i> report account
-                </button>
+                <div id="profile-primary-actions" hidden>
+                    <button type="button" id="profile-dm-btn" hidden><i class="ti ti-message"></i> message</button>
+                    <details id="profile-more-actions" hidden>
+                        <summary><i class="ti ti-dots" aria-hidden="true"></i> more</summary>
+                        <div id="profile-more-menu">
+                            <button type="button" id="profile-block-btn" hidden><i class="ti ti-ban" aria-hidden="true"></i> block</button>
+                            <button type="button" id="profile-report-btn" hidden><i class="ti ti-flag" aria-hidden="true"></i> report account</button>
+                        </div>
+                    </details>
+                </div>
                 <button
                     type="button"
                     id="profile-edit-btn"
