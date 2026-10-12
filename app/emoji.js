@@ -316,26 +316,28 @@ function renderEmojiEditor() {
         error.textContent = ''
         submit.textContent = 'uploading…'
         setBusy(true)
+        let uploaded = false
         try {
             const res = await fetch(existing ? '/admin/emoji/replace' : '/admin/emoji/add', {
                 method: 'POST', credentials: 'same-origin', body: payload
             })
             const data = await readResponse(res)
+            uploaded = true
             selectedEmoji = data.emoji
             emojisData = emojisData.filter(emoji => emoji.shortcode !== data.emoji.shortcode)
             emojisData.push(data.emoji)
             renderEmojiEditor()
             showToast(existing ? 'emoji image replaced' : 'emoji added', 'success')
-            await loadEmojis()
         } catch (e) {
             error.textContent = e.message
         } finally {
             busy = false
             submit.textContent = existing ? 'replace image' : 'add emoji'
             setBusy(false)
-            if (!selectedEmoji && existing) closeEmoji()
+            if (uploaded || (!selectedEmoji && existing)) closeEmoji()
             renderEmojis()
         }
+        if (uploaded) await loadEmojis()
     })
     detail.append(form)
     if (existing) {
