@@ -1052,7 +1052,10 @@ if (session) {
   }
 
   socket.on("verificationChanged", data => {
-    if (data.notification) showToast(data.notification.message, data.notification.type);
+    if (data.notification) {
+      showToast(data.notification.message, data.notification.type);
+      if (data.notification.celebrate) window.burstVerificationConfetti?.(data.notification.type);
+    }
     role = data.role || "user";
     myVerified = !!data.verified;
     myRedVerified = !!data.redVerified;
