@@ -3900,3 +3900,16 @@ html.dm-view #char-counter { right: 16px; }
     html.dm-view #dm-header { top: 95px; left: 0; height: 56px; padding: 5px 12px; }
     html.dm-view ul { top: 151px; }
 }
+
+#quick-status { position: relative; }
+#quick-status-btn { display: flex; align-items: center; gap: 5px; padding: 0 7px; font-size: 11px; }
+#quick-status-btn .status-dot { margin: 0; flex-shrink: 0; }
+#quick-status-btn .ti { font-size: 10px; }
+#quick-status-menu { position: absolute; top: calc(100% + 6px); right: 0; display: flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.4); z-index: 600; }
+#quick-status-menu[hidden] { display: none; }
+#quick-status-menu .status-option { width: 100%; height: auto; min-height: 32px; line-height: 1.2; }
+#quick-status-menu .status-option:focus-visible { outline: 2px solid var(--pink); outline-offset: -2px; }
+@media (max-width: 600px) {
+    #quick-status-btn { height: 22px; padding: 0 5px; }
+    #quick-status-btn .quick-status-label { display: none; }
+}

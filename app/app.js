@@ -345,6 +345,7 @@ if (session) {
   updateProfileBtn();
   document.querySelector("#profile-btn").addEventListener("click", (e) => {
     e.stopPropagation();
+    closeQuickStatus();
     openProfile(username);
   });
 
@@ -751,11 +752,86 @@ if (session) {
     return STATUS_OPTIONS.find((o) => o.value === value)?.label ?? "Online";
   }
 
+  const quickStatusButton = document.querySelector("#quick-status-btn");
+  const quickStatusMenu = document.querySelector("#quick-status-menu");
+  const quickStatusOptions = STATUS_OPTIONS.map(option => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "status-option";
+    button.dataset.value = option.value;
+    button.setAttribute("role", "menuitemradio");
+    button.tabIndex = -1;
+    button.append(statusDot(option.value), document.createTextNode(option.label));
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      socket.emit("setStatus", option.value);
+      myStatus = option.value;
+      updateQuickStatus();
+      closeQuickStatus(true);
+    });
+    quickStatusMenu.appendChild(button);
+    return button;
+  });
+  function updateQuickStatus() {
+    const label = statusLabel(myStatus || "online");
+    const text = document.createElement("span");
+    text.className = "quick-status-label";
+    text.textContent = label;
+    const chevron = document.createElement("i");
+    chevron.className = "ti ti-chevron-down";
+    chevron.setAttribute("aria-hidden", "true");
+    quickStatusButton.replaceChildren(statusDot(myStatus || "online"), text, chevron);
+    quickStatusButton.setAttribute("aria-label", `change status, currently ${label}`);
+    quickStatusButton.title = `change status: ${label}`;
+    for (const option of quickStatusOptions) {
+      const selected = option.dataset.value === (myStatus || "online");
+      option.classList.toggle("active", selected);
+      option.setAttribute("aria-checked", String(selected));
+    }
+  }
+  function closeQuickStatus(restoreFocus = false) {
+    quickStatusMenu.hidden = true;
+    quickStatusButton.setAttribute("aria-expanded", "false");
+    if (restoreFocus) quickStatusButton.focus();
+  }
+  function openQuickStatus(index) {
+    quickStatusMenu.hidden = false;
+    quickStatusButton.setAttribute("aria-expanded", "true");
+    quickStatusOptions[index ?? Math.max(0, STATUS_OPTIONS.findIndex(option => option.value === myStatus))].focus();
+  }
+  quickStatusButton.addEventListener("click", event => {
+    event.stopPropagation();
+    if (quickStatusMenu.hidden) openQuickStatus();
+    else closeQuickStatus();
+  });
+  quickStatusButton.addEventListener("keydown", event => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      openQuickStatus(event.key === "ArrowUp" ? quickStatusOptions.length - 1 : 0);
+    }
+  });
+  quickStatusMenu.addEventListener("keydown", event => {
+    const index = quickStatusOptions.indexOf(document.activeElement);
+    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeQuickStatus(true); }
+    else if (event.key === "Tab") closeQuickStatus();
+    else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? quickStatusOptions.length - 1
+        : (index + (event.key === "ArrowDown" ? 1 : -1) + quickStatusOptions.length) % quickStatusOptions.length;
+      quickStatusOptions[next].focus();
+    }
+  });
+  document.addEventListener("click", event => {
+    if (!document.querySelector("#quick-status").contains(event.target)) closeQuickStatus();
+  });
+  updateQuickStatus();
+
   // saved profile
   socket.on("savedProfile", (data) => {
     if (!data) return;
     myBio = data.bio ?? "";
     myStatus = data.status ?? "online";
+    updateQuickStatus();
     myPronouns = data.pronouns ?? "";
     // refresh panel if showing own profile
     const panel = document.querySelector("#profile-panel");
@@ -887,6 +963,7 @@ if (session) {
         e.stopPropagation();
         socket.emit("setStatus", opt.value);
         myStatus = opt.value;
+        updateQuickStatus();
         dropdown.style.display = "none";
       });
       dropdown.appendChild(btn);
