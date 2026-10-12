@@ -1507,6 +1507,8 @@ io.on("connection", (socket) => {
     channelHistoryFor(socket.currentChannel, socket.userEmail),
   );
   socket.emit("init", {
+    verified: isVerified(socket.userEmail),
+    redVerified: isRedVerified(socket.userEmail),
     dmAvailable: !socket.userEmail.endsWith("@guest"),
     isOwner: ["owner"].includes(socket.userRole),
     role: socket.userRole ?? 'user',
@@ -2118,7 +2120,9 @@ httpServer.on("request", async (req, res) => {
     `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`,
   );
   attachActionAudit(req, res, url);
-  if (await directMessages.handleHttp(req, res, url)) return;
+  const privateFileRoute = url.pathname === "/dm/upload" || url.pathname.startsWith("/dm/files/") ||
+    /^\/admin\/reports\/\d+\/files\//.test(url.pathname);
+  if (privateFileRoute && await directMessages.handleHttp(req, res, url)) return;
 
   // Clerk sign-in: the client signs in with clerk-js and POSTs the resulting
   // session JWT here. We verify it, resolve the user's primary email, and mint
@@ -3282,11 +3286,20 @@ httpServer.on("request", async (req, res) => {
       const currentRole = getRole(targetEmail);
       req.actionAuditDetails = {
         previousRole: currentRole,
+        grantModerator: payload.grantModerator === true,
         previouslyVerified: isVerified(targetEmail),
         previouslyRedVerified: isRedVerified(targetEmail),
       };
-      const newRole = url.pathname === '/admin/verify' && currentRole === 'user' ? 'mod'
-        : url.pathname === '/admin/unverify' && currentRole === 'mod' ? 'user' : currentRole;
+      if (payload.grantModerator !== undefined && typeof payload.grantModerator !== 'boolean') {
+        sendJson(res, 400, { error: 'moderator permission choice must be a boolean' });
+        return;
+      }
+      if (payload.grantModerator === true && url.pathname !== '/admin/verify') {
+        sendJson(res, 400, { error: 'moderator permissions can only be granted with regular verification' });
+        return;
+      }
+      const newRole = url.pathname === '/admin/verify' && payload.grantModerator === true && currentRole === 'user'
+        ? 'mod' : currentRole;
       req.actionAuditDetails.newRole = newRole;
       try {
         // Clerk remains the source of truth when verification changes a role.
@@ -3314,6 +3327,7 @@ httpServer.on("request", async (req, res) => {
           socket.cachedVerified = verified;
           socket.cachedRedVerified = redVerified;
           socket.emit('uRole', newRole);
+          socket.emit("verificationChanged", { role: newRole, verified, redVerified });
         });
         for (const socket of io.sockets.sockets.values()) {
           if (['admin', 'owner'].includes(socket.userRole)) socket.emit('userVerificationChanged', targetEmail);

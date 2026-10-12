@@ -323,7 +323,7 @@ if (session) {
       btn.appendChild(badge);
     } else if (myRedVerified) {
       btn.appendChild(makeRedCheckBadge(13));
-    } else if (role === "mod") {
+    } else if (myVerified) {
       const badge = document.createElement("img");
       badge.src = "https://cdn.chattm.app/verified.png";
       badge.style.cssText =
@@ -1051,6 +1051,19 @@ if (session) {
     };
   }
 
+  socket.on("verificationChanged", data => {
+    role = data.role || "user";
+    myVerified = !!data.verified;
+    myRedVerified = !!data.redVerified;
+    isOwner = role === "owner";
+    updateProfileBtn();
+    const adminButton = document.querySelector("#admin-btn");
+    adminButton.style.display = ["mod", "admin", "owner"].includes(role) ? "" : "none";
+    adminButton.innerHTML = role === "mod" ? '<i class="ti ti-flag"></i> reports' : '<i class="ti ti-shield-lock"></i> admin';
+    if (profilePanel.style.display !== "none" && profilePanel.dataset.profileUsername === username) {
+      socket.emit("getProfile", username);
+    }
+  });
   socket.on("profilePresenceChanged", targetUsername => {
     if (profilePanel.style.display !== "none" &&
         profilePanel.dataset.profileUsername?.toLowerCase() === targetUsername?.toLowerCase()) {
@@ -1109,12 +1122,12 @@ if (session) {
         ),
       );
     else if (data.redVerified) nameRow.appendChild(makeRedCheckBadge(14));
-    else if (data.role === "mod")
+    else if (data.verified)
       nameRow.appendChild(
         makeBadge(
           "https://cdn.chattm.app/verified.png",
           14,
-          "this user is a moderator",
+          "this user has been verified",
         ),
       );
 
@@ -2683,6 +2696,8 @@ socket.on("messageDeleted", (messageId) => {
   socket.on(
     "init",
     ({
+      verified: verifiedBadge,
+      redVerified: redBadge,
       dmAvailable: canDm,
       isOwner: owner,
       role: r,
@@ -2691,6 +2706,8 @@ socket.on("messageDeleted", (messageId) => {
       uMuted,
       currentChannel: ch,
     }) => {
+      myVerified = !!verifiedBadge;
+      myRedVerified = !!redBadge;
       dmAvailable = !!canDm;
       accountMuted = !!uMuted;
       publicChatMuted = !!muted;

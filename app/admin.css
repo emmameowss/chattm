@@ -703,3 +703,10 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
     .admin-page .admin-resources-section .admin-link { font-size: 11px; }
     .admin-page .admin-resources-section .admin-link small { margin-top: 1px; font-size: 10px; }
 }
+
+.admin-users-page .admin-verification-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.admin-users-page .admin-verification-controls select { min-width: 150px; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; font-size: 12px; }
+@media (max-width: 600px) {
+  .admin-users-page .admin-verification-row { align-items: flex-start; flex-direction: column; }
+  .admin-users-page .admin-verification-controls { justify-content: flex-start; }
+}

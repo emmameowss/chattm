@@ -390,20 +390,22 @@ function detailTabs(content) {
   return panels;
 }
 
-async function changeVerification(user, red, btn) {
+async function changeVerification(user, red, btn, options = {}) {
   const enabled = red ? user.redVerified : user.verified;
+  const remove = options.remove ?? enabled;
+  const grantModerator = !red && !remove && !!options.grantModerator;
   const label = red ? 'red verification' : 'regular verification';
-  let impact = 'the role stays unchanged.';
-  if (!red && !enabled && user.role === 'user') impact = 'this also promotes the user to mod.';
-  if (!red && enabled && user.role === 'mod') impact = 'this also changes the role from mod to user.';
+  const impact = grantModerator && user.role === 'user'
+    ? 'this also gives the account moderator permissions.'
+    : 'account permissions stay unchanged.';
   const confirmed = await showModal({
-    message: `${enabled ? 'remove' : 'add'} ${label} for ${user.username}?\n\n${impact}`,
-    confirmLabel: enabled ? 'remove verification' : 'verify user'
+    message: `${remove ? 'remove' : 'add'} ${label} for ${user.username}?\n\n${impact}`,
+    confirmLabel: remove ? 'remove badge' : grantModerator ? 'verify and make moderator' : 'give badge'
   });
   if (!confirmed) return;
-  const action = red ? (enabled ? 'unredverify' : 'redverify') : (enabled ? 'unverify' : 'verify');
-  await performAction(`/admin/${action}`, { email: user.email }, btn,
-    `${label} ${enabled ? 'removed' : 'added'}`, user);
+  const action = red ? (remove ? 'unredverify' : 'redverify') : (remove ? 'unverify' : 'verify');
+  await performAction(`/admin/${action}`, { email: user.email, ...(action === 'verify' ? { grantModerator } : {}) }, btn,
+    grantModerator ? 'badge and moderator permissions granted' : `${label} ${remove ? 'removed' : 'added'}`, user);
 }
 
 function renderDetail(user) {
@@ -436,7 +438,7 @@ function renderDetail(user) {
   panels.profile.append(profile);
 
   const verification = section('verification', uRole === 'owner'
-    ? 'regular verification promotes users to mod. removing it changes mods back to users. red verification leaves roles unchanged.'
+    ? 'choose a badge only or a badge with moderator permissions. removing a badge leaves permissions unchanged.'
     : 'only the owner can change verification.');
   [false, true].forEach(red => {
     const enabled = red ? user.redVerified : user.verified;
@@ -446,16 +448,40 @@ function renderDetail(user) {
       badge(enabled ? 'verified' : 'not verified', enabled ? (red ? 'red-verified' : 'staff') : ''));
     row.append(info);
     if (uRole === 'owner') {
-      const control = button(enabled ? 'remove' : 'verify', enabled ? 'shield-x' : 'shield-check',
-        btn => changeVerification(user, red, btn));
-      control.id = red ? 'admin-red-verification' : 'admin-regular-verification';
-      control.setAttribute('aria-label', `${enabled ? 'remove' : 'add'} ${red ? 'red' : 'regular'} verification`);
-      control.disabled = !red && user.guest;
-      row.append(control);
+      const controls = element('div', 'admin-verification-controls');
+      if (!red && (!enabled || user.role === 'user')) {
+        const mode = element('select');
+        mode.id = 'admin-verification-mode';
+        mode.setAttribute('aria-label', 'regular verification permissions');
+        for (const [value, label] of [['badge', 'badge only'], ['moderator', 'badge + moderator']]) {
+          const option = element('option', '', label);
+          option.value = value;
+          option.disabled = value === 'moderator' && user.role !== 'user';
+          mode.append(option);
+        }
+        mode.value = 'badge';
+        mode.disabled = user.guest;
+        const apply = button('apply', 'shield-check', btn => changeVerification(user, false, btn,
+          { remove: false, grantModerator: mode.value === 'moderator' }));
+        apply.id = 'admin-regular-verification';
+        const update = () => { apply.disabled = user.guest || (enabled && mode.value === 'badge'); };
+        mode.addEventListener('change', update);
+        update();
+        controls.append(mode, apply);
+      }
+      if (red || enabled) {
+        const control = button(enabled ? 'remove badge' : 'verify', enabled ? 'shield-x' : 'shield-check',
+          btn => changeVerification(user, red, btn, { remove: enabled }));
+        control.id = red ? 'admin-red-verification' : 'admin-remove-regular-verification';
+        control.setAttribute('aria-label', `${enabled ? 'remove' : 'add'} ${red ? 'red' : 'regular'} verification`);
+        control.disabled = !red && user.guest;
+        controls.append(control);
+      }
+      row.append(controls);
     }
     verification.append(row);
   });
-  if (user.guest && uRole === 'owner') verification.append(element('p', '', 'regular verification is unavailable for guests because guests cannot have moderator roles.'));
+  if (user.guest && uRole === 'owner') verification.append(element('p', '', 'regular verification is unavailable for guest accounts.'));
   panels.profile.append(verification);
 
   const moderation = section('moderation');
