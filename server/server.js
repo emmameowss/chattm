@@ -1183,6 +1183,7 @@ async function buildAdminUserList() {
       redVerified: current?.redVerified ?? isRedVerified(email),
       status: current?.status ?? getProfileData(email).status ?? "offline",
       online: current?.online ?? false,
+      createdAt: clerkUser.createdAt ?? current?.createdAt ?? null,
     });
   }
 
@@ -1221,7 +1222,7 @@ function paginateAdminUsers(users, request = {}) {
   const view = views.has(request.view) ? request.view : "all";
   const role = roles.has(request.role) ? request.role : "all";
   const type = ["guest", "registered"].includes(request.type) ? request.type : "all";
-  const sort = ["online", "asc", "desc"].includes(request.sort) ? request.sort : "online";
+  const sort = ["newest", "online", "asc", "desc"].includes(request.sort) ? request.sort : "newest";
   const query = typeof request.query === "string" ? request.query.trim().toLocaleLowerCase() : "";
   const pageSizeValue = Number(request.pageSize);
   const pageSize = Number.isFinite(pageSizeValue) ? Math.max(10, Math.min(100, Math.floor(pageSizeValue))) : 50;
@@ -1250,9 +1251,11 @@ function paginateAdminUsers(users, request = {}) {
   const byName = (a, b) =>
     (a.username || a.email).localeCompare(b.username || b.email, undefined, { sensitivity: "base", numeric: true }) ||
     a.email.localeCompare(b.email);
-  visibleUsers.sort((a, b) => sort === "online"
-    ? Number(b.online) - Number(a.online) || byName(a, b)
-    : sort === "desc" ? -byName(a, b) : byName(a, b));
+  visibleUsers.sort((a, b) => sort === "newest"
+    ? (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0) || byName(a, b)
+    : sort === "online"
+      ? Number(b.online) - Number(a.online) || byName(a, b)
+      : sort === "desc" ? -byName(a, b) : byName(a, b));
   const totalPages = Math.max(1, Math.ceil(visibleUsers.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const requestId = Number.isSafeInteger(request.requestId) ? request.requestId : null;

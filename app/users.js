@@ -164,7 +164,7 @@ function renderUsers() {
   document.querySelectorAll('[data-user-count]').forEach(node => {
     node.textContent = loaded ? (userCounts[node.dataset.userCount] ?? 0).toLocaleString() : '—';
   });
-  resetButton.hidden = !(searchInput.value.trim() || activeView !== 'all' || roleFilter.value !== 'all' || typeFilter.value !== 'all' || sortInput.value !== 'online');
+  resetButton.hidden = !(searchInput.value.trim() || activeView !== 'all' || roleFilter.value !== 'all' || typeFilter.value !== 'all' || sortInput.value !== 'newest');
   if (!loaded) return;
   const start = totalMatches ? (currentPage - 1) * pageSize + 1 : 0;
   const end = totalMatches ? start + usersData.length - 1 : 0;
@@ -754,7 +754,7 @@ document.querySelectorAll('[data-user-view]').forEach(btn => btn.addEventListene
 resetButton.addEventListener('click', () => {
   searchInput.value = '';
   roleFilter.value = typeFilter.value = 'all';
-  sortInput.value = 'online';
+  sortInput.value = 'newest';
   activeView = 'all';
   document.querySelectorAll('[data-user-view]').forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.userView === 'all')));
   currentPage = 1;
