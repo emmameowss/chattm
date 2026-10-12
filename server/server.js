@@ -18,6 +18,9 @@ import {
 } from "@aws-sdk/client-s3";
 import {
   db,
+  saveVerificationNotification,
+  getVerificationNotifications,
+  dismissVerificationNotification,
   dmStore,
   deleteSessionsByClerkId,
   addActionLog,
@@ -1446,17 +1449,21 @@ function notifyVerificationChange(email, previous, kind = "regular") {
     message = "your verification has been updated.";
   }
   const notification = changed ? {
+    id: randomUUID(),
+    createdAt: Date.now(),
     message,
     type: red ? "red-verification" : "success",
     celebrate: enabled && (badgeChanged || (!["mod", "admin", "owner"].includes(previous.role) &&
       ["mod", "admin", "owner"].includes(state.role))),
   } : null;
+  if (notification) saveVerificationNotification(email, notification);
   forEachUserSocket(email, socket => {
     socket.userRole = state.role;
     socket.cachedVerified = state.verified;
     socket.cachedRedVerified = state.redVerified;
     socket.emit("uRole", state.role);
-    socket.emit("verificationChanged", { ...state, notification });
+    socket.emit("verificationChanged", state);
+    if (notification) socket.emit("verificationNotification", notification);
   });
 }
 
@@ -1579,6 +1586,25 @@ io.on("connection", (socket) => {
   socket.cachedStatus = getProfileData(socket.userEmail).status ?? "online";
   socket.emit("savedAvatar", socket.cachedAvatar);
   socket.emit("savedProfile", getProfileData(socket.userEmail));
+  socket.emit("verificationNotifications", getVerificationNotifications(socket.userEmail));
+  socket.on("dismissVerificationNotification", (id, acknowledge) => {
+    const user = getSession(socket.handshake.auth.session);
+    if (!user || user.email !== socket.userEmail) {
+      if (typeof acknowledge === "function") acknowledge({ success: false, error: "session expired" });
+      return;
+    }
+    if (typeof id !== "string" || id.length > 80 || !checkRateLimit(user.email, "dismiss-verification", 100, 60_000)) {
+      if (typeof acknowledge === "function") acknowledge({ success: false, error: "could not dismiss notification" });
+      return;
+    }
+    try {
+      dismissVerificationNotification(user.email, id);
+      emitToUser(user.email, "verificationNotificationDismissed", id);
+      if (typeof acknowledge === "function") acknowledge({ success: true });
+    } catch {
+      if (typeof acknowledge === "function") acknowledge({ success: false, error: "could not dismiss notification" });
+    }
+  });
   directMessages.attach(socket);
   refreshDmProfiles();
   emitUserList();

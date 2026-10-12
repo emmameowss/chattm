@@ -844,10 +844,4 @@ if (['beta.chattm.app', 'localhost', '127.0.0.1'].includes(location.hostname)) {
   brand.append(badge);
 }
 
-// Notify this account even when it is viewing an admin page rather than chat.
-socket.on('verificationChanged', data => {
-  if (data.notification) {
-      showToast(data.notification.message, data.notification.type);
-      if (data.notification.celebrate) window.burstVerificationConfetti?.(data.notification.type);
-    }
-});
+window.bindVerificationNotifications(socket);

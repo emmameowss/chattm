@@ -3934,3 +3934,11 @@ html.dm-view #char-counter { right: 16px; }
 @media (max-width: 480px) {
     #block-confirm-form { padding: 20px; }
 }
+
+#toast-container { max-height: calc(100dvh - 40px); overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+#toast-container::-webkit-scrollbar { display: none; }
+.verification-toast { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; }
+.verification-toast-text { overflow-wrap: anywhere; line-height: 1.5; }
+.verification-toast .verification-toast-close { width: 24px; height: 24px; padding: 0; line-height: 1; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; color: inherit; }
+.verification-toast .verification-toast-close:hover { background: #ffffff15; }
+.verification-toast-error { grid-column: 1 / -1; font-size: 11px; }

@@ -1380,3 +1380,27 @@ export const dmStore = createDmStore(db);
 export function deleteSessionsByClerkId(clerkSessionId) {
   db.prepare('DELETE FROM sessions WHERE clerk_session_id = ?').run(clerkSessionId);
 }
+
+
+// Verification notices belong to accounts, rather than individual browser tabs.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS verification_notifications (
+    id TEXT PRIMARY KEY, email TEXT NOT NULL, message TEXT NOT NULL,
+    type TEXT NOT NULL, celebrate INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS verification_notifications_account_idx
+    ON verification_notifications(email, created_at, id);
+`);
+export function saveVerificationNotification(email, notification) {
+  db.prepare(`INSERT INTO verification_notifications (id,email,message,type,celebrate,created_at)
+    VALUES (?,?,?,?,?,?)`).run(notification.id, email, notification.message, notification.type,
+      notification.celebrate ? 1 : 0, notification.createdAt);
+}
+export function getVerificationNotifications(email) {
+  return db.prepare(`SELECT id,message,type,celebrate,created_at FROM verification_notifications
+    WHERE email = ? ORDER BY created_at,id`).all(email).map(row => ({ id: row.id, message: row.message,
+      type: row.type, celebrate: !!row.celebrate, createdAt: row.created_at }));
+}
+export function dismissVerificationNotification(email, id) {
+  db.prepare('DELETE FROM verification_notifications WHERE email = ? AND id = ?').run(email, id);
+}
