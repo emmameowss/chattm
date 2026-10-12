@@ -3875,13 +3875,12 @@ body.admin-page::after {
 .dm-peer-pronouns { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 #dm-peer-btn .status-dot { flex-shrink: 0; margin: 0; }
 #dm-block-status { font-size: 11px; color: var(--muted); }
-#dm-block-btn { margin-left: auto; flex-shrink: 0; }
-#profile-dm-btn { width: 100%; margin-bottom: 7px; }
+#profile-dm-btn, #profile-block-btn { width: 100%; margin-bottom: 7px; }
 html.dm-view #userlist, html.dm-view body::after { display: none; }
 html.dm-view ul { right: 0; top: 108px; }
 html.dm-view #composer-wrap { right: 0; }
 html.dm-view #char-counter { right: 16px; }
-.dm-item:focus-visible, #dm-peer-btn:focus-visible, #dm-block-btn:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+.dm-item:focus-visible, #dm-peer-btn:focus-visible, #profile-block-btn:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
 
 @media (max-width: 600px) {
     html.dm-enabled #channels { height: 68px; display: grid; grid-template-columns: minmax(0, 1fr) auto; overflow: hidden; align-content: start; row-gap: 3px; }

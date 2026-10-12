@@ -456,6 +456,12 @@ if (session) {
     button.append(details);
     button.setAttribute("aria-label", `view ${peer.username}'s profile${peer.pronouns ? `, ${peer.pronouns}` : ""}, ${statusText}`);
   }
+  function updateProfileBlockButton() {
+    const button = document.querySelector("#profile-block-btn");
+    const targetUsername = button.dataset.targetUsername;
+    const conversation = dmConversations.find(c => c.peer.username.toLowerCase() === targetUsername?.toLowerCase());
+    button.textContent = conversation?.blockedByMe ? "unblock" : "block";
+  }
   function renderDmList() {
     document.querySelector("#direct-messages").hidden = !dmAvailable;
     document.documentElement.classList.toggle("dm-enabled", dmAvailable);
@@ -487,10 +493,10 @@ if (session) {
     document.querySelector("#dm-header").hidden = !conversation;
     if (conversation) {
       renderDmPeer(conversation.peer);
-      document.querySelector("#dm-block-btn").textContent = conversation.blockedByMe ? "unblock" : "block";
       document.querySelector("#dm-block-status").textContent = conversation.blocked ? "messaging is blocked" : "";
       onlineUsernames = [conversation.peer.username];
     }
+    updateProfileBlockButton();
     const count = dmConversations.reduce((total, c) => total + c.unread, 0);
     document.title = count + unread ? `(${count + unread}) chat™` : "chat™";
     updateComposer();
@@ -597,13 +603,17 @@ if (session) {
     event.stopPropagation();
     if (activeDm()) openProfile(activeDm().peer.username);
   });
-  document.querySelector("#dm-block-btn").addEventListener("click", async () => {
-    const conversation = activeDm();
-    if (!conversation) return;
-    const button = document.querySelector("#dm-block-btn");
+  document.querySelector("#profile-block-btn").addEventListener("click", async event => {
+    event.stopPropagation();
+    const button = event.currentTarget;
+    const targetUsername = button.dataset.targetUsername;
+    if (!targetUsername) return;
     button.disabled = true;
-    try { await dmRequest("dmBlock", { conversationId: conversation.id, blocked: !conversation.blockedByMe }); }
-    catch (error) { showToast(error.message, "error"); }
+    try {
+      let conversation = dmConversations.find(c => c.peer.username.toLowerCase() === targetUsername.toLowerCase());
+      if (!conversation) ({ conversation } = await dmRequest("dmOpen", { username: targetUsername }));
+      await dmRequest("dmBlock", { conversationId: conversation.id, blocked: !conversation.blockedByMe });
+    } catch (error) { showToast(error.message, "error"); }
     finally { button.disabled = false; }
   });
   document.querySelector("#profile-dm-btn").addEventListener("click", async () => {
@@ -843,6 +853,8 @@ if (session) {
     profilePanel.dataset.profileUsername = targetUsername;
     const reportButton = document.querySelector("#profile-report-btn");
     document.querySelector("#profile-dm-btn").hidden = true;
+    document.querySelector("#profile-block-btn").hidden = true;
+    document.querySelector("#profile-block-btn").dataset.targetUsername = "";
     reportButton.hidden = true;
     reportButton.dataset.targetUsername = "";
     // clear previous content
@@ -1013,6 +1025,10 @@ if (session) {
     const dmButton = document.querySelector("#profile-dm-btn");
     dmButton.hidden = isOwnProfile || data.isGuest || !dmAvailable;
     dmButton.dataset.targetUsername = data.username;
+    const blockButton = document.querySelector("#profile-block-btn");
+    blockButton.hidden = dmButton.hidden;
+    blockButton.dataset.targetUsername = data.username;
+    updateProfileBlockButton();
     reportButton.hidden = isOwnProfile;
     reportButton.dataset.targetUsername = data.username;
     if (isOwnProfile) {
@@ -1140,6 +1156,7 @@ if (session) {
     document.querySelector("#profile-edit-actions").style.display = "none";
     document.querySelector("#profile-edit-btn").style.display = "none";
     document.querySelector("#profile-avatar-wrap").innerHTML = "";
+    document.querySelector("#profile-block-btn").hidden = true;
     document.querySelector("#profile-report-btn").hidden = true;
     pendingAvatar = undefined;
   }
