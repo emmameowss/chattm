@@ -606,6 +606,7 @@ body.admin-page input { min-height: 40px; font-size: 14px; }
 .admin-emoji-page .admin-emoji-form input { width: 100%; margin: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
 .admin-emoji-page .admin-emoji-form input:read-only { color: var(--muted); }
 .admin-emoji-page .admin-emoji-editor-preview { display: flex; align-items: center; justify-content: center; min-height: 180px; padding: 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--muted); text-align: center; }
+.admin-emoji-page .admin-emoji-editor-preview.drag-over { border-color: var(--pink); background: var(--pink-dim); color: var(--text); }
 .admin-emoji-page .admin-emoji-editor-preview img { display: block; width: 120px; height: 120px; object-fit: contain; }
 .admin-emoji-page .admin-emoji-help { margin: 0; color: var(--muted); font-size: 12px; }
 .admin-emoji-page .admin-emoji-error { margin: 0; color: var(--danger); font-size: 13px; }

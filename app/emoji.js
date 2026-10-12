@@ -231,7 +231,7 @@ function renderEmojiEditor() {
     image.alt = 'emoji preview'
     image.hidden = !existing
     if (existing) image.src = existing.url
-    const placeholder = element('span', '', 'choose an image to preview')
+    const placeholder = element('span', '', 'drop an image here or choose one below')
     placeholder.hidden = !!existing
     preview.append(image, placeholder)
 
@@ -259,7 +259,7 @@ function renderEmojiEditor() {
     fileLabel.append(file)
     const error = element('p', 'admin-emoji-error')
     error.setAttribute('role', 'alert')
-    file.addEventListener('change', () => {
+    const updateChosenFile = () => {
         releasePreview()
         error.textContent = ''
         const chosen = file.files[0]
@@ -278,7 +278,32 @@ function renderEmojiEditor() {
             if (existing) image.src = existing.url
         }
         if (invalid) error.textContent = file.validationMessage
-    })
+    }
+    file.addEventListener('change', updateChosenFile)
+
+    const handleImageDrop = event => {
+        event.preventDefault()
+        preview.classList.remove('drag-over')
+        const dropped = [...(event.dataTransfer?.files || [])]
+        if (!dropped.length) return
+        const transfer = new DataTransfer()
+        transfer.items.add(dropped[0])
+        file.files = transfer.files
+        file.dispatchEvent(new Event('change', {bubbles: true}))
+    }
+    for (const target of [preview, fileLabel]) {
+        target.addEventListener('dragover', event => {
+            event.preventDefault()
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+            preview.classList.add('drag-over')
+        })
+        target.addEventListener('dragleave', event => {
+            if (!(event.relatedTarget instanceof Node) || !target.contains(event.relatedTarget)) {
+                preview.classList.remove('drag-over')
+            }
+        })
+        target.addEventListener('drop', handleImageDrop)
+    }
     const submit = element('button', 'admin-emoji-primary', existing ? 'replace image' : 'add emoji')
     submit.type = 'submit'
     form.append(preview, nameLabel, help, fileLabel,
