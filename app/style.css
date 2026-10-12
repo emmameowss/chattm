@@ -1677,7 +1677,8 @@ button:active {
     margin-top: 4px;
 }
 
-#profile-report-btn {
+#profile-report-btn,
+#profile-block-btn {
     width: 100%;
     margin-bottom: 7px;
     border-color: #5b3944;
@@ -1685,7 +1686,8 @@ button:active {
     color: var(--pink);
 }
 
-#profile-report-btn:hover {
+#profile-report-btn:hover,
+#profile-block-btn:hover {
     background: #2b1c22;
 }
 

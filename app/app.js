@@ -460,7 +460,11 @@ if (session) {
     const button = document.querySelector("#profile-block-btn");
     const targetUsername = button.dataset.targetUsername;
     const conversation = dmConversations.find(c => c.peer.username.toLowerCase() === targetUsername?.toLowerCase());
-    button.textContent = conversation?.blockedByMe ? "unblock" : "block";
+    const blocked = !!conversation?.blockedByMe;
+    const icon = document.createElement("i");
+    icon.className = blocked ? "ti ti-lock-open" : "ti ti-ban";
+    icon.setAttribute("aria-hidden", "true");
+    button.replaceChildren(icon, document.createTextNode(blocked ? " unblock" : " block"));
   }
   function renderDmList() {
     document.querySelector("#direct-messages").hidden = !dmAvailable;
