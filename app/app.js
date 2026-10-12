@@ -800,6 +800,7 @@ if (session) {
     { value: "online", label: "Online", color: "online" },
     { value: "idle", label: "Idle", color: "idle" },
     { value: "dnd", label: "Do Not Disturb", color: "dnd" },
+    { value: "invisible", label: "Invisible", color: "offline" },
   ];
 
   function statusDot(value) {
@@ -890,7 +891,7 @@ if (session) {
   socket.on("savedProfile", (data) => {
     if (!data) return;
     myBio = data.bio ?? "";
-    myStatus = data.status ?? "online";
+    myStatus = data.status === "offline" ? "invisible" : data.status ?? "online";
     updateQuickStatus();
     myPronouns = data.pronouns ?? "";
     // refresh panel if showing own profile
@@ -1050,6 +1051,12 @@ if (session) {
     };
   }
 
+  socket.on("profilePresenceChanged", targetUsername => {
+    if (profilePanel.style.display !== "none" &&
+        profilePanel.dataset.profileUsername?.toLowerCase() === targetUsername?.toLowerCase()) {
+      socket.emit("getProfile", profilePanel.dataset.profileUsername);
+    }
+  });
   socket.on("profileData", (data) => {
     if (!data) {
       document.querySelector("#profile-status-display").textContent =

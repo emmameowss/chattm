@@ -194,6 +194,7 @@ export function createDmService(deps) {
       const conversation = member(email, payload.conversationId);
       sending(email, conversation);
       if (socket.currentDm !== conversation.id || typeof payload.typing !== 'boolean') fail('invalid typing request', 400);
+      if (payload.typing && deps.invisible?.(email)) return {};
       for (const other of io.sockets.sockets.values()) {
         if (other.currentDm === conversation.id && other.userEmail === peer(conversation, email)) {
           try { socketActor(other); other.emit('dmTyping', { conversationId: conversation.id, username: identity(email).username, typing: payload.typing }); } catch {}

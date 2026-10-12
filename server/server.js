@@ -1043,10 +1043,14 @@ setInterval(() => {
 
 const roomOf = (ch) => "channel:" + ch;
 
+function isInvisible(email) {
+  return ["invisible", "offline"].includes(getProfileData(email).status);
+}
+
 function onlineUserCount() {
   const onlineEmails = new Set();
   for (const socket of io.sockets.sockets.values()) {
-    if (socket.username && socket.userEmail) onlineEmails.add(socket.userEmail);
+    if (socket.username && socket.userEmail && !isInvisible(socket.userEmail)) onlineEmails.add(socket.userEmail);
   }
   return onlineEmails.size;
 }
@@ -1056,7 +1060,7 @@ function emitOnlineUserCount() {
 }
 
 function emitAllUserLists() {
-  for (const c of listChannels()) emitUserList(c.name);
+  emitUserList();
   refreshDmProfiles();
 }
 
@@ -1079,8 +1083,8 @@ function buildUserList(channel = "main", includeHidden = false) {
         role: s.userRole ?? "user",
         verified: s.cachedVerified ?? false,
         redVerified: s.cachedRedVerified ?? false,
-        status: s.cachedStatus ?? "online",
-        online: true,
+        status: !includeHidden && isInvisible(s.userEmail) ? "offline" : s.cachedStatus ?? "online",
+        online: includeHidden || !isInvisible(s.userEmail),
       });
     }
   }
@@ -1100,7 +1104,7 @@ function buildUserList(channel = "main", includeHidden = false) {
       role: row.role ?? "user",
       verified: !!row.verified,
       redVerified: !!row.red_verified,
-      status: row.status ?? "online",
+      status: !includeHidden && ["invisible", "offline"].includes(row.status) ? "offline" : row.status ?? "online",
       online: false,
     });
   }
@@ -1292,11 +1296,10 @@ function channelHistoryFor(channel, email) {
   return getHistory(channel).map(message => channelMessageFor(message, email)).filter(Boolean);
 }
 
-function emitUserList(channel = "main") {
-  if (!channel) return;
-  const users = buildUserList(channel);
+function emitUserList() {
+  const users = buildUserList(null);
   for (const socket of io.sockets.sockets.values()) {
-    if (socket.currentChannel !== channel) continue;
+    if (!socket.currentChannel) continue;
     socket.emit("userlist", users.map(({ email, ...user }) => {
       if (!dmStore.hasBlock(socket.userEmail, email)) return user;
       return { username: user.username, blockedByMe: true, online: user.online };
@@ -1307,7 +1310,7 @@ function emitUserList(channel = "main") {
     if (
       ["admin", "owner"].includes(s.userRole) &&
       s.username &&
-      s.currentChannel === channel
+      s.currentChannel
     ) {
       s.emit("adminUsersChanged");
       s.emit('uRole', getRole(s.userEmail))
@@ -1442,7 +1445,7 @@ function consumeMessageCooldown(email) {
 }
 
 const directMessages = createDmService({
-  store: dmStore, io, getSession, getRequestUser, getRole, isBanned, isMuted,
+  store: dmStore, io, getSession, getRequestUser, getRole, isBanned, isMuted, invisible: isInvisible,
   getEmailByUsername, checkRateLimit, validateContent: validateMessageContent,
   consumeCooldown: consumeMessageCooldown, s3, getReportById,
   privateBucket: () => process.env.AWS_S3_PRIVATE_BUCKET && process.env.AWS_S3_PRIVATE_BUCKET !== process.env.AWS_S3_BUCKET
@@ -1465,8 +1468,8 @@ const directMessages = createDmService({
   },
   peerProfile: email => {
     const profile = getProfileData(email);
-    return { pronouns: profile.pronouns || "", status: profile.status || "online",
-      online: [...io.sockets.sockets.values()].some(socket => socket.userEmail === email && socket.username) };
+    return { pronouns: profile.pronouns || "", status: isInvisible(email) ? "offline" : profile.status || "online",
+      online: !isInvisible(email) && [...io.sockets.sockets.values()].some(socket => socket.userEmail === email && socket.username) };
   },
   leaveChannel(socket) {
     const previous = socket.currentChannel;
@@ -1488,7 +1491,7 @@ io.on("connection", (socket) => {
     socket.handshake.headers["x-forwarded-for"]?.split(",")[0].trim() ||
     socket.handshake.address;
   console.log(`${socket.userEmail} connected`);
-  if (!socket.userEmail.endsWith("@guest")) setLastSeen(socket.userEmail);
+  if (!socket.userEmail.endsWith("@guest") && !isInvisible(socket.userEmail)) setLastSeen(socket.userEmail);
   // everyone starts in the default channel
   socket.currentChannel = "main";
   socket.join(roomOf("main"));
@@ -1540,14 +1543,27 @@ io.on("connection", (socket) => {
   socket.emit("savedProfile", getProfileData(socket.userEmail));
   directMessages.attach(socket);
   refreshDmProfiles();
+  emitUserList();
 
   socket.on("setStatus", (status) => {
-    const s = String(status ?? "").slice(0, 100);
-    setProfileStatus(socket.userEmail, s);
-    socket.cachedStatus = s;
-    refreshDmProfiles();
-    emitUserList(socket.currentChannel);
-    socket.emit("savedProfile", getProfileData(socket.userEmail));
+    const value = status === "offline" ? "invisible" : status;
+    if (!["online", "idle", "dnd", "invisible"].includes(value)) {
+      socket.emit("commandError", "choose a valid status", "error");
+      return;
+    }
+    setProfileStatus(socket.userEmail, value);
+    if (value !== "invisible" && !socket.userEmail.endsWith("@guest")) setLastSeen(socket.userEmail);
+    forEachUserSocket(socket.userEmail, session => {
+      session.cachedStatus = value;
+      if (value === "invisible") {
+        directMessages.stopTyping(session);
+        if (session.currentChannel) session.to(roomOf(session.currentChannel)).emit("stopTyping", session.username);
+      }
+      session.emit("savedProfile", getProfileData(socket.userEmail));
+    });
+    emitOnlineUserCount();
+    emitAllUserLists();
+    io.emit("profilePresenceChanged", socket.username);
   });
 
   socket.on("setBio", (bio) => {
@@ -1610,7 +1626,9 @@ io.on("connection", (socket) => {
       }
       const profile = getProfileData(email);
       const role = getRole(email)
-      const isOnline = [...io.sockets.sockets.values()].some(
+      const invisible = isInvisible(email);
+      const isOwnProfile = socket.userEmail === email;
+      const isOnline = (isOwnProfile || !invisible) && [...io.sockets.sockets.values()].some(
         (s) => s.userEmail === email && s.username,
       );
       socket.emit("profileData", {
@@ -1618,7 +1636,7 @@ io.on("connection", (socket) => {
         bio: email.endsWith("@guest")
           ? "i'm a guest on chat™"
           : (profile.bio ?? ""),
-        status: profile.status ?? "",
+        status: invisible && !isOwnProfile ? "offline" : profile.status ?? "",
         pronouns: email.endsWith("@guest") ? "" : (profile.pronouns ?? ""),
         color: getColor(email),
         avatar: getAvatar(email),
@@ -1628,7 +1646,7 @@ io.on("connection", (socket) => {
         isOwner: role === "owner",
         isGuest: email.endsWith("@guest"),
         online: isOnline,
-        lastSeen: isOnline ? null : (profile.lastSeen ?? null),
+        lastSeen: isOnline || invisible ? null : (profile.lastSeen ?? null),
       });
     } catch (e) {
       console.error("getProfile error:", e);
@@ -1700,7 +1718,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("typing", () => {
-    if (!socket.username || socket.currentDm) return;
+    if (!socket.username || socket.currentDm || isInvisible(socket.userEmail)) return;
     for (const recipient of io.sockets.sockets.values()) {
       if (recipient !== socket && recipient.currentChannel === socket.currentChannel &&
           !dmStore.hasBlock(recipient.userEmail, socket.userEmail)) recipient.emit("typing", socket.username);
@@ -1780,9 +1798,7 @@ io.on("connection", (socket) => {
       channelHistoryFor(name, socket.userEmail),
     );
     socket.emit("switchedChannel", name);
-    // presence changed in both the old and the new channel
-    emitUserList(prev);
-    emitUserList(name);
+    emitUserList();
   });
 
   socket.on("createChannel", (rawName) => {

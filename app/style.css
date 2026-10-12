@@ -1733,7 +1733,8 @@ button:active {
 .status-dot.dnd {
     background: #ed4245;
 }
-.status-dot.offline {
+.status-dot.offline,
+.status-dot.invisible {
     background: #72767d;
 }
 
