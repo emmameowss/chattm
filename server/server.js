@@ -1432,8 +1432,23 @@ function notifyVerificationChange(email, previous, kind = "regular") {
   const badgeChanged = (red ? previous.redVerified : previous.verified) !== enabled;
   const permissions = ["mod", "admin", "owner"].includes(state.role)
     ? "you have moderator permissions." : "you do not have moderator permissions.";
+  let message = `your ${red ? "red verification" : "regular verification"} was removed. ${permissions}`;
+  if (enabled) {
+    const badge = red ? "red" : "blue";
+    const congratulations = badgeChanged
+      ? red ? "congratulations, you've received red verification!" : "congratulations, you've been verified!"
+      : previous.role === "user" && state.role === "mod"
+        ? "congratulations, you're now a moderator!" : "your verification has been updated!";
+    const moderationAdded = !["mod", "admin", "owner"].includes(previous.role) &&
+      ["mod", "admin", "owner"].includes(state.role);
+    message = moderationAdded
+      ? `${congratulations} you now have access to moderation permissions and a ${badge} badge next to your name!`
+      : `${congratulations} you now have a ${badge} badge next to your name!`;
+  } else if (!badgeChanged) {
+    message = `your verification has been updated. ${permissions}`;
+  }
   const notification = changed ? {
-    message: `your ${red ? "red verification" : "regular verification"} was ${badgeChanged ? enabled ? "granted" : "removed" : "updated"}. ${permissions}`,
+    message,
     type: red ? "red-verification" : "success",
   } : null;
   forEachUserSocket(email, socket => {
