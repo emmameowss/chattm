@@ -1424,6 +1424,27 @@ function forEachUserSocket(email, callback) {
   }
 }
 
+function notifyVerificationChange(email, previous, kind = "regular") {
+  const state = { role: getRole(email), verified: isVerified(email), redVerified: isRedVerified(email) };
+  const changed = previous.role !== state.role || previous.verified !== state.verified || previous.redVerified !== state.redVerified;
+  const red = kind === "red";
+  const enabled = red ? state.redVerified : state.verified;
+  const badgeChanged = (red ? previous.redVerified : previous.verified) !== enabled;
+  const permissions = ["mod", "admin", "owner"].includes(state.role)
+    ? "you have moderator permissions." : "you do not have moderator permissions.";
+  const notification = changed ? {
+    message: `your ${red ? "red verification" : "regular verification"} was ${badgeChanged ? enabled ? "granted" : "removed" : "updated"}. ${permissions}`,
+    type: red ? "red-verification" : "success",
+  } : null;
+  forEachUserSocket(email, socket => {
+    socket.userRole = state.role;
+    socket.cachedVerified = state.verified;
+    socket.cachedRedVerified = state.redVerified;
+    socket.emit("uRole", state.role);
+    socket.emit("verificationChanged", { ...state, notification });
+  });
+}
+
 function validateMessageContent(text, image) {
   const invalid = message => { throw Object.assign(new Error(message), { statusCode: 400 }); };
   if (typeof text !== "string") invalid("message must be text");
@@ -3299,7 +3320,7 @@ httpServer.on("request", async (req, res) => {
         return;
       }
       const newRole = url.pathname === '/admin/verify' && payload.grantModerator === true && currentRole === 'user'
-        ? 'mod' : currentRole;
+        ? 'mod' : url.pathname === '/admin/unverify' && currentRole === 'mod' ? 'user' : currentRole;
       req.actionAuditDetails.newRole = newRole;
       try {
         // Clerk remains the source of truth when verification changes a role.
@@ -3322,13 +3343,9 @@ httpServer.on("request", async (req, res) => {
 
         const verified = isVerified(targetEmail);
         const redVerified = isRedVerified(targetEmail);
-        forEachUserSocket(targetEmail, socket => {
-          socket.userRole = newRole;
-          socket.cachedVerified = verified;
-          socket.cachedRedVerified = redVerified;
-          socket.emit('uRole', newRole);
-          socket.emit("verificationChanged", { role: newRole, verified, redVerified });
-        });
+        notifyVerificationChange(targetEmail, { role: currentRole,
+          verified: req.actionAuditDetails.previouslyVerified,
+          redVerified: req.actionAuditDetails.previouslyRedVerified }, regular ? "regular" : "red");
         for (const socket of io.sockets.sockets.values()) {
           if (['admin', 'owner'].includes(socket.userRole)) socket.emit('userVerificationChanged', targetEmail);
         }
@@ -3937,6 +3954,7 @@ httpServer.on("request", async (req, res) => {
         }
 
         const currentRole = getRole(targetEmail)
+        const previousVerification = { role: currentRole, verified: isVerified(targetEmail), redVerified: isRedVerified(targetEmail) };
         req.actionAuditDetails = { previousRole: currentRole };
         if (currentRole === 'owner' && sessRole !== 'owner') {
           res.writeHead(403, { 'content-type': 'application/json' });
@@ -3984,6 +4002,8 @@ httpServer.on("request", async (req, res) => {
             })
           }
         }
+
+        notifyVerificationChange(targetEmail, previousVerification);
 
         // Emit to admin users for auto-refresh
         for (const [, s] of io.sockets.sockets) {

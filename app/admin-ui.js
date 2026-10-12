@@ -113,6 +113,7 @@
     if (!container) return;
     const variants = {
       success: ['check', 'success'],
+      'red-verification': ['rosette-discount-check', 'red-verification'],
       error: ['alert-triangle', 'error'],
       info: ['info-circle', 'info'],
     };

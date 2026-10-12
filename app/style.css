@@ -3501,6 +3501,12 @@ body.admin-page {
     color: var(--pink);
 }
 
+.toast.red-verification {
+    border-color: #8f3743;
+    background: linear-gradient(135deg, #3d0a0f, #5a151c);
+    color: #ffe3e7;
+}
+
 .toast.error {
     border-color: var(--danger);
     background: var(--danger-dim-toast);

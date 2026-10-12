@@ -395,9 +395,11 @@ async function changeVerification(user, red, btn, options = {}) {
   const remove = options.remove ?? enabled;
   const grantModerator = !red && !remove && !!options.grantModerator;
   const label = red ? 'red verification' : 'regular verification';
-  const impact = grantModerator && user.role === 'user'
-    ? 'this also gives the account moderator permissions.'
-    : 'account permissions stay unchanged.';
+  const impact = !red && remove && user.role === 'mod'
+    ? 'this also removes moderator permissions and changes the account role to user.'
+    : grantModerator && user.role === 'user'
+      ? 'this also gives the account moderator permissions.'
+      : 'account permissions stay unchanged.';
   const confirmed = await showModal({
     message: `${remove ? 'remove' : 'add'} ${label} for ${user.username}?\n\n${impact}`,
     confirmLabel: remove ? 'remove badge' : grantModerator ? 'verify and make moderator' : 'give badge'
@@ -438,7 +440,7 @@ function renderDetail(user) {
   panels.profile.append(profile);
 
   const verification = section('verification', uRole === 'owner'
-    ? 'choose a badge only or a badge with moderator permissions. removing a badge leaves permissions unchanged.'
+    ? 'choose a badge only or a badge with moderator permissions. removing regular verification also removes moderator permissions; admin and owner roles stay unchanged.'
     : 'only the owner can change verification.');
   [false, true].forEach(red => {
     const enabled = red ? user.redVerified : user.verified;
@@ -841,3 +843,8 @@ if (['beta.chattm.app', 'localhost', '127.0.0.1'].includes(location.hostname)) {
   const badge = element('span', 'dev-badge', location.hostname === 'beta.chattm.app' ? 'beta' : 'dev');
   brand.append(badge);
 }
+
+// Notify this account even when it is viewing an admin page rather than chat.
+socket.on('verificationChanged', data => {
+  if (data.notification) showToast(data.notification.message, data.notification.type);
+});
