@@ -146,8 +146,16 @@ function renderEmojis() {
     const table = document.querySelector('#admin-emoji-table-wrap')
     const query = search.value.trim().toLowerCase()
     const filtered = emojisData.filter(emoji => emoji.shortcode.toLowerCase().includes(query))
-        .sort((a, b) => sort.value === 'asc'
-            ? a.shortcode.localeCompare(b.shortcode) : b.shortcode.localeCompare(a.shortcode))
+        .sort((a, b) => {
+            if (sort.value === 'newest') {
+                const timeA = a.uploadedAt ? Date.parse(a.uploadedAt) : NaN
+                const timeB = b.uploadedAt ? Date.parse(b.uploadedAt) : NaN
+                if (Number.isFinite(timeA) && Number.isFinite(timeB) && timeA !== timeB) return timeB - timeA
+                if (Number.isFinite(timeA) !== Number.isFinite(timeB)) return Number.isFinite(timeA) ? -1 : 1
+                return a.shortcode.localeCompare(b.shortcode)
+            }
+            return sort.value === 'asc' ? a.shortcode.localeCompare(b.shortcode) : b.shortcode.localeCompare(a.shortcode)
+        })
     const focused = document.activeElement?.dataset.emojiOpen
     list.replaceChildren()
     state.hidden = loaded && !loadError && filtered.length > 0
@@ -158,7 +166,7 @@ function renderEmojis() {
     document.querySelector('#admin-emoji-count').textContent = loaded ? 'custom emoji (' + emojisData.length + ')' : 'custom emoji'
     document.querySelector('#admin-emoji-results').textContent = loaded && !loadError
         ? filtered.length + ' of ' + emojisData.length + ' emoji' : ''
-    document.querySelector('#admin-emoji-reset').hidden = !query && sort.value === 'asc'
+    document.querySelector('#admin-emoji-reset').hidden = !query && sort.value === 'newest'
     for (const emoji of filtered) {
         const row = element('tr', 'admin-directory-row')
         row.classList.toggle('selected', selectedEmoji?.shortcode === emoji.shortcode && drawer.open)
@@ -397,7 +405,7 @@ search.addEventListener('input', renderEmojis)
 sort.addEventListener('change', renderEmojis)
 document.querySelector('#admin-emoji-reset').addEventListener('click', () => {
     search.value = ''
-    sort.value = 'asc'
+    sort.value = 'newest'
     renderEmojis()
 })
 socket.on('emojiUpdate', loadEmojis)

@@ -2835,8 +2835,31 @@ httpServer.on("request", async (req, res) => {
     if (!requireAdminPage(req, res)) return
 
     const emojis = getCustomEmoji()
+    const uploadedAt = new Map()
+    if (process.env.AWS_S3_BUCKET) {
+      try {
+        let continuationToken
+        do {
+          const result = await s3.send(new ListObjectsV2Command({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Prefix: "emojis/",
+            ContinuationToken: continuationToken,
+          }))
+          for (const object of result.Contents ?? []) {
+            const filename = object.Key.split("/").pop()
+            if (!filename || !object.LastModified) continue
+            const ext = extname(filename)
+            const shortcode = `:${filename.slice(0, ext ? -ext.length : undefined)}:`
+            uploadedAt.set(shortcode, object.LastModified.toISOString())
+          }
+          continuationToken = result.IsTruncated ? result.NextContinuationToken : null
+        } while (continuationToken)
+      } catch (error) {
+        console.error("failed to fetch emoji upload dates:", error)
+      }
+    }
     const emojiList = Object.entries(emojis)
-      .map(([shortcode, url]) => ({shortcode, url}))
+      .map(([shortcode, url]) => ({shortcode, url, uploadedAt: uploadedAt.get(shortcode) ?? null}))
       .sort((a,b) => a.shortcode.localeCompare(b.shortcode))
 
     res.writeHead(200, {'content-type': 'application/json'})
