@@ -125,7 +125,7 @@ db.exec(`
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
-    target_type TEXT NOT NULL CHECK (target_type IN ('message', 'account')),
+    target_type TEXT NOT NULL CHECK (target_type IN ('message', 'account', 'dm_message')),
     target_key TEXT NOT NULL,
     target_username TEXT,
     target_email TEXT,
@@ -147,6 +147,21 @@ db.exec(`
     note TEXT NOT NULL
   );
 `);
+
+// SQLite cannot widen a CHECK constraint with ALTER TABLE. Preserve every
+// report and note while replacing only the reports table, inside a transaction.
+const reportsSchema = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'reports'").get().sql;
+if (!reportsSchema.includes("'dm_message'")) {
+  db.transaction(() => {
+    const previousSequence = db.prepare("SELECT seq FROM sqlite_sequence WHERE name = 'reports'").get()?.seq || 0;
+    db.exec(reportsSchema.replace('CREATE TABLE reports', 'CREATE TABLE reports_dm_migration')
+      .replace("'message', 'account'", "'message', 'account', 'dm_message'"));
+    db.exec(`INSERT INTO reports_dm_migration SELECT * FROM reports;
+      DROP TABLE reports;
+      ALTER TABLE reports_dm_migration RENAME TO reports;`);
+    db.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'reports'").run(previousSequence);
+  })();
+}
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS action_logs_time_idx ON action_logs (occurred_at DESC, id DESC);
@@ -1261,4 +1276,107 @@ export async function migrateFromFiles() {
   if (migrated.length) {
     console.log(`migrated from legacy files: ${migrated.join(", ")}`);
   }
+}
+
+
+// Separate storage prevents public history queries and channel reply joins from
+// ever including private messages.
+export function createDmStore(database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS dm_conversations (
+      id TEXT PRIMARY KEY, participant_a TEXT NOT NULL, participant_b TEXT NOT NULL,
+      created_at INTEGER NOT NULL, latest_seq INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL, UNIQUE(participant_a, participant_b),
+      CHECK(participant_a < participant_b)
+    );
+    CREATE TABLE IF NOT EXISTS dm_reads (
+      conversation_id TEXT NOT NULL, email TEXT NOT NULL, last_read_seq INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY(conversation_id, email)
+    );
+    CREATE TABLE IF NOT EXISTS dm_messages (
+      id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, seq INTEGER NOT NULL,
+      owner_email TEXT NOT NULL, time INTEGER NOT NULL, payload_json TEXT NOT NULL,
+      deleted INTEGER NOT NULL DEFAULT 0, UNIQUE(conversation_id, seq)
+    );
+    CREATE TABLE IF NOT EXISTS dm_blocks (
+      blocker TEXT NOT NULL, blocked TEXT NOT NULL, PRIMARY KEY(blocker, blocked),
+      CHECK(blocker <> blocked)
+    );
+    CREATE TABLE IF NOT EXISTS dm_attachments (
+      id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, uploader TEXT NOT NULL,
+      object_key TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, mime TEXT NOT NULL,
+      size INTEGER NOT NULL, message_id TEXT UNIQUE
+    );
+    CREATE INDEX IF NOT EXISTS dm_messages_history_idx ON dm_messages(conversation_id, seq);
+  `);
+  const getConversation = id => database.prepare('SELECT * FROM dm_conversations WHERE id = ?').get(id);
+  const rawMessage = id => database.prepare('SELECT * FROM dm_messages WHERE id = ? AND deleted = 0').get(id);
+  const unpack = row => row ? { ...JSON.parse(row.payload_json), id: row.id,
+    conversationId: row.conversation_id, seq: row.seq, ownerEmail: row.owner_email, time: row.time } : null;
+  return {
+    getConversation,
+    open(id, a, b) {
+      const [first, second] = [a, b].sort();
+      database.prepare(`INSERT OR IGNORE INTO dm_conversations
+        (id, participant_a, participant_b, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
+        .run(id, first, second, Date.now(), Date.now());
+      return database.prepare('SELECT * FROM dm_conversations WHERE participant_a = ? AND participant_b = ?').get(first, second);
+    },
+    list(email) {
+      return database.prepare(`SELECT c.*, COALESCE(r.last_read_seq, 0) AS last_read_seq,
+        (SELECT COUNT(*) FROM dm_messages m WHERE m.conversation_id = c.id AND m.deleted = 0
+          AND m.owner_email <> ? AND m.seq > COALESCE(r.last_read_seq, 0)) AS unread
+        FROM dm_conversations c LEFT JOIN dm_reads r ON r.conversation_id = c.id AND r.email = ?
+        WHERE c.participant_a = ? OR c.participant_b = ? ORDER BY c.updated_at DESC, c.id`)
+        .all(email, email, email, email);
+    },
+    history(id) {
+      return database.prepare(`SELECT * FROM (SELECT * FROM dm_messages WHERE conversation_id = ?
+        AND deleted = 0 ORDER BY seq DESC LIMIT 100) ORDER BY seq`).all(id).map(unpack);
+    },
+    getMessage: id => unpack(rawMessage(id)),
+    addMessage(conversationId, email, id, payload, attachmentId = null) {
+      return database.transaction(() => {
+        database.prepare('UPDATE dm_conversations SET latest_seq = latest_seq + 1, updated_at = ? WHERE id = ?')
+          .run(Date.now(), conversationId);
+        const seq = getConversation(conversationId).latest_seq;
+        database.prepare(`INSERT INTO dm_messages (id, conversation_id, seq, owner_email, time, payload_json)
+          VALUES (?, ?, ?, ?, ?, ?)`).run(id, conversationId, seq, email, Date.now(), JSON.stringify(payload));
+        if (attachmentId) {
+          const result = database.prepare(`UPDATE dm_attachments SET message_id = ? WHERE id = ?
+            AND conversation_id = ? AND uploader = ? AND message_id IS NULL`).run(id, attachmentId, conversationId, email);
+          if (!result.changes) throw new Error('attachment unavailable');
+        }
+        return unpack(rawMessage(id));
+      })();
+    },
+    deleteMessage(id) { database.prepare('UPDATE dm_messages SET deleted = 1, payload_json = ? WHERE id = ?').run('{}', id); },
+    markRead(id, email, seq) {
+      database.prepare(`INSERT INTO dm_reads (conversation_id, email, last_read_seq) VALUES (?, ?, ?)
+        ON CONFLICT(conversation_id, email) DO UPDATE SET last_read_seq = MAX(last_read_seq, excluded.last_read_seq)`)
+        .run(id, email, seq);
+    },
+    hasBlock(a, b) { return !!database.prepare('SELECT 1 FROM dm_blocks WHERE blocker = ? AND blocked = ?').get(a, b); },
+    setBlock(a, b, blocked) {
+      if (blocked) database.prepare('INSERT OR IGNORE INTO dm_blocks VALUES (?, ?)').run(a, b);
+      else database.prepare('DELETE FROM dm_blocks WHERE blocker = ? AND blocked = ?').run(a, b);
+    },
+    addAttachment(file) {
+      database.prepare(`INSERT INTO dm_attachments (id, conversation_id, uploader, object_key, filename, mime, size)
+        VALUES (@id, @conversationId, @uploader, @key, @filename, @mime, @size)`).run(file);
+    },
+    getAttachment: id => database.prepare('SELECT * FROM dm_attachments WHERE id = ?').get(id),
+    context(message) {
+      const before = database.prepare(`SELECT * FROM dm_messages WHERE conversation_id = ? AND deleted = 0
+        AND seq < ? ORDER BY seq DESC LIMIT 3`).all(message.conversationId, message.seq).reverse();
+      const after = database.prepare(`SELECT * FROM dm_messages WHERE conversation_id = ? AND deleted = 0
+        AND seq > ? ORDER BY seq LIMIT 3`).all(message.conversationId, message.seq);
+      return [...before.map(unpack), message, ...after.map(unpack)];
+    },
+  };
+}
+export const dmStore = createDmStore(db);
+
+export function deleteSessionsByClerkId(clerkSessionId) {
+  db.prepare('DELETE FROM sessions WHERE clerk_session_id = ?').run(clerkSessionId);
 }

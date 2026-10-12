@@ -3853,3 +3853,40 @@ body.admin-page::after {
         display: none;
     }
 }
+
+/* Direct messages share the channel composer and message renderer. */
+#direct-messages { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+#direct-messages[hidden], #dm-header[hidden] { display: none; }
+#dm-list-header { padding: 4px 8px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+#dm-list { display: flex; flex-direction: column; gap: 6px; }
+.dm-empty { padding: 4px 8px; color: var(--muted); font-size: 11px; }
+.dm-item { width: 100%; text-align: left; display: flex; align-items: center; justify-content: flex-start; gap: 6px; border: 0; background: transparent; color: var(--muted); }
+.dm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-item .badge-wrap { flex-shrink: 0; margin-left: -3px; }
+.dm-item .badge-wrap img { margin-left: 0 !important; }
+.dm-avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.dm-unread { margin-left: auto; border-radius: 10px; padding: 1px 5px; color: var(--bg); background: var(--pink); font-size: 10px; }
+#dm-header { position: fixed; top: 52px; left: 160px; right: 0; height: 42px; padding: 6px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); background: var(--bg); z-index: 98; }
+#dm-peer-btn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#dm-block-status { font-size: 11px; color: var(--muted); }
+#dm-block-btn { margin-left: auto; flex-shrink: 0; }
+#profile-dm-btn { width: 100%; margin-bottom: 7px; }
+html.dm-view #userlist, html.dm-view body::after { display: none; }
+html.dm-view ul { right: 0; top: 94px; }
+html.dm-view #composer-wrap { right: 0; }
+html.dm-view #char-counter { right: 16px; }
+.dm-item:focus-visible, #dm-peer-btn:focus-visible, #dm-block-btn:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+    html.dm-enabled #channels { height: 68px; display: grid; grid-template-columns: minmax(0, 1fr) auto; overflow: hidden; align-content: start; row-gap: 3px; }
+    html.dm-enabled #channels-list { flex-direction: row; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+    html.dm-enabled #add-channel-btn { grid-column: 2; grid-row: 1; }
+    html.dm-enabled #direct-messages { grid-column: 1 / -1; margin: 0; padding: 2px 0 0; display: flex; align-items: center; min-width: 0; gap: 5px; }
+    html.dm-enabled #dm-list-header { font-size: 9px; flex-shrink: 0; padding: 0; }
+    html.dm-enabled #dm-list { flex-direction: row; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+    html.dm-enabled .dm-empty { margin: 0; white-space: nowrap; padding: 4px; }
+    html.dm-enabled .dm-item { width: auto; max-width: 180px; }
+    html.dm-enabled ul { top: 95px; }
+    html.dm-view #dm-header { top: 95px; left: 0; height: 40px; padding: 5px 12px; }
+    html.dm-view ul { top: 135px; }
+}

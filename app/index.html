@@ -163,6 +163,7 @@
                 ></textarea>
             </div>
             <div id="profile-actions">
+                <button type="button" id="profile-dm-btn" class="profile-report-btn" hidden><i class="ti ti-message"></i> message</button>
                 <button type="button" id="profile-report-btn" class="profile-report-btn" hidden>
                     <i class="ti ti-flag"></i> report account
                 </button>
@@ -262,15 +263,24 @@
                 </select>
                 <label for="report-note">additional context <span>optional</span></label>
                 <textarea id="report-note" name="note" maxlength="500" rows="4" placeholder="add context for the moderators"></textarea>
-                <div class="report-dialog-footer"><span>only moderators and admins can see this report.</span><div><button type="button" id="report-dialog-cancel">cancel</button><button type="submit" id="report-submit">send report</button></div></div>
+                <div class="report-dialog-footer"><span id="report-privacy-note">only moderators and admins can see this report.</span><div><button type="button" id="report-dialog-cancel">cancel</button><button type="submit" id="report-submit">send report</button></div></div>
             </form>
         </dialog>
+        <div id="dm-header" hidden>
+            <button type="button" id="dm-peer-btn"></button>
+            <span id="dm-block-status" role="status"></span>
+            <button type="button" id="dm-block-btn">block</button>
+        </div>
         <nav id="channels">
             <div id="channels-header">channels</div>
             <div id="channels-list"></div>
             <button type="button" id="add-channel-btn" style="display: none">
                 + new channel
             </button>
+            <section id="direct-messages" hidden aria-label="direct messages">
+                <div id="dm-list-header">direct messages</div>
+                <div id="dm-list"></div>
+            </section>
         </nav>
         <ul></ul>
         <script>

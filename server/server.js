@@ -18,6 +18,8 @@ import {
 } from "@aws-sdk/client-s3";
 import {
   db,
+  dmStore,
+  deleteSessionsByClerkId,
   addActionLog,
   getActionLogs,
   createReport,
@@ -93,6 +95,7 @@ import {
   setHidden,
   removeHidden,
 } from "./db.js";
+import { createDmService } from "./dm.js";
 import { verifyWebhook } from "@clerk/backend/webhooks"
 
 const httpServer = createServer();
@@ -642,6 +645,7 @@ const commands = {
       const prevUser = socket.username;
       socket.username = nick;
       saveUsername(socket.userEmail, nick);
+      refreshDmProfiles();
       if (prevUser && prevUser !== nick) {
         socket.emit("userRenamed", { from: prevUser, to: nick });
       }
@@ -1053,6 +1057,7 @@ function emitOnlineUserCount() {
 
 function emitAllUserLists() {
   for (const c of listChannels()) emitUserList(c.name);
+  refreshDmProfiles();
 }
 
 function buildUserList(channel = "main", includeHidden = false) {
@@ -1273,6 +1278,7 @@ function paginateAdminUsers(users, request = {}) {
 }
 
 function emitUserList(channel = "main") {
+  if (!channel) return;
   const users = buildUserList(channel);
   const publicUsers = users.map(({ email, ...rest }) => rest);
   io.to(roomOf(channel)).emit("userlist", publicUsers);
@@ -1395,6 +1401,52 @@ function forEachUserSocket(email, callback) {
   }
 }
 
+function validateMessageContent(text, image) {
+  const invalid = message => { throw Object.assign(new Error(message), { statusCode: 400 }); };
+  if (typeof text !== "string") invalid("message must be text");
+  if (text.length > MAX_MESSAGE_LENGTH) invalid(`message is too long (max ${MAX_MESSAGE_LENGTH} characters)`);
+  if (image != null && typeof image !== "string") invalid("invalid media");
+  if (containsBlockedLink(text) || isBlockedImageUrl(image)) {
+    invalid("media links from unapproved sites aren't allowed, please use the direct upload function or an approved site");
+  }
+}
+
+function consumeMessageCooldown(email) {
+  const role = getRole(email);
+  const bypass = ["mod", "admin", "owner"].includes(role) || isRedVerified(email);
+  const now = Date.now();
+  if (!bypass && lastmessage[email] && now - lastmessage[email] < msgcooldown) {
+    throw Object.assign(new Error("slow down"), { statusCode: 429 });
+  }
+  lastmessage[email] = now;
+}
+
+const directMessages = createDmService({
+  store: dmStore, io, getSession, getRequestUser, getRole, isBanned, isMuted,
+  getEmailByUsername, checkRateLimit, validateContent: validateMessageContent,
+  consumeCooldown: consumeMessageCooldown, s3, getReportById,
+  privateBucket: () => process.env.AWS_S3_PRIVATE_BUCKET && process.env.AWS_S3_PRIVATE_BUCKET !== process.env.AWS_S3_BUCKET
+    ? process.env.AWS_S3_PRIVATE_BUCKET : null,
+  sessionAllowed: user => !isIpBanned(user.ip) && (!user.clerkSessionId || clerkSessionCache.get(user.clerkSessionId)?.active !== false),
+  ensureSessionActive: user => !user.clerkSessionId || isClerkSessionActive(user.clerkSessionId),
+  identity: email => ({ username: getStoredUsername(email) || "unknown", avatar: getAvatar(email) || null,
+    color: getColor(email) || null, verified: isVerified(email), redVerified: isRedVerified(email),
+    isToken: getRole(email) === "owner" }),
+  leaveChannel(socket) {
+    const previous = socket.currentChannel;
+    if (previous) {
+      socket.to(roomOf(previous)).emit("stopTyping", socket.username);
+      socket.leave(roomOf(previous));
+      socket.currentChannel = null;
+      emitUserList(previous);
+    }
+  },
+});
+function refreshDmProfiles() {
+  const emails = new Set([...io.sockets.sockets.values()].map(socket => socket.userEmail));
+  for (const email of emails) if (!email.endsWith("@guest")) directMessages.update(email);
+}
+
 io.on("connection", (socket) => {
   socket.userIP =
     socket.handshake.headers["x-forwarded-for"]?.split(",")[0].trim() ||
@@ -1416,6 +1468,7 @@ io.on("connection", (socket) => {
     getHistory(socket.currentChannel).map(({ ownerEmail, ...m }) => m),
   );
   socket.emit("init", {
+    dmAvailable: !socket.userEmail.endsWith("@guest"),
     isOwner: ["owner"].includes(socket.userRole),
     role: socket.userRole ?? 'user',
     chatMuted,
@@ -1449,6 +1502,8 @@ io.on("connection", (socket) => {
   socket.cachedStatus = getProfileData(socket.userEmail).status ?? "online";
   socket.emit("savedAvatar", socket.cachedAvatar);
   socket.emit("savedProfile", getProfileData(socket.userEmail));
+  directMessages.attach(socket);
+  refreshDmProfiles();
 
   socket.on("setStatus", (status) => {
     const s = String(status ?? "").slice(0, 100);
@@ -1561,6 +1616,7 @@ io.on("connection", (socket) => {
       else deleteAvatar(socket.userEmail);
       socket.cachedAvatar = url;
       socket.emit("savedAvatar", url);
+      refreshDmProfiles();
       emitUserList(socket.currentChannel);
     } catch (e) {
       console.error("refreshAvatar failed:", e);
@@ -1590,6 +1646,7 @@ io.on("connection", (socket) => {
     if (prevUser !== name) emitOnlineUserCount();
     if (!socket.userEmail.endsWith("@guest")) {
       saveUsername(socket.userEmail, name);
+      refreshDmProfiles();
     }
     const isGuest = socket.userEmail.endsWith("@guest");
     if (prevUser && prevUser !== name && !isGuest) {
@@ -1600,11 +1657,12 @@ io.on("connection", (socket) => {
   });
 
   socket.on("typing", () => {
-    if (!socket.username) return;
+    if (!socket.username || socket.currentDm) return;
     socket.to(roomOf(socket.currentChannel)).emit("typing", socket.username);
   });
 
   socket.on("stopTyping", () => {
+    if (socket.currentDm) return;
     socket
       .to(roomOf(socket.currentChannel))
       .emit("stopTyping", socket.username);
@@ -1622,6 +1680,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("deleteMessage", (messageId) => {
+    if (socket.currentDm || !socket.currentChannel) return;
     const history = getHistory(socket.currentChannel);
     const msg = history.find((m) => m.id === messageId);
     if (!msg) {
@@ -1660,9 +1719,13 @@ io.on("connection", (socket) => {
   socket.on("switchChannel", (name) => {
     if (typeof name !== "string" || !channelExists(name)) return;
     const prev = socket.currentChannel;
-    if (prev === name) return;
-    socket.to(roomOf(prev)).emit("stopTyping", socket.username);
-    socket.leave(roomOf(prev));
+    if (prev === name && !socket.currentDm) return;
+    directMessages.stopTyping(socket);
+    socket.currentDm = null;
+    if (prev) {
+      socket.to(roomOf(prev)).emit("stopTyping", socket.username);
+      socket.leave(roomOf(prev));
+    }
     socket.join(roomOf(name));
     socket.currentChannel = name;
     socket.emit(
@@ -1743,6 +1806,12 @@ io.on("connection", (socket) => {
   });
 
   socket.on("message", async (data) => {
+    if (socket.currentDm || !socket.currentChannel || !data || typeof data !== "object") return;
+    const destination = socket.currentChannel;
+    if (data.channel !== undefined && data.channel !== destination) {
+      socket.emit("commandError", "channel changed; please resend your message", "error");
+      return;
+    }
     // check if muted
     if (
       isMuted(socket.userEmail) &&
@@ -1757,32 +1826,13 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (typeof data.text === "string" && data.text.length > MAX_MESSAGE_LENGTH) {
-      socket.emit('commandError', `message is too long (max ${MAX_MESSAGE_LENGTH} characters)`, 'error')
-      return
-    }
-
-    if (containsBlockedLink(data.text) || isBlockedImageUrl(data.image)) {
-      socket.emit('commandError', "media links from unapproved sites aren't allowed, please use the direct upload function or an approved site", "error")
+    try {
+      validateMessageContent(data.text ?? "", data.image);
+      consumeMessageCooldown(socket.userEmail);
+    } catch (error) {
+      socket.emit("commandError", error.message, "error");
       return;
     }
-
-    const now = Date.now();
-    // verified users (and the owner) bypass the message cooldown
-    const bypassCooldown =
-      socket.userRole === "mod" ||
-      socket.cachedRedVerified ||
-      socket.userRole === "owner" ||
-      socket.userRole === "admin";
-    if (
-      !bypassCooldown &&
-      lastmessage[socket.userEmail] &&
-      now - lastmessage[socket.userEmail] < msgcooldown
-    ) {
-      socket.emit("commandError", "slow down", 'error');
-      return;
-    }
-    lastmessage[socket.userEmail] = now;
 
     if (chatMuted && !["mod", "admin", "owner"].includes(socket.userRole)) {
       socket.emit("showE", "chat is currently muted");
@@ -1819,7 +1869,7 @@ io.on("connection", (socket) => {
       `${timestamp}: ${socket.userEmail} (${socket.username}): ${logText}\n`,
     );
     const replyTo =
-      typeof data.replyTo === "string" && getMessageById(data.replyTo)
+      typeof data.replyTo === "string" && getMessageById(data.replyTo)?.channel === destination
         ? data.replyTo
         : null;
     const message = {
@@ -1829,7 +1879,7 @@ io.on("connection", (socket) => {
       ownerEmail: socket.userEmail,
       username: socket.username,
       time: Date.now(),
-      channel: socket.currentChannel,
+      channel: destination,
       isToken: ["owner"].includes(socket.userRole),
       isGuest: socket.userEmail.endsWith("@guest"),
       color: getColor(socket.userEmail) ?? null,
@@ -1840,7 +1890,7 @@ io.on("connection", (socket) => {
     };
     // only mention people currently present in this channel
     const roomIds =
-      io.sockets.adapter.rooms.get(roomOf(socket.currentChannel)) ?? new Set();
+      io.sockets.adapter.rooms.get(roomOf(destination)) ?? new Set();
     const onlineNames = [...roomIds]
       .map((id) => io.sockets.sockets.get(id)?.username)
       .filter(Boolean);
@@ -1857,7 +1907,7 @@ io.on("connection", (socket) => {
     addMessage(message);
     const stored = getMessageById(message.id);
     const { ownerEmail, ...publicMessage } = stored;
-    io.to(roomOf(socket.currentChannel)).emit("message", publicMessage);
+    io.to(roomOf(destination)).emit("message", publicMessage);
   });
 });
 
@@ -2002,6 +2052,7 @@ httpServer.on("request", async (req, res) => {
     `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`,
   );
   attachActionAudit(req, res, url);
+  if (await directMessages.handleHttp(req, res, url)) return;
 
   // Clerk sign-in: the client signs in with clerk-js and POSTs the resulting
   // session JWT here. We verify it, resolve the user's primary email, and mint
@@ -2507,8 +2558,10 @@ httpServer.on("request", async (req, res) => {
       if (!reporterUsername) {
         reporterUsername = [...io.sockets.sockets.values()].find(socket => normalizeEmail(socket.userEmail) === reporterEmail)?.username || reporterEmail.split("@")[0];
       }
-      const targetType = typeof payload.messageId === "string" ? "message" : typeof payload.targetUsername === "string" ? "account" : null;
-      if (!targetType || (targetType === "message" && payload.targetUsername !== undefined) || (targetType === "account" && payload.messageId !== undefined)) {
+      const targets = ["messageId", "targetUsername", "dmMessageId"].filter(key => payload[key] !== undefined);
+      const targetType = typeof payload.dmMessageId === "string" ? "dm_message"
+        : typeof payload.messageId === "string" ? "message" : typeof payload.targetUsername === "string" ? "account" : null;
+      if (!targetType || targets.length !== 1) {
         sendJson(res, 400, { error: "report exactly one message or account" });
         return;
       }
@@ -2517,7 +2570,14 @@ httpServer.on("request", async (req, res) => {
       let targetEmail = null;
       let targetUsername = null;
       let snapshot;
-      if (targetType === "message") {
+      if (targetType === "dm_message") {
+        if (user.clerkSessionId && !await isClerkSessionActive(user.clerkSessionId)) {
+          sendJson(res, 401, { error: "session expired" });
+          return;
+        }
+        const evidence = directMessages.reportEvidence(user, payload.dmMessageId);
+        ({ targetKey, targetEmail, targetUsername, snapshot } = evidence);
+      } else if (targetType === "message") {
         const messageId = payload.messageId.trim();
         if (!messageId || messageId.length > 80) {
           sendJson(res, 400, { error: "invalid message" });
@@ -2688,7 +2748,7 @@ httpServer.on("request", async (req, res) => {
     if (req.method === "GET" && !action) {
       const report = getReportById(reportId);
       if (!report) sendJson(res, 404, { error: "report not found" });
-      else sendJson(res, 200, { report });
+      else sendJson(res, 200, { report: directMessages.staffReport(report) });
       return;
     }
 
@@ -4292,6 +4352,7 @@ httpServer.on("request", async (req, res) => {
           event.type === "session.removed"
         ) {
           const clerkSessionId = event.data.id;
+          deleteSessionsByClerkId(clerkSessionId);
           for (const [, s] of io.sockets.sockets) {
             if (s.clerkSessionId === clerkSessionId) {
               s.emit("kicked", "your session was ended");

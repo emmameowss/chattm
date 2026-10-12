@@ -274,19 +274,25 @@
                 </li>
                 <li>
                     <strong>messages</strong> — all messages you send are
-                    permanently stored.
+                    stored in the site's database. direct messages are available
+                    in the app only to their two participants. unread positions
+                    and DM blocks are also stored.
                 </li>
                 <li>
                     <strong>moderation reports</strong> — if you report a
                     message or account, the report stores your username and
                     account identifier, the selected reason, any optional note,
-                    and a snapshot of the reported message or account. Reports
+                    and a snapshot of the reported message or account. a direct
+                    message report also includes up to three messages before
+                    and after the reported message, with their attachments.
+                    this evidence remains available if a message is deleted. Reports
                     and staff notes are visible to moderators and admins, not
                     to the reported user.
                 </li>
                 <li>
                     <strong>images and files</strong> — any images or files you
-                    upload are stored in Amazon S3.
+                    upload are stored in Cloudflare R2. files uploaded in direct
+                    messages use a separate private bucket.
                 </li>
             </ul>
 
@@ -323,13 +329,18 @@
                 <strong>and is not encrypted</strong>. you should be
                 aware of this when deciding what information to share on the
                 platform. images and all other files uploaded while using the
-                website are publicly accessible by anyone, at any time.
+                public channels are accessible by anyone with their URLs.
+                direct-message uploads require an authenticated participant
+                session, or staff access to a report containing that file.
+                externally linked media retains its original accessibility.
             </div>
 
             <h2>4. how your data is used</h2>
             <p>
-                reports and messages may be reviewed by moderators and admins
-                when investigating abuse. other stored personal data, such as
+                public messages and reports may be reviewed by moderators and
+                admins when investigating abuse. staff cannot browse direct
+                messages through the app; they can view only the excerpt and
+                attachments submitted with a DM report. other stored personal data, such as
                 emails and IP logs, is
                 <strong>not actively accessed or reviewed</strong> except when
                 necessary — for example, to investigate abuse or resolve
@@ -388,7 +399,10 @@
                 reports, and report notes are retained
                 <strong>indefinitely</strong> unless an admin or owner
                 deliberately deletes a report. there is currently no automated
-                deletion process.
+                deletion process. you can delete your own direct messages from
+                the conversation. their content is removed from message storage;
+                any previously submitted report evidence and uploaded files are
+                retained. deleted-message sequence metadata remains for ordering.
             </p>
 
             <h2>7. breaches</h2>

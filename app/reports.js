@@ -79,7 +79,7 @@ function renderRows() {
     const time = element('td', 'admin-report-time', formatDate(report.createdAt));
     const issue = element('td', 'admin-report-issue');
     issue.append(element('strong', '', reasons[report.reason] || report.reason));
-    issue.append(element('small', '', report.targetType === 'message' ? 'message report' : 'account report'));
+    issue.append(element('small', '', report.targetType === 'dm_message' ? 'direct message report' : report.targetType === 'message' ? 'message report' : 'account report'));
     const reporter = element('td', 'admin-report-person');
     reporter.append(element('strong', '', report.reporterUsername || report.reporterEmail));
     if (report.reporterUsername) reporter.append(element('small', '', report.reporterEmail));
@@ -155,7 +155,7 @@ function detailSection(title, description = '') {
 
 function reportedMediaUrl(value, inferType = true) {
   try {
-    const url = new URL(value);
+    const url = new URL(value, window.location.origin);
     if (!['https:', 'http:'].includes(url.protocol)) return null;
 
     const path = url.pathname;
@@ -201,9 +201,17 @@ function renderReportedMessage(evidence, snapshot) {
   // `image` stores uploads in current messages. Older messages can instead
   // contain a filename and media URL in their text, so extract those too.
   addMedia(snapshot.image ? reportedMediaUrl(snapshot.image) : null);
-  const text = String(snapshot.text || '').replace(/https?:\/\/[^\s<>"']+/gi, rawUrl => {
+  const text = String(snapshot.text || '').replace(/https?:\/\/[^\s<>"']+|\/admin\/reports\/\d+\/files\/[a-f0-9-]{36}(?:\.[a-z0-9]+)?/gi, rawUrl => {
     const cleanUrl = rawUrl.replace(/[),.!?;:]+$/g, '');
-    addMedia(reportedMediaUrl(cleanUrl, false));
+    const preview = reportedMediaUrl(cleanUrl, false);
+    addMedia(preview);
+    if (!preview) {
+      const link = element('a', 'admin-report-file', 'open attached link or file');
+      link.href = cleanUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      evidence.append(link);
+    }
     return rawUrl.slice(cleanUrl.length) ? rawUrl.slice(cleanUrl.length) : ' ';
   }).replace(/[ \t]+/g, ' ').replace(/\s*:\s*$/, '').trim();
 
@@ -227,7 +235,7 @@ function renderReportDetails(report) {
   const summary = detailSection('report');
   detailField(summary, 'report ID', `#${report.id}`);
   detailField(summary, 'submitted', formatDate(report.createdAt, true));
-  detailField(summary, 'type', report.targetType === 'message' ? 'message' : 'account');
+  detailField(summary, 'type', report.targetType === 'dm_message' ? 'direct message' : report.targetType === 'message' ? 'message' : 'account');
   detailField(summary, 'reason', reasons[report.reason] || report.reason);
   if (report.note) {
     const note = element('p', 'admin-report-submitted-note', report.note);
@@ -252,6 +260,18 @@ function renderReportDetails(report) {
     detailField(evidence, 'sent', formatDate(snapshot.time, true));
     renderReportedMessage(evidence, snapshot);
     sections.push(evidence);
+  }
+
+  if (report.targetType === 'dm_message') {
+    const excerpt = detailSection('direct message evidence', 'the reported message and up to 3 messages before and after it; no access to the rest of the conversation.');
+    for (const message of report.snapshot?.context || []) {
+      const item = detailSection(message.messageId === report.targetKey ? 'reported message' : 'context message');
+      detailField(item, 'author', message.authorUsername);
+      detailField(item, 'sent', formatDate(message.time, true));
+      renderReportedMessage(item, message);
+      excerpt.append(item);
+    }
+    sections.push(excerpt);
   }
 
   const notesSection = detailSection('internal notes', 'visible only to moderators and admins.');

@@ -384,6 +384,216 @@ if (session) {
   let renderedHistory = []; // for re-render on mode toggle
   let currentChannel = "main";
   let channelList = ["main"];
+  let currentDm = null;
+  let dmConversations = [];
+  let dmAvailable = false;
+  let switchingDm = false;
+  let viewRequest = 0;
+  let accountMuted = false;
+  let publicChatMuted = false;
+  let sendPending = false;
+  let latestDmSeq = 0;
+  let lastReadSent = 0;
+
+  function dmRequest(event, payload) {
+    return new Promise((resolve, reject) => {
+      socket.timeout(10000).emit(event, payload, (error, result) => {
+        if (error || !result?.success) reject(new Error(result?.error || "connection interrupted; please try again"));
+        else resolve(result);
+      });
+    });
+  }
+  function activeDm() { return dmConversations.find(c => c.id === currentDm); }
+  function updateComposer() {
+    const blocked = activeDm()?.blocked;
+    const disabled = sendPending || switchingDm || accountMuted ||
+      (currentDm ? blocked : publicChatMuted && !["mod", "admin", "owner"].includes(role));
+    document.querySelector("#message-input").disabled = !!disabled;
+    document.querySelector('#message-form button[type="submit"]').disabled = !!disabled;
+    document.querySelector("#attach-btn").disabled = !!disabled;
+  }
+  function renderDmList() {
+    document.querySelector("#direct-messages").hidden = !dmAvailable;
+    document.documentElement.classList.toggle("dm-enabled", dmAvailable);
+    const list = document.querySelector("#dm-list");
+    list.replaceChildren();
+    if (!dmConversations.length) {
+      const empty = document.createElement("p");
+      empty.className = "dm-empty";
+      empty.textContent = "start a DM from a profile";
+      list.appendChild(empty);
+    }
+    for (const conversation of dmConversations) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "channel-item dm-item" + (conversation.id === currentDm ? " active" : "");
+      item.setAttribute("aria-label", `${conversation.peer.username}${conversation.unread ? `, ${conversation.unread} unread messages` : ""}`);
+      if (conversation.peer.avatar) {
+        const avatar = document.createElement("img");
+        avatar.src = conversation.peer.avatar;
+        avatar.alt = "";
+        avatar.className = "dm-avatar";
+        item.appendChild(avatar);
+      }
+      const name = document.createElement("span");
+      name.className = "dm-name";
+      name.textContent = conversation.peer.username;
+      if (conversation.peer.redVerified) applyRedVerifiedColor(name);
+      else applyFlagColor(name, conversation.peer.color || getNameColor(conversation.peer.username));
+      item.appendChild(name);
+      if (conversation.peer.isOwner) {
+        item.appendChild(makeBadge("https://cdn.chattm.app/verified_owner.png", 11,
+          "this user is verified to be the owner of chat™"));
+      } else if (conversation.peer.redVerified) {
+        item.appendChild(makeRedCheckBadge(11));
+      } else if (conversation.peer.verified) {
+        item.appendChild(makeBadge("https://cdn.chattm.app/verified.png", 11,
+          "this user has been verified"));
+      }
+      if (conversation.unread) {
+        const badge = document.createElement("span");
+        badge.className = "dm-unread";
+        badge.textContent = conversation.unread > 99 ? "99+" : conversation.unread;
+        item.appendChild(badge);
+      }
+      item.addEventListener("click", () => switchDm(conversation.id));
+      list.appendChild(item);
+    }
+    const conversation = activeDm();
+    document.querySelector("#dm-header").hidden = !conversation;
+    if (conversation) {
+      document.querySelector("#dm-peer-btn").textContent = conversation.peer.username;
+      document.querySelector("#dm-block-btn").textContent = conversation.blockedByMe ? "unblock" : "block";
+      document.querySelector("#dm-block-status").textContent = conversation.blocked ? "messaging is blocked" : "";
+      onlineUsernames = [conversation.peer.username];
+    }
+    const count = dmConversations.reduce((total, c) => total + c.unread, 0);
+    document.title = count + unread ? `(${count + unread}) chat™` : "chat™";
+    updateComposer();
+  }
+  function renderHistory(messages) {
+    document.querySelector("ul").replaceChildren();
+    renderedHistory = messages;
+    lastMsgMeta = null;
+    atBottom = false;
+    messages.forEach(renderMessage);
+    atBottom = true;
+    msgList.scrollTop = msgList.scrollHeight;
+  }
+  function resetConversationUi() {
+    cancelReply();
+    clearTimeout(typeTimeout);
+    typingUsers.clear();
+    updateTypingIndicator();
+    document.querySelector("#message-context-menu").classList.remove("open");
+    hideSuggestion();
+  }
+  function markDmRead() {
+    if (!currentDm || switchingDm || document.hidden || !document.hasFocus() || latestDmSeq <= lastReadSent) return;
+    const conversationId = currentDm;
+    const seq = latestDmSeq;
+    lastReadSent = seq;
+    dmRequest("dmRead", { conversationId, seq }).catch(() => {
+      if (currentDm === conversationId && lastReadSent === seq) lastReadSent = 0;
+    });
+  }
+  async function switchDm(id) {
+    if (currentDm === id && !switchingDm) { markDmRead(); return; }
+    const request = ++viewRequest;
+    switchingDm = true;
+    emitTyping(false);
+    updateComposer();
+    try {
+      const result = await dmRequest("dmSwitch", { conversationId: id });
+      if (request !== viewRequest) return;
+      if (!dmConversations.some(c => c.id === id)) dmConversations.push(result.conversation);
+      currentDm = id;
+      switchingDm = false;
+      latestDmSeq = result.conversation.latestSeq;
+      lastReadSent = 0;
+      resetConversationUi();
+      document.documentElement.classList.add("dm-view");
+      renderHistory(result.messages);
+      renderChannels();
+      renderDmList();
+      markDmRead();
+    } catch (error) {
+      if (request !== viewRequest) return;
+      switchingDm = false;
+      updateComposer();
+      showToast(error.message, "error");
+    }
+  }
+  function emitTyping(typing) {
+    if (currentDm) {
+      dmRequest("dmTyping", { conversationId: currentDm, typing }).catch(() => {});
+    } else if (!switchingDm) socket.emit(typing ? "typing" : "stopTyping");
+  }
+  socket.on("dmList", conversations => {
+    dmConversations = conversations;
+    renderDmList();
+  });
+  socket.on("dmMessage", message => {
+    if (message.conversationId === currentDm && !switchingDm) {
+      if (!renderedHistory.some(m => m.id === message.id)) {
+        renderedHistory.push(message);
+        renderMessage(message);
+      }
+      latestDmSeq = Math.max(latestDmSeq, message.seq);
+      markDmRead();
+    }
+    if (!message.mine && !notifymuted && myStatus !== "dnd" &&
+        (message.conversationId !== currentDm || document.hidden || !document.hasFocus())) beep();
+  });
+  socket.on("dmDeleted", ({ conversationId, messageId }) => {
+    if (conversationId !== currentDm || switchingDm) return;
+    renderedHistory = renderedHistory.filter(m => m.id !== messageId).map(m =>
+      m.replyTo?.id === messageId ? { ...m, replyTo: { id: messageId, deleted: true } } : m);
+    if (replyingTo?.id === messageId) cancelReply();
+    renderHistory(renderedHistory);
+  });
+  socket.on("dmTyping", ({ conversationId, username: name, typing }) => {
+    if (conversationId !== currentDm || switchingDm) return;
+    if (typing) typingUsers.add(name); else typingUsers.delete(name);
+    updateTypingIndicator();
+  });
+  socket.on("disconnect", () => {
+    currentDm = null;
+    switchingDm = false;
+    viewRequest++;
+    dmConversations = [];
+    document.documentElement.classList.remove("dm-view");
+    renderDmList();
+    // Do not leave private content displayed after a revoked connection.
+    renderHistory([]);
+  });
+  window.addEventListener("focus", markDmRead);
+  document.addEventListener("visibilitychange", markDmRead);
+  document.querySelector("#dm-peer-btn").addEventListener("click", event => {
+    event.stopPropagation();
+    if (activeDm()) openProfile(activeDm().peer.username);
+  });
+  document.querySelector("#dm-block-btn").addEventListener("click", async () => {
+    const conversation = activeDm();
+    if (!conversation) return;
+    const button = document.querySelector("#dm-block-btn");
+    button.disabled = true;
+    try { await dmRequest("dmBlock", { conversationId: conversation.id, blocked: !conversation.blockedByMe }); }
+    catch (error) { showToast(error.message, "error"); }
+    finally { button.disabled = false; }
+  });
+  document.querySelector("#profile-dm-btn").addEventListener("click", async () => {
+    const button = document.querySelector("#profile-dm-btn");
+    const targetUsername = button.dataset.targetUsername;
+    button.disabled = true;
+    try {
+      const result = await dmRequest("dmOpen", { username: targetUsername });
+      closeProfile();
+      await switchDm(result.conversation.id);
+    } catch (error) { showToast(error.message, "error"); }
+    finally { button.disabled = false; }
+  });
+
 
   const tooltipsbtn = document.querySelector("#tooltips-btn");
   let tooltipsHidden = localStorage.getItem("tooltipsHidden") === "true";
@@ -533,6 +743,7 @@ if (session) {
     document.querySelector("#profile-backdrop").style.display = "block";
     profilePanel.dataset.profileUsername = targetUsername;
     const reportButton = document.querySelector("#profile-report-btn");
+    document.querySelector("#profile-dm-btn").hidden = true;
     reportButton.hidden = true;
     reportButton.dataset.targetUsername = "";
     // clear previous content
@@ -699,6 +910,9 @@ if (session) {
     // status display
     const isOwnProfile = data.username?.toLowerCase() === username?.toLowerCase();
     const reportButton = document.querySelector("#profile-report-btn");
+    const dmButton = document.querySelector("#profile-dm-btn");
+    dmButton.hidden = isOwnProfile || data.isGuest || !dmAvailable;
+    dmButton.dataset.targetUsername = data.username;
     reportButton.hidden = isOwnProfile;
     reportButton.dataset.targetUsername = data.username;
     if (isOwnProfile) {
@@ -927,9 +1141,9 @@ if (session) {
   // typing indicator stuff
   let typeTimeout;
   document.querySelector("#message-input").addEventListener("input", () => {
-    socket.emit("typing");
+    emitTyping(true);
     clearTimeout(typeTimeout);
-    typeTimeout = setTimeout(() => socket.emit("stopTyping"), 2000);
+    typeTimeout = setTimeout(() => emitTyping(false), 2000);
     updateCharCounter()
   });
 
@@ -948,11 +1162,13 @@ if (session) {
   }
 
   socket.on("typing", (name) => {
+    if (currentDm || switchingDm) return;
     typingUsers.add(name);
     updateTypingIndicator();
   });
 
   socket.on("stopTyping", (name) => {
+    if (currentDm || switchingDm) return;
     typingUsers.delete(name);
     updateTypingIndicator();
   });
@@ -967,13 +1183,8 @@ if (session) {
 
   // message history
   socket.on("history", (messages) => {
-    document.querySelector("ul").innerHTML = ""; // clear (needed when switching channels)
-    renderedHistory = messages;
-    lastMsgMeta = null;
-    atBottom = false; // suppress per-message scrolls during batch render
-    messages.forEach((data) => renderMessage(data));
-    atBottom = true;
-    msgList.scrollTop = msgList.scrollHeight;
+    if (currentDm || switchingDm) return;
+    renderHistory(messages);
   });
 
   // ─── Channels ───────────────────────────────────────────────────────────────
@@ -985,7 +1196,7 @@ if (session) {
     channelList.forEach((name) => {
       const item = document.createElement("div");
       item.className =
-        "channel-item" + (name === currentChannel ? " active" : "");
+        "channel-item" + (!currentDm && name === currentChannel ? " active" : "");
       const label = document.createElement("span");
       label.className = "channel-name";
       label.textContent = name;
@@ -1011,7 +1222,14 @@ if (session) {
   }
 
   function switchChannel(name) {
-    if (name === currentChannel) return;
+    if (name === currentChannel && !currentDm && !switchingDm) return;
+    viewRequest++;
+    emitTyping(false);
+    currentDm = null;
+    switchingDm = false;
+    document.documentElement.classList.remove("dm-view");
+    resetConversationUi();
+    renderDmList();
     document.querySelector("ul").innerHTML = "";
     renderedHistory = [];
     lastMsgMeta = null;
@@ -1033,6 +1251,7 @@ if (session) {
   });
 
   socket.on("switchedChannel", (name) => {
+    if (currentDm || switchingDm) return;
     currentChannel = name;
     renderChannels();
     typingUsers.clear();
@@ -1041,57 +1260,54 @@ if (session) {
 
   async function sendMessageNew(e) {
     e.preventDefault();
+    if (sendPending || switchingDm) return;
     hideSuggestion();
-    // stops typing when a message is sent
-    socket.emit("stopTyping");
+    emitTyping(false);
     const textInput = document.querySelector("#message-input");
     const fileInput = document.querySelector("#file-input");
-
     const file = fileInput.files[0];
-
-    if (!textInput.value && !file) return;
-
-    const replyTo = replyingTo ? replyingTo.id : null;
-
-    if (file) {
-      if (file.size > MAX_SIZE) {
-        showToast("file too big (max is 50mb)", 'error');
-        fileInput.value = "";
+    const text = textInput.value;
+    if (!text && !file) return;
+    const destination = { conversationId: currentDm, channel: currentChannel };
+    const replyTo = replyingTo?.id || null;
+    sendPending = true;
+    updateComposer();
+    try {
+      if (file && file.size > MAX_SIZE) throw new Error("file too big (max is 50mb)");
+      let image = null;
+      let outgoingText = text;
+      let attachmentId = null;
+      if (file) {
+        showStatus("uploading...");
+        const result = await uploadFile(file, destination.conversationId);
+        if (destination.conversationId) attachmentId = result.attachmentId;
+        else if (file.type.startsWith("image/") || file.type.startsWith("video/")) image = result.url;
+        else outgoingText = `${text}${text ? " " : ""}${file.name}: ${result.url}`;
+        hideStatus();
+      }
+      if (destination.conversationId) {
+        await dmRequest("dmSend", { conversationId: destination.conversationId, text, attachmentId, replyTo });
+      } else {
+        // A public upload must not move into a DM or a different channel.
+        if (currentDm || switchingDm || currentChannel !== destination.channel) throw new Error("channel changed; please resend your message");
+        socket.emit("message", { username, channel: destination.channel, text: outgoingText, image, replyTo });
+      }
+      if (currentDm === destination.conversationId && currentChannel === destination.channel) {
+        if (textInput.value === text) textInput.value = "";
+        if (fileInput.files[0] === file) fileInput.value = "";
+        updateCharCounter();
         document.querySelector("#attach-btn").style.borderColor = "";
         document.querySelector("#attach-btn").style.color = "";
-        return;
+        if (replyingTo?.id === replyTo) cancelReply();
       }
-      const isImage = file.type.startsWith("image/");
-      const isVideo = file.type.startsWith("video/")
-      showStatus("uploading...");
-      const url = await uploadFile(file);
-      showStatus("uploaded!", "pink");
-      setTimeout(hideStatus, 3000);
-      socket.emit("message", {
-        username,
-        text: (isImage || isVideo)
-          ? textInput.value || null
-          : `${textInput.value ? textInput.value + " " : ""}${file.name}: ${url}`,
-        image: (isImage || isVideo) ? url : null,
-        replyTo,
-      });
-      textInput.value = "";
-      fileInput.value = "";
-      updateCharCounter()
-      document.querySelector("#attach-btn").style.borderColor = "";
-      document.querySelector("#attach-btn").style.color = "";
-    } else {
-      socket.emit("message", {
-        username,
-        text: textInput.value,
-        image: null,
-        replyTo,
-      });
-      textInput.value = "";
-      updateCharCounter()
+    } catch (error) {
+      hideStatus();
+      showToast(error.message || "could not send message", "error");
+    } finally {
+      sendPending = false;
+      updateComposer();
+      textInput.focus();
     }
-    if (replyingTo) cancelReply();
-    textInput.focus();
   }
 
   // force enter to send message
@@ -1186,6 +1402,7 @@ if (session) {
   });
   socket.on("message", (data) => {
     // ignore stray messages from another channel (race during a switch)
+    if (currentDm || switchingDm) return;
     if (data.channel && data.channel !== currentChannel) return;
     if (isSystemMessage(data)) return;
     renderedHistory.push(data);
@@ -1205,7 +1422,7 @@ if (session) {
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       unread = 0;
-      document.title = "chat™";
+      renderDmList();
     }
   });
 
@@ -1501,6 +1718,7 @@ if (session) {
   }
 
   function openMessageContextMenu(li, message, canDelete) {
+    if (message.conversationId) canDelete = message.mine;
     const menu = document.querySelector("#message-context-menu");
     const rect = li.getBoundingClientRect();
     const replyBtn = document.querySelector("#ctx-reply-btn");
@@ -1510,7 +1728,7 @@ if (session) {
     };
 
     const reportBtn = document.querySelector("#ctx-report-btn");
-    const canReport = !message.system && message.username?.toLowerCase() !== username?.toLowerCase();
+    const canReport = !message.system && (message.conversationId ? !message.mine : message.username?.toLowerCase() !== username?.toLowerCase());
     reportBtn.style.display = canReport ? "" : "none";
     reportBtn.onclick = () => {
       openReportForm({ message });
@@ -1520,7 +1738,10 @@ if (session) {
     const deleteBtn = document.querySelector("#ctx-delete-btn");
     deleteBtn.style.display = canDelete ? "" : "none";
     deleteBtn.onclick = () => {
-      socket.emit("deleteMessage", message.id);
+      if (message.conversationId) {
+        dmRequest("dmDelete", { conversationId: message.conversationId, messageId: message.id })
+          .catch(error => showToast(error.message, "error"));
+      } else socket.emit("deleteMessage", message.id);
       menu.classList.remove("open");
     };
 
@@ -1540,6 +1761,7 @@ if (session) {
   });
 
 socket.on("messageDeleted", (messageId) => {
+    if (currentDm || switchingDm) return;
     const li = document.querySelector(`li[data-id="${messageId}"]`);
     if (!li) return;
     
@@ -1671,7 +1893,7 @@ socket.on("messageDeleted", (messageId) => {
           
           newLi.addEventListener("contextmenu", (e) => {
             e.preventDefault();
-            openMessageContextMenu(newLi, currentMsg.id, currentMsg.username === username || isOwner);
+            openMessageContextMenu(newLi, currentMsg, currentMsg.username === username || isOwner);
           });
           
           currentLi.replaceWith(newLi);
@@ -1695,25 +1917,26 @@ socket.on("messageDeleted", (messageId) => {
   });
 
   // cdn/image stuff
-  async function uploadFile(file) {
+  async function uploadFile(file, conversationId = null) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("username", username);
     const res = await fetch(
-      `${window.location.origin}/upload`,
+      conversationId ? `/dm/upload?conversationId=${encodeURIComponent(conversationId)}` : `${window.location.origin}/upload`,
       {
         method: "POST",
         body: formData,
         credentials: 'same-origin'
       },
     );
-    const { url } = await res.json();
-    return url;
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "upload failed");
+    return result;
   }
 
   // links show up as links in chat
   function functioninglinks(text, color) {
-    const tokenRegex = /(https?:\/\/[^\s]+)|(@[a-zA-Z0-9_]+)|(:[a-z0-9_-]+:)/g;
+    const tokenRegex = /(https?:\/\/[^\s]+|\/dm\/files\/[a-f0-9-]{36}(?:\.[a-z0-9]+)?)|(@[a-zA-Z0-9_]+)|(:[a-z0-9_-]+:)/g;
     const parts = text.split(tokenRegex).filter((p) => p !== undefined);
     const fragment = document.createDocumentFragment();
 
@@ -1723,7 +1946,7 @@ socket.on("messageDeleted", (messageId) => {
 
     for (const part of parts) {
       if (!part) continue;
-      if (/^https?:\/\//.test(part)) {
+      if (/^(https?:\/\/|\/dm\/files\/)/.test(part)) {
         if (videoExtensions.test(part)) {
           const a = document.createElement("a");
           a.href = part;
@@ -2003,6 +2226,7 @@ socket.on("messageDeleted", (messageId) => {
   });
 
   socket.on("userlist", (users) => {
+    if (currentDm || switchingDm) return;
     onlineUsernames = users
       .filter((u) => u.online)
       .map((u) => u.username)
@@ -2208,12 +2432,16 @@ socket.on("messageDeleted", (messageId) => {
     e.style.display = "block";
   })
 
-  let chatMutedb = false;
+  socket.on("muted", () => { accountMuted = true; updateComposer(); });
+  socket.on("unmuted", () => { accountMuted = false; updateComposer(); });
+  socket.on("mutechat", () => { publicChatMuted = true; updateComposer(); });
+  socket.on("unmutechat", () => { publicChatMuted = false; updateComposer(); });
 
   // check owner status and mute chat status on connect
   socket.on(
     "init",
     ({
+      dmAvailable: canDm,
       isOwner: owner,
       role: r,
       chatMuted: muted,
@@ -2221,6 +2449,12 @@ socket.on("messageDeleted", (messageId) => {
       uMuted,
       currentChannel: ch,
     }) => {
+      dmAvailable = !!canDm;
+      accountMuted = !!uMuted;
+      publicChatMuted = !!muted;
+      currentDm = null;
+      switchingDm = false;
+      document.documentElement.classList.remove("dm-view");
       isOwner = owner;
       role = r ?? 'user';
       if (ch) currentChannel = ch;
@@ -2252,6 +2486,7 @@ socket.on("messageDeleted", (messageId) => {
           : '<i class="ti ti-shield-lock"></i> admin';
       }
 
+      renderDmList();
       if (color) {
         myColor = color;
         updateProfileBtn();
@@ -2311,16 +2546,20 @@ socket.on("messageDeleted", (messageId) => {
     const title = document.querySelector("#report-dialog-title");
     form.reset();
     activeReportTarget = target.message
-      ? { messageId: target.message.id }
+      ? target.message.conversationId ? { dmMessageId: target.message.id } : { messageId: target.message.id }
       : { targetUsername: target.targetUsername };
     if (target.message) {
       const preview = target.message.text || (target.message.image ? "image message" : "message");
       title.textContent = "report message";
-      summary.textContent = `by ${target.message.username || "unknown user"} in #${target.message.channel || currentChannel}: ${preview.slice(0, 140)}`;
+      const location = target.message.conversationId ? "a direct message" : `#${target.message.channel || currentChannel}`;
+      summary.textContent = `by ${target.message.username || "unknown user"} in ${location}: ${preview.slice(0, 140)}`;
     } else {
       title.textContent = "report account";
       summary.textContent = `reporting ${target.targetUsername}`;
     }
+    document.querySelector("#report-privacy-note").textContent = target.message?.conversationId
+      ? "moderators and admins will see this message, up to 3 messages before and after it, and their attachments."
+      : "only moderators and admins can see this report.";
     if (!dialog.open) dialog.showModal();
     document.querySelector("#report-reason").focus();
   }
