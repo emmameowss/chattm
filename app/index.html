@@ -255,6 +255,16 @@
                 <i class="ti ti-trash"></i> delete message
             </button>
         </div>
+        <dialog id="block-dialog" class="report-dialog" aria-labelledby="block-dialog-title" aria-describedby="block-dialog-description">
+            <form id="block-confirm-form">
+                <header class="report-dialog-header">
+                    <div><h2 id="block-dialog-title">block account</h2><p id="block-target-summary"></p></div>
+                    <button type="button" id="block-dialog-close" aria-label="close block confirmation"><i class="ti ti-x" aria-hidden="true"></i></button>
+                </header>
+                <p id="block-dialog-description">their public messages will be hidden and you won't be able to DM each other.</p>
+                <div class="report-dialog-footer"><span>you can unblock them from their profile.</span><div><button type="button" id="block-dialog-cancel">cancel</button><button type="submit" id="block-confirm">block</button></div></div>
+            </form>
+        </dialog>
         <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-dialog-title">
             <form id="report-form">
                 <header class="report-dialog-header">

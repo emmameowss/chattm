@@ -1277,11 +1277,31 @@ function paginateAdminUsers(users, request = {}) {
   };
 }
 
+function channelMessageFor(message, email) {
+  if (message.ownerEmail && dmStore.hasBlock(email, message.ownerEmail)) return null;
+  const { ownerEmail, ...result } = message;
+  if (result.replyTo) {
+    const original = getMessageById(result.replyTo.id);
+    if (original?.ownerEmail && dmStore.hasBlock(email, original.ownerEmail)) {
+      result.replyTo = { id: result.replyTo.id, authorBlocked: true, username: "blocked", hidden: true };
+    }
+  }
+  return result;
+}
+function channelHistoryFor(channel, email) {
+  return getHistory(channel).map(message => channelMessageFor(message, email)).filter(Boolean);
+}
+
 function emitUserList(channel = "main") {
   if (!channel) return;
   const users = buildUserList(channel);
-  const publicUsers = users.map(({ email, ...rest }) => rest);
-  io.to(roomOf(channel)).emit("userlist", publicUsers);
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.currentChannel !== channel) continue;
+    socket.emit("userlist", users.map(({ email, ...user }) => {
+      if (!dmStore.hasBlock(socket.userEmail, email)) return user;
+      return { username: user.username, blockedByMe: true, online: user.online };
+    }));
+  }
 
   for (const [, s] of io.sockets.sockets) {
     if (
@@ -1432,6 +1452,17 @@ const directMessages = createDmService({
   identity: email => ({ username: getStoredUsername(email) || "unknown", avatar: getAvatar(email) || null,
     color: getColor(email) || null, verified: isVerified(email), redVerified: isRedVerified(email),
     isToken: getRole(email) === "owner" }),
+  blockChanged(email) {
+    const channels = new Set();
+    forEachUserSocket(email, socket => {
+      if (socket.currentChannel) {
+        socket.emit("history", channelHistoryFor(socket.currentChannel, email));
+        channels.add(socket.currentChannel);
+      }
+      socket.emit("blockStateChanged");
+    });
+    for (const channel of channels) emitUserList(channel);
+  },
   peerProfile: email => {
     const profile = getProfileData(email);
     return { pronouns: profile.pronouns || "", status: profile.status || "online",
@@ -1470,7 +1501,7 @@ io.on("connection", (socket) => {
   // strip ownerEmail before sending history to client
   socket.emit(
     "history",
-    getHistory(socket.currentChannel).map(({ ownerEmail, ...m }) => m),
+    channelHistoryFor(socket.currentChannel, socket.userEmail),
   );
   socket.emit("init", {
     dmAvailable: !socket.userEmail.endsWith("@guest"),
@@ -1572,6 +1603,11 @@ io.on("connection", (socket) => {
         socket.emit("profileData", null);
         return;
       }
+      if (dmStore.hasBlock(socket.userEmail, email)) {
+        socket.emit("profileData", { username: getStoredUsername(email) || reqUsername,
+          blockedByMe: true, isGuest: email.endsWith("@guest") });
+        return;
+      }
       const profile = getProfileData(email);
       const role = getRole(email)
       const isOnline = [...io.sockets.sockets.values()].some(
@@ -1665,7 +1701,10 @@ io.on("connection", (socket) => {
 
   socket.on("typing", () => {
     if (!socket.username || socket.currentDm) return;
-    socket.to(roomOf(socket.currentChannel)).emit("typing", socket.username);
+    for (const recipient of io.sockets.sockets.values()) {
+      if (recipient !== socket && recipient.currentChannel === socket.currentChannel &&
+          !dmStore.hasBlock(recipient.userEmail, socket.userEmail)) recipient.emit("typing", socket.username);
+    }
   });
 
   socket.on("stopTyping", () => {
@@ -1738,7 +1777,7 @@ io.on("connection", (socket) => {
     socket.currentChannel = name;
     socket.emit(
       "history",
-      getHistory(name).map(({ ownerEmail, ...m }) => m),
+      channelHistoryFor(name, socket.userEmail),
     );
     socket.emit("switchedChannel", name);
     // presence changed in both the old and the new channel
@@ -1802,7 +1841,7 @@ io.on("connection", (socket) => {
       s.currentChannel = "main";
       s.emit(
         "history",
-        getHistory("main").map(({ ownerEmail, ...m }) => m),
+        channelHistoryFor("main", s.userEmail),
       );
       s.emit("switchedChannel", "main");
     }
@@ -1914,8 +1953,11 @@ io.on("connection", (socket) => {
     message.mentions = mentions;
     addMessage(message);
     const stored = getMessageById(message.id);
-    const { ownerEmail, ...publicMessage } = stored;
-    io.to(roomOf(destination)).emit("message", publicMessage);
+    for (const recipient of io.sockets.sockets.values()) {
+      if (recipient.currentChannel !== destination) continue;
+      const publicMessage = channelMessageFor(stored, recipient.userEmail);
+      if (publicMessage) recipient.emit("message", publicMessage);
+    }
   });
 });
 

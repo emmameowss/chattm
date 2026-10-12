@@ -403,7 +403,17 @@ if (session) {
     document.querySelector('#message-form button[type="submit"]').disabled = !!disabled;
     document.querySelector("#attach-btn").disabled = !!disabled;
   }
+  function makeBlockedAvatar(className = "") {
+    const avatar = document.createElement("span");
+    avatar.className = `${className} blocked-avatar`;
+    avatar.setAttribute("aria-hidden", "true");
+    const sign = document.createElement("i");
+    sign.className = "ti ti-ban";
+    avatar.appendChild(sign);
+    return avatar;
+  }
   function makeDmAvatar(peer) {
+    if (peer.blockedByMe) return makeBlockedAvatar("dm-avatar");
     const avatar = document.createElement(peer.avatar ? "img" : "span");
     avatar.className = "dm-avatar" + (peer.avatar ? "" : " dm-avatar-placeholder");
     if (peer.avatar) {
@@ -419,10 +429,12 @@ if (session) {
   function appendDmName(container, peer) {
     const name = document.createElement("span");
     name.className = "dm-name";
-    name.textContent = peer.username;
-    if (peer.redVerified) applyRedVerifiedColor(name);
+    name.textContent = peer.blockedByMe ? "blocked" : peer.username;
+    if (peer.blockedByMe) name.classList.add("blocked-name");
+    else if (peer.redVerified) applyRedVerifiedColor(name);
     else applyFlagColor(name, peer.color || getNameColor(peer.username));
     container.appendChild(name);
+    if (peer.blockedByMe) return;
     if (peer.isOwner) {
       container.appendChild(makeBadge("https://cdn.chattm.app/verified_owner.png", 11,
         "this user is verified to be the owner of chat™"));
@@ -443,6 +455,12 @@ if (session) {
     appendDmName(nameRow, peer);
     const metadata = document.createElement("span");
     metadata.className = "dm-peer-meta";
+    if (peer.blockedByMe) {
+      details.append(nameRow);
+      button.append(details);
+      button.setAttribute("aria-label", "view blocked profile");
+      return;
+    }
     if (peer.pronouns) {
       const pronouns = document.createElement("span");
       pronouns.className = "dm-peer-pronouns";
@@ -481,7 +499,7 @@ if (session) {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "channel-item dm-item" + (conversation.id === currentDm ? " active" : "");
-      item.setAttribute("aria-label", `${conversation.peer.username}${conversation.unread ? `, ${conversation.unread} unread messages` : ""}`);
+      item.setAttribute("aria-label", `${conversation.blockedByMe ? "blocked" : conversation.peer.username}${conversation.unread ? `, ${conversation.unread} unread messages` : ""}`);
       item.appendChild(makeDmAvatar(conversation.peer));
       appendDmName(item, conversation.peer);
       if (conversation.unread) {
@@ -498,7 +516,7 @@ if (session) {
     if (conversation) {
       renderDmPeer(conversation.peer);
       document.querySelector("#dm-block-status").textContent = conversation.blocked ? "messaging is blocked" : "";
-      onlineUsernames = [conversation.peer.username];
+      onlineUsernames = conversation.blockedByMe ? [] : [conversation.peer.username];
     }
     updateProfileBlockButton();
     const count = dmConversations.reduce((total, c) => total + c.unread, 0);
@@ -567,6 +585,15 @@ if (session) {
     dmConversations = conversations;
     renderDmList();
   });
+  socket.on("dmHistory", ({ conversationId, messages }) => {
+    if (conversationId !== currentDm || switchingDm) return;
+    renderHistory(messages);
+  });
+  socket.on("blockStateChanged", () => {
+    typingUsers.clear();
+    updateTypingIndicator();
+    if (profilePanel.style.display !== "none") socket.emit("getProfile", profilePanel.dataset.profileUsername);
+  });
   socket.on("dmMessage", message => {
     if (message.conversationId === currentDm && !switchingDm) {
       if (!renderedHistory.some(m => m.id === message.id)) {
@@ -607,6 +634,32 @@ if (session) {
     event.stopPropagation();
     if (activeDm()) openProfile(activeDm().peer.username);
   });
+  function confirmBlock(targetUsername) {
+    const dialog = document.querySelector("#block-dialog");
+    const form = document.querySelector("#block-confirm-form");
+    const cancel = document.querySelector("#block-dialog-cancel");
+    const close = document.querySelector("#block-dialog-close");
+    document.querySelector("#block-target-summary").textContent = `blocking ${targetUsername}`;
+    return new Promise(resolve => {
+      function finish(confirmed) {
+        form.removeEventListener("submit", onConfirm);
+        cancel.removeEventListener("click", onCancel);
+        close.removeEventListener("click", onCancel);
+        dialog.removeEventListener("cancel", onCancel);
+        dialog.close();
+        profileMoreActions.querySelector("summary").focus();
+        resolve(confirmed);
+      }
+      function onConfirm(event) { event.preventDefault(); finish(true); }
+      function onCancel(event) { event.preventDefault(); finish(false); }
+      form.addEventListener("submit", onConfirm);
+      cancel.addEventListener("click", onCancel);
+      close.addEventListener("click", onCancel);
+      dialog.addEventListener("cancel", onCancel);
+      dialog.showModal();
+      cancel.focus();
+    });
+  }
   document.querySelector("#profile-block-btn").addEventListener("click", async event => {
     event.stopPropagation();
     const button = event.currentTarget;
@@ -616,8 +669,10 @@ if (session) {
     button.disabled = true;
     try {
       let conversation = dmConversations.find(c => c.peer.username.toLowerCase() === targetUsername.toLowerCase());
+      const blocked = !conversation?.blockedByMe;
+      if (blocked && !await confirmBlock(targetUsername)) return;
       if (!conversation) ({ conversation } = await dmRequest("dmOpen", { username: targetUsername }));
-      await dmRequest("dmBlock", { conversationId: conversation.id, blocked: !conversation.blockedByMe });
+      await dmRequest("dmBlock", { conversationId: conversation.id, blocked });
     } catch (error) { showToast(error.message, "error"); }
     finally { button.disabled = false; }
   });
@@ -1002,6 +1057,29 @@ if (session) {
       return;
     }
     const panel = profilePanel;
+    if (data.blockedByMe) {
+      document.querySelector("#profile-avatar-wrap").replaceChildren(makeBlockedAvatar("profile-avatar-placeholder"));
+      const name = document.createElement("span");
+      name.className = "blocked-name";
+      name.textContent = "blocked";
+      document.querySelector("#profile-name-row").replaceChildren(name);
+      for (const id of ["profile-pronouns-display", "profile-status-display", "profile-bio-display"]) {
+        document.getElementById(id).replaceChildren();
+      }
+      document.querySelector("#profile-status-display").onclick = null;
+      document.querySelector("#profile-dm-btn").hidden = true;
+      document.querySelector("#profile-block-btn").hidden = false;
+      document.querySelector("#profile-block-btn").dataset.targetUsername = data.username;
+      document.querySelector("#profile-report-btn").hidden = false;
+      document.querySelector("#profile-report-btn").dataset.targetUsername = data.username;
+      document.querySelector("#profile-primary-actions").hidden = false;
+      document.querySelector("#profile-edit-btn").style.display = "none";
+      document.querySelector("#profile-edit").style.display = "none";
+      document.querySelector("#profile-edit-actions").style.display = "none";
+      profileMoreActions.hidden = false;
+      updateProfileBlockButton();
+      return;
+    }
     const color = data.color || getNameColor(data.username);
 
     // avatar (static initially; becomes editable when edit section opens)
@@ -1205,7 +1283,7 @@ if (session) {
     ) {
       dropdown.style.display = "none";
     }
-    if (suppressProfileClose) return;
+    if (suppressProfileClose || document.querySelector("#block-dialog").contains(e.target)) return;
     if (
       profilePanel.style.display !== "none" &&
       !profilePanel.contains(e.target) &&
@@ -1620,7 +1698,9 @@ if (session) {
       text.textContent = "original message was deleted";
       ref.appendChild(text);
     } else {
-      if (rt.avatar) {
+      if (rt.authorBlocked) {
+        ref.appendChild(makeBlockedAvatar("reply-ref-avatar"));
+      } else if (rt.avatar) {
         const av = document.createElement("img");
         av.src = rt.avatar;
         av.className = "reply-ref-avatar";
@@ -1634,7 +1714,8 @@ if (session) {
       }
       const name = document.createElement("span");
       name.className = "reply-ref-username";
-      if (rt.redVerified) applyRedVerifiedColor(name);
+      if (rt.authorBlocked) name.classList.add("blocked-name");
+      else if (rt.redVerified) applyRedVerifiedColor(name);
       else applyFlagColor(name, rt.color || getNameColor(rt.username));
       name.textContent = rt.username;
       ref.appendChild(name);
@@ -1660,7 +1741,7 @@ if (session) {
       const snippet = document.createElement("span");
       snippet.className = "reply-ref-snippet";
       const text = rt.text ? rt.text.replace(/\s+/g, " ").trim() : "";
-      snippet.textContent = text
+      snippet.textContent = rt.hidden ? "message hidden" : text
         ? text.length > 60
           ? text.slice(0, 60) + "…"
           : text
@@ -1739,8 +1820,9 @@ if (session) {
   }
 
   function renderMessage(data) {
-    const ausername = data.username;
-    const color = data.color || getNameColor(ausername);
+    const profileUsername = data.profileUsername || data.username;
+    const ausername = data.authorBlocked ? "blocked" : data.username;
+    const color = data.authorBlocked ? "var(--muted)" : data.color || getNameColor(ausername);
 
     const isContinuation =
       lastMsgMeta &&
@@ -1763,7 +1845,7 @@ if (session) {
       }
       li.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        openMessageContextMenu(li, data.id, ausername === username || isOwner);
+        openMessageContextMenu(li, data, ausername === username || isOwner);
       });
       appendMessage(li);
       return;
@@ -1776,7 +1858,9 @@ if (session) {
     // left: avatar or initial placeholder
     const avatarCol = document.createElement("div");
     avatarCol.className = "msg-avatar";
-    if (data.avatar) {
+    if (data.authorBlocked) {
+      avatarCol.appendChild(makeBlockedAvatar("avatar-placeholder"));
+    } else if (data.avatar) {
       const av = document.createElement("img");
       av.src = data.avatar;
       av.className = "avatar";
@@ -1791,7 +1875,7 @@ if (session) {
     avatarCol.style.cursor = "pointer";
     avatarCol.addEventListener("click", (e) => {
       e.stopPropagation();
-      openProfile(ausername);
+      openProfile(profileUsername);
     });
     li.appendChild(avatarCol);
 
@@ -1809,11 +1893,12 @@ if (session) {
     const namespan = document.createElement("span");
     namespan.className = "msg-username";
     const nametext = document.createElement("span");
-    if (data.redVerified) applyRedVerifiedColor(nametext);
+    if (data.authorBlocked) nametext.classList.add("blocked-name");
+    else if (data.redVerified) applyRedVerifiedColor(nametext);
     else applyFlagColor(nametext, color);
     nametext.textContent = ausername;
     namespan.appendChild(nametext);
-    if (data.isToken)
+    if (!data.authorBlocked && data.isToken)
       namespan.appendChild(
         makeBadge(
           "https://cdn.chattm.app/verified_owner.png",
@@ -1821,8 +1906,8 @@ if (session) {
           "this user is verified to be the owner of chat™",
         ),
       );
-    else if (data.redVerified) namespan.appendChild(makeRedCheckBadge(14));
-    else if (data.verified)
+    else if (!data.authorBlocked && data.redVerified) namespan.appendChild(makeRedCheckBadge(14));
+    else if (!data.authorBlocked && data.verified)
       namespan.appendChild(
         makeBadge(
           "https://cdn.chattm.app/verified.png",
@@ -1833,7 +1918,7 @@ if (session) {
     namespan.style.cursor = "pointer";
     namespan.addEventListener("click", (e) => {
       e.stopPropagation();
-      openProfile(ausername);
+      openProfile(profileUsername);
     });
     header.appendChild(namespan);
 
@@ -2304,6 +2389,16 @@ socket.on("messageDeleted", (messageId) => {
     const div = document.createElement("div");
     div.className = "ul-entry" + (u.online ? "" : " ul-offline");
 
+    if (u.blockedByMe) {
+      div.appendChild(makeBlockedAvatar("ul-avatar"));
+      const name = document.createElement("span");
+      name.className = "ul-name blocked-name";
+      name.textContent = "blocked";
+      div.appendChild(name);
+      div.addEventListener("click", event => { event.stopPropagation(); openProfile(u.username); });
+      return div;
+    }
+
     // avatar with status dot overlay
     const avWrap = document.createElement("div");
     avWrap.className = "ul-avatar-wrap";
@@ -2368,7 +2463,7 @@ socket.on("messageDeleted", (messageId) => {
   socket.on("userlist", (users) => {
     if (currentDm || switchingDm) return;
     onlineUsernames = users
-      .filter((u) => u.online)
+      .filter((u) => u.online && !u.blockedByMe)
       .map((u) => u.username)
       .filter(Boolean);
     const ul = document.querySelector("#userlist");
@@ -2636,7 +2731,7 @@ socket.on("messageDeleted", (messageId) => {
 
 
   // modal
-  function showModal({ message, withInput = false, defaultValue = "" }) {
+  function showModal({ message, withInput = false, defaultValue = "", confirmLabel = "confirm" }) {
     return new Promise((resolve) => {
       const overlay = document.querySelector("#modal-overlay");
       const msgEl = document.querySelector("#modal-message");
@@ -2645,16 +2740,18 @@ socket.on("messageDeleted", (messageId) => {
       const cancelBtn = document.querySelector("#modal-cancel");
 
       msgEl.textContent = message;
+      confirmBtn.textContent = confirmLabel;
       inputEl.style.display = withInput ? "block" : "none";
       inputEl.value = defaultValue;
       overlay.style.display = "flex";
       if (withInput) inputEl.focus();
+      else cancelBtn.focus();
 
       function cleanUp(result) {
         overlay.style.display = "none";
         confirmBtn.removeEventListener("click", onConfirm);
         cancelBtn.removeEventListener("click", onCancel);
-        if (withInput) inputEl.removeEventListener("keydown", onKey);
+        overlay.removeEventListener("keydown", onKey);
         resolve(result);
       }
       function onConfirm() {
@@ -2664,7 +2761,7 @@ socket.on("messageDeleted", (messageId) => {
         cleanUp(withInput ? null : false);
       }
       function onKey(e) {
-        if (e.key === "Enter") {
+        if (e.key === "Enter" && (withInput || e.target === confirmBtn)) {
           e.preventDefault();
           onConfirm();
         } else if (e.key === "Escape") {
@@ -2674,7 +2771,7 @@ socket.on("messageDeleted", (messageId) => {
       }
       confirmBtn.addEventListener("click", onConfirm);
       cancelBtn.addEventListener("click", onCancel);
-      if (withInput) inputEl.addEventListener("keydown", onKey);
+      overlay.addEventListener("keydown", onKey);
     });
   }
 

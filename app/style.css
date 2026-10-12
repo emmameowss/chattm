@@ -2606,7 +2606,8 @@ html.light .dev-badge {
     backdrop-filter: blur(7px) saturate(.85);
 }
 
-#report-form {
+#report-form,
+#block-confirm-form {
     display: flex;
     flex-direction: column;
     gap: 11px;
@@ -2647,8 +2648,8 @@ html.light .dev-badge {
 .report-dialog-footer > span { max-width: 180px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .report-dialog-footer > div { justify-content: flex-end; }
 .report-dialog-footer button { min-height: 38px; border-radius: 8px; }
-#report-submit { border-color: var(--pink); background: var(--pink); color: #25151a; font-weight: 600; }
-#report-submit:hover:not(:disabled) { background: #ffc0ce; color: #25151a; }
+#report-submit, #block-confirm { border-color: var(--pink); background: var(--pink); color: #25151a; font-weight: 600; }
+#report-submit:hover:not(:disabled), #block-confirm:hover:not(:disabled) { background: #ffc0ce; color: #25151a; }
 
 @media (max-width: 480px) {
     #report-form { padding: 20px; }
@@ -3909,4 +3910,20 @@ html.dm-view #char-counter { right: 16px; }
 @media (max-width: 600px) {
     #quick-status-btn { height: 22px; padding: 0 5px; }
     #quick-status-btn .quick-status-label { display: none; }
+}
+
+/* Blocked identities use the same neutral appearance throughout the chat. */
+.blocked-avatar { display: inline-flex; align-items: center; justify-content: center; background: #555; color: #c3c3c3; filter: grayscale(1); overflow: hidden; flex-shrink: 0; }
+.blocked-avatar .ti { display: block; font-size: inherit; line-height: 1; }
+.blocked-name { color: var(--muted); background: none; }
+.dm-avatar.blocked-avatar { font-size: 16px; }
+#dm-peer-btn .dm-avatar.blocked-avatar { font-size: 25px; }
+.ul-avatar.blocked-avatar { font-size: 22px; }
+.msg-avatar .blocked-avatar { font-size: 28px; }
+.reply-ref-avatar.blocked-avatar { font-size: 12px; }
+#profile-avatar-wrap .blocked-avatar { font-size: 52px; color: #c3c3c3; }
+
+#block-dialog-description { margin: 0; color: var(--text); font-size: 13px; line-height: 1.6; }
+@media (max-width: 480px) {
+    #block-confirm-form { padding: 20px; }
 }

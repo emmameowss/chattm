@@ -43,10 +43,13 @@ export function createDmService(deps) {
   }
   function summary(conversation, email) {
     const other = peer(conversation, email);
-    const profile = { ...identity(other), ...deps.peerProfile?.(other) };
+    let profile = { ...identity(other), ...deps.peerProfile?.(other) };
+    const blockedByMe = store.hasBlock(email, other);
+    if (blockedByMe) profile = { username: profile.username, avatar: null, color: null,
+      isToken: false, verified: false, redVerified: false, pronouns: "", status: "", online: false };
     return { id: conversation.id, peer: { username: profile.username, avatar: profile.avatar,
       color: profile.color, isOwner: profile.isToken, verified: profile.verified, redVerified: profile.redVerified,
-      pronouns: profile.pronouns || "", status: profile.status || "online", online: !!profile.online },
+      pronouns: profile.pronouns || "", status: profile.status || "online", online: !!profile.online, blockedByMe },
       updatedAt: conversation.updated_at, latestSeq: conversation.latest_seq,
       unread: conversation.unread || 0, blockedByMe: store.hasBlock(email, other),
       blocked: store.hasBlock(email, other) || store.hasBlock(other, email) };
@@ -54,11 +57,15 @@ export function createDmService(deps) {
   function publicMessage(message, email) {
     const { ownerEmail, ...data } = message;
     const reply = data.replyTo ? store.getMessage(data.replyTo) : null;
-    return { ...data, mine: ownerEmail === email,
+    const authorBlocked = store.hasBlock(email, ownerEmail);
+    return { ...data, authorBlocked, profileUsername: identity(ownerEmail).username, mine: ownerEmail === email,
+      ...(authorBlocked ? { avatar: null, color: null, isToken: false, verified: false, redVerified: false } : {}),
       replyTo: data.replyTo ? { id: data.replyTo, deleted: !reply,
         ...(reply && reply.conversationId === data.conversationId ? {
           username: reply.username, text: reply.text, image: reply.image, color: reply.color,
           avatar: reply.avatar, isToken: reply.isToken, verified: reply.verified, redVerified: reply.redVerified,
+          ...(store.hasBlock(email, reply.ownerEmail) ? { authorBlocked: true, username: "blocked", avatar: null,
+            color: "var(--muted)", isToken: false, verified: false, redVerified: false } : {}),
         } : {}) } : null };
   }
   function emitUser(email, event, payload) {
@@ -173,6 +180,14 @@ export function createDmService(deps) {
       store.setBlock(email, peer(conversation, email), payload.blocked);
       for (const other of io.sockets.sockets.values()) if (other.currentDm === conversation.id) stopTyping(other);
       updatePair(conversation);
+      deps.blockChanged?.(email);
+      for (const viewer of io.sockets.sockets.values()) {
+        if (viewer.userEmail === email && viewer.currentDm === conversation.id) {
+          emitUser(email, 'dmHistory', { conversationId: conversation.id,
+            messages: store.history(conversation.id).map(message => publicMessage(message, email)) });
+          break;
+        }
+      }
       return {};
     });
     on('dmTyping', (email, payload) => {
