@@ -2324,10 +2324,6 @@ html.replying #bottom-hints {
     text-overflow: ellipsis;
 }
 
-#userlist.menu-open {
-    top: 280px;
-}
-
 ::-webkit-scrollbar {
     width: 4px;
 }

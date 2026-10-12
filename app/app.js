@@ -51,15 +51,7 @@ const moreMenu = document.querySelector("#more-menu");
 
 moreBtn.addEventListener("click", (e) => {
   e.stopPropagation();
-  const isOpen = moreMenu.classList.toggle("open");
-  if (window.innerWidth > 600) {
-    if (isOpen) {
-      const menuRect = moreMenu.getBoundingClientRect();
-      userlist.style.top = `${menuRect.bottom + 12}px`;
-    } else {
-      userlist.style.top = "";
-    }
-  }
+  moreMenu.classList.toggle("open");
 });
 
 document.addEventListener("click", (e) => {
@@ -67,7 +59,6 @@ document.addEventListener("click", (e) => {
   if (modalOverlay.contains(e.target)) return;
   if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
     moreMenu.classList.remove("open");
-    userlist.style.top = "";
   }
 });
 
@@ -81,7 +72,6 @@ function openSettings() {
   settingsPanel.style.display = "block";
   settingsBackdrop.style.display = "block";
   moreMenu.classList.remove("open");
-  userlist.style.top = "";
 }
 
 function closeSettings() {
@@ -2211,7 +2201,6 @@ socket.on("messageDeleted", (messageId) => {
   document.querySelector("#stats-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     moreMenu.classList.remove("open");
-    userlist.style.top = "";
     openStats();
   });
 
