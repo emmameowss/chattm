@@ -3868,7 +3868,7 @@ body.admin-page::after {
 .dm-avatar-placeholder { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; text-transform: uppercase; }
 .dm-unread { margin-left: auto; border-radius: 10px; padding: 1px 5px; color: var(--bg); background: var(--pink); font-size: 10px; }
 #dm-header { position: fixed; top: 52px; left: 160px; right: 0; height: 56px; padding: 6px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); background: var(--bg); z-index: 98; }
-#dm-peer-btn { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; padding: 4px 6px; text-align: left; background: transparent; border-color: transparent; white-space: nowrap; }
+#dm-peer-btn { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; height: auto; min-height: 42px; padding: 4px 6px; line-height: normal; text-align: left; background: transparent; border-color: transparent; white-space: nowrap; }
 #dm-peer-btn:hover { background: var(--border); }
 #dm-peer-btn .dm-avatar { width: 32px; height: 32px; font-size: 14px; }
 .dm-peer-details { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
