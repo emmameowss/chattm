@@ -128,7 +128,7 @@ const s3 = new S3Client({
 // clerk-js, then POSTs the resulting session JWT to /clerk-login where we
 // verify it here and mint one of our own SQLite sessions.
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-const adminSecurity = createAdminSecurity({ clerk, verifyToken, secretKey: process.env.CLERK_SECRET_KEY });
+const adminSecurity = createAdminSecurity({ clerk });
 
 // Origins allowed to present Clerk session tokens to /clerk-login. Set
 // CLERK_AUTHORIZED_PARTIES to a comma-separated list of your frontend origins
@@ -2204,29 +2204,6 @@ httpServer.on("request", async (req, res) => {
       reply(403, { error: "forbidden" });
       return;
     }
-    if (url.pathname === "/admin/security/verify" && req.method === "POST") {
-      const origin = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`;
-      if (req.headers.origin !== origin) {
-        reply(403, { error: "unauthorized origin" });
-        return;
-      }
-      if (!checkRateLimit(sessionId, "admin-2fa", 20, 60 * 1000)) {
-        reply(429, { error: "too many attempts, try again later" });
-        return;
-      }
-      try {
-        let body = "";
-        for await (const chunk of req) {
-          body += chunk;
-          if (body.length > 16384) { reply(413, { error: "request too large" }); return; }
-        }
-        await adminSecurity.verify(sessionId, user, JSON.parse(body).token, origin);
-        reply(200, { verified: true });
-      } catch {
-        reply(403, { error: "verify your second factor with the same Clerk account used to sign in" });
-      }
-      return;
-    }
     const security = await adminSecurity.check(sessionId, user);
     if (url.pathname === "/admin/security/status" && req.method === "GET") {
       reply(security.error === "unavailable" ? 503 : 200, security);
@@ -2235,7 +2212,13 @@ httpServer.on("request", async (req, res) => {
     if (!security.allowed) {
       const pages = ["/admin", "/admin/users", "/admin/emoji", "/admin/logs", "/admin/reports"];
       if (req.method === "GET" && pages.includes(url.pathname)) {
-        const html = await renderPage("admin-security.html", { CLERK_KEY: escapeHtml(getClerkKey(req) || "") });
+        const html = await renderPage("admin-security.html", {
+          ADMIN_NAV_LINKS: renderAdminNav(role, url.pathname),
+          PAGE_TITLE: escapeHtml(({ "/admin": "overview", "/admin/users": "users", "/admin/emoji": "emoji", "/admin/logs": "logs", "/admin/reports": "reports" })[url.pathname]),
+          WARNING: security.error === "setup_required"
+            ? "two-factor authentication is required to access the admin panel. enable it on your Clerk account before returning."
+            : "we couldn't confirm your account security. admin access is unavailable. please sign in again or try later.",
+        });
         res.writeHead(403, { "content-type": "text/html", "cache-control": "no-store" });
         res.end(html);
       } else reply(403, { error: "admin_2fa_required" });

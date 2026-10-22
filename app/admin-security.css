@@ -1,8 +1,0 @@
-body { min-height: 100vh; display: grid; place-items: center; margin: 0; padding: 24px; box-sizing: border-box; }
-.security-card { width: min(100%, 520px); padding: 28px; border: 1px solid var(--pink, #f5a9b8); border-radius: 12px; background: var(--surface, #191719); }
-.security-card h1 { font-size: 26px; line-height: 1.2; }
-.security-card p { line-height: 1.6; }
-#security-controls, #security-form { display: flex; flex-direction: column; gap: 12px; margin-block: 20px; }
-.security-card [hidden] { display: none !important; }
-#security-error { color: var(--pink, #f5a9b8); }
-.security-card input, .security-card select { padding: 12px; font: inherit; }

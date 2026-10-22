@@ -1,34 +1,35 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>admin security · chat™</title>
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/admin-security.css">
-  <script async crossorigin="anonymous" data-clerk-publishable-key="<!--CLERK_KEY-->" src="https://clerk.chattm.app/npm/@clerk/clerk-js@5/dist/clerk.browser.js"></script>
-  <script src="/admin-security.js" defer></script>
-</head>
-<body>
-  <main class="security-card">
-    <p>chat™ admin</p>
-    <h1>two-factor authentication required</h1>
-    <p id="security-message" role="status">checking your Clerk account… admin access is locked.</p>
-    <div id="security-controls" hidden>
-      <button id="security-setup" type="button">manage Clerk account security</button>
-      <button id="security-check" type="button">check again</button>
-      <form id="security-form" hidden>
-        <label for="security-method">verification method</label>
-        <select id="security-method"></select>
-        <button id="security-send" type="button" hidden>send SMS code</button>
-        <label for="security-code">verification code</label>
-        <input id="security-code" autocomplete="one-time-code" required maxlength="128">
-        <button type="submit">verify and enter admin panel</button>
-      </form>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>chat™ admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="/admin.css">
+  </head>
+  <body class="admin-page">
+    <aside class="admin-shell-sidebar" inert aria-hidden="true">
+      <div class="admin-brand"><h1>chat™</h1></div>
+      <nav class="admin-nav" aria-label="Admin navigation"><div class="admin-nav-tabs"><!--ADMIN_NAV_LINKS--></div></nav>
+    </aside>
+    <main class="admin-main" inert aria-hidden="true">
+      <header class="admin-page-header"><h2><!--PAGE_TITLE--></h2></header>
+      <div class="admin-sections-grid">
+        <section class="admin-section" style="min-height: 180px"></section>
+        <section class="admin-section" style="min-height: 180px"></section>
+      </div>
+      <section class="admin-section" style="min-height: 240px; margin-top: 24px"></section>
+    </main>
+    <div id="modal-overlay" style="display: flex;">
+      <div id="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="modal-message">
+        <p id="modal-message"><!--WARNING--></p>
+        <div id="modal-actions"><button type="button" id="modal-cancel" autofocus onclick="location.href='/'">back</button></div>
+      </div>
     </div>
-    <p id="security-error" role="alert"></p>
-    <div id="security-signin"></div>
-    <a href="/">back to chat™</a>
-  </main>
-</body>
+  </body>
 </html>
