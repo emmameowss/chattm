@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createAdminSecurity } from "./admin-security.js";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import formidable from "formidable";
@@ -127,6 +128,7 @@ const s3 = new S3Client({
 // clerk-js, then POSTs the resulting session JWT to /clerk-login where we
 // verify it here and mint one of our own SQLite sessions.
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+const adminSecurity = createAdminSecurity({ clerk, verifyToken, secretKey: process.env.CLERK_SECRET_KEY });
 
 // Origins allowed to present Clerk session tokens to /clerk-login. Set
 // CLERK_AUTHORIZED_PARTIES to a comma-separated list of your frontend origins
@@ -1647,6 +1649,13 @@ io.on("connection", (socket) => {
 
   socket.on("getAdminUsers", async (request = {}) => {
     if (!["admin", "owner"].includes(socket.userRole ?? "user")) return;
+    const appSessionId = socket.handshake.auth.session;
+    const appUser = getSession(appSessionId);
+    if (!appUser || !["admin", "owner"].includes(getRole(appUser.email)) ||
+        !(await adminSecurity.check(appSessionId, appUser)).allowed) {
+      socket.emit("commandError", "two-factor authentication is required for admin access");
+      return;
+    }
     const filters = request && typeof request === "object" && !Array.isArray(request) ? request : {};
     let users;
     let partial = false;
@@ -2182,6 +2191,59 @@ httpServer.on("request", async (req, res) => {
     `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`,
   );
   attachActionAudit(req, res, url);
+  // Run before any admin handler, including private report downloads.
+  if (url.pathname === "/admin" || url.pathname.startsWith("/admin/") || url.pathname === "/stats") {
+    const sessionId = parseCookies(req).session;
+    const user = getRequestUser(req);
+    const role = user ? getRole(user.email) : "user";
+    const reply = (status, data) => {
+      res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify(data));
+    };
+    if (!user || user.guest || !["mod", "admin", "owner"].includes(role)) {
+      reply(403, { error: "forbidden" });
+      return;
+    }
+    if (url.pathname === "/admin/security/verify" && req.method === "POST") {
+      const origin = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`;
+      if (req.headers.origin !== origin) {
+        reply(403, { error: "unauthorized origin" });
+        return;
+      }
+      if (!checkRateLimit(sessionId, "admin-2fa", 20, 60 * 1000)) {
+        reply(429, { error: "too many attempts, try again later" });
+        return;
+      }
+      try {
+        let body = "";
+        for await (const chunk of req) {
+          body += chunk;
+          if (body.length > 16384) { reply(413, { error: "request too large" }); return; }
+        }
+        await adminSecurity.verify(sessionId, user, JSON.parse(body).token, origin);
+        reply(200, { verified: true });
+      } catch {
+        reply(403, { error: "verify your second factor with the same Clerk account used to sign in" });
+      }
+      return;
+    }
+    const security = await adminSecurity.check(sessionId, user);
+    if (url.pathname === "/admin/security/status" && req.method === "GET") {
+      reply(security.error === "unavailable" ? 503 : 200, security);
+      return;
+    }
+    if (!security.allowed) {
+      const pages = ["/admin", "/admin/users", "/admin/emoji", "/admin/logs", "/admin/reports"];
+      if (req.method === "GET" && pages.includes(url.pathname)) {
+        const html = await renderPage("admin-security.html", { CLERK_KEY: escapeHtml(getClerkKey(req) || "") });
+        res.writeHead(403, { "content-type": "text/html", "cache-control": "no-store" });
+        res.end(html);
+      } else reply(403, { error: "admin_2fa_required" });
+      return;
+    }
+    res.setHeader("cache-control", "no-store");
+  }
+
   const privateFileRoute = url.pathname === "/dm/upload" || url.pathname.startsWith("/dm/files/") ||
     /^\/admin\/reports\/\d+\/files\//.test(url.pathname);
   if (privateFileRoute && await directMessages.handleHttp(req, res, url)) return;
@@ -3531,6 +3593,7 @@ httpServer.on("request", async (req, res) => {
       let clerkId = null
       let lastSignInAt = null
       let activeSessions = null;
+      let twoFactorEnabled = null;
       let clerkBanned = targetEmail.endsWith('@guest') ? false : null;
       let clerkUsername = null;
 
@@ -3551,6 +3614,7 @@ httpServer.on("request", async (req, res) => {
 
           if (clerkId) {
             const clerkUser = await clerk.users.getUser(clerkId);
+            twoFactorEnabled = !!clerkUser.twoFactorEnabled;
             clerkBanned = !!clerkUser.banned;
             clerkUsername =
               clerkUser.username ||
@@ -3618,6 +3682,7 @@ httpServer.on("request", async (req, res) => {
         messageCount,
         activeSessions,
         clerkBanned,
+        twoFactorEnabled,
         banned,
         banReason,
         muted,
@@ -4644,6 +4709,16 @@ httpServer.on("request", async (req, res) => {
       ) {
         res.writeHead(403);
         res.end("forbidden");
+        return;
+      }
+      const adminTemplates = new Map([
+        ["admin.html", "/admin"], ["users.html", "/admin/users"],
+        ["emoji.html", "/admin/emoji"], ["logs.html", "/admin/logs"], ["reports.html", "/admin/reports"],
+      ]);
+      const adminPath = adminTemplates.get(resolvedPath.slice(appDir.length + 1));
+      if (adminPath) {
+        res.writeHead(302, { Location: adminPath, "cache-control": "no-store" });
+        res.end();
         return;
       }
       const data = await readFile(resolvedPath);

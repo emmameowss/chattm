@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>admin security · chat™</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/admin-security.css">
+  <script async crossorigin="anonymous" data-clerk-publishable-key="<!--CLERK_KEY-->" src="https://clerk.chattm.app/npm/@clerk/clerk-js@5/dist/clerk.browser.js"></script>
+  <script src="/admin-security.js" defer></script>
+</head>
+<body>
+  <main class="security-card">
+    <p>chat™ admin</p>
+    <h1>two-factor authentication required</h1>
+    <p id="security-message" role="status">checking your Clerk account… admin access is locked.</p>
+    <div id="security-controls" hidden>
+      <button id="security-setup" type="button">manage Clerk account security</button>
+      <button id="security-check" type="button">check again</button>
+      <form id="security-form" hidden>
+        <label for="security-method">verification method</label>
+        <select id="security-method"></select>
+        <button id="security-send" type="button" hidden>send SMS code</button>
+        <label for="security-code">verification code</label>
+        <input id="security-code" autocomplete="one-time-code" required maxlength="128">
+        <button type="submit">verify and enter admin panel</button>
+      </form>
+    </div>
+    <p id="security-error" role="alert"></p>
+    <div id="security-signin"></div>
+    <a href="/">back to chat™</a>
+  </main>
+</body>
+</html>

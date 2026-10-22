@@ -575,6 +575,7 @@ function renderDetail(user) {
 
   const account = section('account details');
   field(account, 'account type', user.guest ? 'guest' : 'registered');
+  field(account, 'two-factor authentication', user.guest ? 'not applicable' : user.twoFactorEnabled == null ? 'unavailable' : user.twoFactorEnabled ? 'enabled' : 'disabled');
   field(account, 'joined', user.createdAt ? `${formatDate(user.createdAt)}${user.joinedEstimated ? ' (estimated)' : ''}` : 'unavailable');
   field(account, 'total messages', Number(user.messageCount || 0).toLocaleString());
   panels.account.append(account);
