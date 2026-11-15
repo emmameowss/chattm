@@ -285,9 +285,19 @@ function renderBulkEditor() {
         image.alt = ''
         thumbnail.append(image)
         const info = element('div', 'admin-emoji-bulk-info')
+        item.statusEl = element('span', 'admin-emoji-bulk-status', item.error || bulkStatusLabels[item.status])
         info.append(element('code', 'admin-emoji-shortcode', item.name ? ':' + item.name + ':' : item.file.name),
-            element('span', 'admin-emoji-bulk-status', item.error || bulkStatusLabels[item.status]))
+            item.statusEl)
         row.append(thumbnail, info)
+        if (item.status !== 'invalid') {
+            const progress = element('div', 'admin-emoji-bulk-progress')
+            progress.setAttribute('role', 'progressbar')
+            progress.setAttribute('aria-label', 'upload progress for ' + item.file.name)
+            item.barEl = element('span')
+            progress.append(item.barEl)
+            row.append(progress)
+            setBulkProgress(item, item.status === 'added' ? 1 : item.progress || 0)
+        }
         if (item.status !== 'added' && item.status !== 'uploading') {
             const remove = element('button', 'admin-emoji-bulk-remove')
             remove.type = 'button'
@@ -320,6 +330,32 @@ function renderBulkEditor() {
     detail.append(actions, list)
 }
 
+function setBulkProgress(item, fraction) {
+    item.progress = fraction
+    if (!item.barEl) return
+    item.barEl.style.width = Math.round(fraction * 100) + '%'
+    item.barEl.parentElement.setAttribute('aria-valuenow', String(Math.round(fraction * 100)))
+}
+
+function uploadWithProgress(url, body, onProgress) {
+    return new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest()
+        request.open('POST', url)
+        request.withCredentials = true
+        request.upload.addEventListener('progress', event => {
+            if (event.lengthComputable) onProgress(event.loaded / event.total)
+        })
+        request.addEventListener('load', () => {
+            let data = null
+            try { data = JSON.parse(request.responseText) } catch {}
+            if (request.status >= 200 && request.status < 300 && data && data.success !== false) resolve(data)
+            else reject(new Error(data?.error || 'request failed'))
+        })
+        request.addEventListener('error', () => reject(new Error('network error, try again')))
+        request.send(body)
+    })
+}
+
 async function uploadBulk() {
     if (busy) return
     const pending = bulkItems.filter(item => item.status === 'pending' || item.status === 'failed')
@@ -330,13 +366,16 @@ async function uploadBulk() {
     for (const item of pending) {
         item.status = 'uploading'
         item.error = ''
+        item.progress = 0
         renderBulkEditor()
         const payload = new FormData()
         payload.append('shortcode', item.name)
         payload.append('file', item.file)
         try {
-            const res = await fetch('/admin/emoji/add', {method: 'POST', credentials: 'same-origin', body: payload})
-            const data = await readResponse(res)
+            const data = await uploadWithProgress('/admin/emoji/add', payload, fraction => {
+                setBulkProgress(item, fraction)
+                item.statusEl.textContent = fraction < 1 ? 'uploading… ' + Math.round(fraction * 100) + '%' : 'saving…'
+            })
             item.status = 'added'
             emojisData = emojisData.filter(emoji => emoji.shortcode !== data.emoji.shortcode)
             emojisData.push(data.emoji)
