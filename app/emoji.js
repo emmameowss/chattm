@@ -98,8 +98,15 @@ const backdrop = document.querySelector('#admin-emoji-drawer-backdrop')
 const detail = document.querySelector('#admin-emoji-detail')
 const search = document.querySelector('#admin-emoji-search')
 const sort = document.querySelector('#admin-emoji-sort')
+const bulkInput = document.querySelector('#admin-emoji-bulk-input')
 const maxFileSize = 2 * 1024 * 1024
 const imageTypes = ['image/png', 'image/gif', 'image/webp', 'image/jpeg']
+const bulkStatusLabels = {pending: 'ready', uploading: 'uploading…', added: 'added'}
+let bulkItems = []
+
+function shortcodeFromFile(file) {
+    return file.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 32)
+}
 
 function element(tag, className, text) {
     const node = document.createElement(tag)
@@ -214,18 +221,141 @@ function closeEmoji(animate = false) {
         document.body.classList.remove('admin-drawer-open')
         selectedEmoji = null
         releasePreview()
+        releaseBulk()
         renderEmojis()
     }, animate === true)
 }
 
-function openEmoji(emoji = null) {
-    if (busy) return
-    selectedEmoji = emoji
-    renderEmojiEditor()
+function showDrawer() {
     if (!drawer.open) drawer.show()
     backdrop.hidden = false
     document.body.classList.add('admin-drawer-open')
     renderEmojis()
+}
+
+function openEmoji(emoji = null) {
+    if (busy) return
+    releaseBulk()
+    selectedEmoji = emoji
+    renderEmojiEditor()
+    showDrawer()
+}
+
+function releaseBulk() {
+    for (const item of bulkItems) URL.revokeObjectURL(item.url)
+    bulkItems = []
+}
+
+function openBulk(files) {
+    if (busy || !files.length) return
+    releasePreview()
+    releaseBulk()
+    selectedEmoji = null
+    const taken = new Set(emojisData.map(emoji => emoji.shortcode))
+    bulkItems = files.map(file => {
+        const name = shortcodeFromFile(file)
+        const item = {file, name, url: URL.createObjectURL(file), status: 'pending', error: ''}
+        if (!imageTypes.includes(file.type) || file.size > maxFileSize || !file.size) {
+            item.error = 'not a PNG, GIF, WebP, or JPEG up to 2 MB'
+        } else if (!/^[a-z0-9_]{1,32}$/.test(name)) {
+            item.error = 'file name can’t be used as a shortcode'
+        } else if (taken.has(':' + name + ':')) {
+            item.error = 'shortcode already in use'
+        }
+        if (item.error) item.status = 'invalid'
+        else taken.add(':' + name + ':')
+        return item
+    })
+    renderBulkEditor()
+    showDrawer()
+}
+
+function renderBulkEditor() {
+    detail.replaceChildren()
+    document.querySelector('#admin-emoji-drawer-title').textContent = 'bulk upload'
+    const pending = bulkItems.filter(item => item.status === 'pending' || item.status === 'failed')
+    const list = element('ul', 'admin-emoji-bulk-list')
+    for (const item of bulkItems) {
+        const row = element('li', 'admin-emoji-bulk-item ' + item.status)
+        const thumbnail = element('div', 'admin-emoji-thumbnail')
+        const image = element('img')
+        image.src = item.url
+        image.alt = ''
+        thumbnail.append(image)
+        const info = element('div', 'admin-emoji-bulk-info')
+        info.append(element('code', 'admin-emoji-shortcode', item.name ? ':' + item.name + ':' : item.file.name),
+            element('span', 'admin-emoji-bulk-status', item.error || bulkStatusLabels[item.status]))
+        row.append(thumbnail, info)
+        if (item.status !== 'added' && item.status !== 'uploading') {
+            const remove = element('button', 'admin-emoji-bulk-remove')
+            remove.type = 'button'
+            remove.disabled = busy
+            remove.setAttribute('aria-label', 'remove ' + item.file.name)
+            const icon = element('i', 'ti ti-x')
+            icon.setAttribute('aria-hidden', 'true')
+            remove.append(icon)
+            remove.addEventListener('click', () => {
+                URL.revokeObjectURL(item.url)
+                bulkItems = bulkItems.filter(other => other !== item)
+                if (bulkItems.length) renderBulkEditor()
+                else closeEmoji()
+            })
+            row.append(remove)
+        }
+        list.append(row)
+    }
+    const actions = element('div', 'admin-emoji-bulk-actions')
+    const choose = element('button', '', 'choose different images')
+    choose.type = 'button'
+    choose.disabled = busy
+    choose.addEventListener('click', () => bulkInput.click())
+    const submit = element('button', 'admin-emoji-primary', busy ? 'uploading…'
+        : pending.length ? 'add ' + pending.length + ' emoji' : 'add')
+    submit.type = 'button'
+    submit.disabled = busy || !pending.length
+    submit.addEventListener('click', uploadBulk)
+    actions.append(choose, submit)
+    detail.append(element('p', 'admin-emoji-help',
+        'shortcodes come from file names. PNG, GIF, WebP, or JPEG · up to 2 MB each.'), list, actions)
+}
+
+async function uploadBulk() {
+    if (busy) return
+    const pending = bulkItems.filter(item => item.status === 'pending' || item.status === 'failed')
+    if (!pending.length) return
+    busy = true
+    setBusy(true)
+    let added = 0
+    for (const item of pending) {
+        item.status = 'uploading'
+        item.error = ''
+        renderBulkEditor()
+        const payload = new FormData()
+        payload.append('shortcode', item.name)
+        payload.append('file', item.file)
+        try {
+            const res = await fetch('/admin/emoji/add', {method: 'POST', credentials: 'same-origin', body: payload})
+            const data = await readResponse(res)
+            item.status = 'added'
+            emojisData = emojisData.filter(emoji => emoji.shortcode !== data.emoji.shortcode)
+            emojisData.push(data.emoji)
+            added++
+        } catch (e) {
+            item.status = 'failed'
+            item.error = e.message
+        }
+    }
+    busy = false
+    setBusy(false)
+    const failed = pending.length - added
+    if (failed) {
+        renderBulkEditor()
+        showToast(added + ' added, ' + failed + ' failed', added ? 'info' : 'error')
+    } else {
+        showToast(added === 1 ? 'emoji added' : added + ' emoji added', 'success')
+        closeEmoji()
+    }
+    await loadEmojis()
 }
 
 function renderEmojiEditor() {
@@ -278,8 +408,7 @@ function renderEmojiEditor() {
             image.src = previewUrl
             image.hidden = false
             placeholder.hidden = true
-            if (!existing && !name.value) name.value = chosen.name.replace(/\.[^.]+$/, '')
-                .toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 32)
+            if (!existing && !name.value) name.value = shortcodeFromFile(chosen)
         } else {
             image.hidden = !existing
             placeholder.hidden = !!existing
@@ -365,7 +494,7 @@ function renderEmojiEditor() {
 }
 
 function setBusy(value) {
-    document.querySelectorAll('#admin-emoji-detail button, #admin-emoji-detail input, #admin-emoji-add, #admin-emoji-refresh, #admin-emoji-drawer-close')
+    document.querySelectorAll('#admin-emoji-detail button, #admin-emoji-detail input, #admin-emoji-add, #admin-emoji-bulk, #admin-emoji-refresh, #admin-emoji-drawer-close')
         .forEach(control => { control.disabled = value })
     detail.setAttribute('aria-busy', String(value))
     renderEmojis()
@@ -397,6 +526,12 @@ async function deleteEmoji(emoji) {
 }
 
 document.querySelector('#admin-emoji-add').addEventListener('click', () => openEmoji())
+document.querySelector('#admin-emoji-bulk').addEventListener('click', () => { if (!busy) bulkInput.click() })
+bulkInput.addEventListener('change', () => {
+    const files = [...bulkInput.files]
+    bulkInput.value = ''
+    openBulk(files)
+})
 document.querySelector('#admin-emoji-refresh').addEventListener('click', loadEmojis)
 document.querySelector('#admin-emoji-drawer-close').addEventListener('click', closeEmoji)
 backdrop.addEventListener('click', () => closeEmoji(true))
