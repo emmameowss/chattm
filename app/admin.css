@@ -2793,8 +2793,12 @@ body.admin-page input {
     padding-right: 0;
 }
 
+.admin-emoji-page .admin-emoji-table :is(th, td) {
+    vertical-align: middle;
+}
+
 .admin-emoji-page .admin-emoji-select {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     width: 24px;
