@@ -2778,11 +2778,79 @@ body.admin-page input {
 }
 
 .admin-emoji-page .admin-emoji-table th:first-child {
-    width: 90%;
+    width: 56px;
+}
+
+.admin-emoji-page .admin-emoji-table th:nth-child(2) {
+    width: auto;
 }
 
 .admin-emoji-page .admin-emoji-table th:last-child {
-    width: 10%;
+    width: 72px;
+}
+
+.admin-emoji-page .admin-emoji-table :is(th, td):first-child {
+    padding-right: 0;
+}
+
+.admin-emoji-page .admin-emoji-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.admin-emoji-page .admin-emoji-select input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--pink);
+    cursor: pointer;
+}
+
+.admin-emoji-page .admin-directory-row.checked {
+    background: #161214;
+}
+
+.admin-emoji-page .admin-users-views {
+    align-items: center;
+    justify-content: space-between;
+}
+
+.admin-emoji-page .admin-emoji-selection {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-emoji-page .admin-emoji-selection[hidden] {
+    display: none;
+}
+
+.admin-emoji-page .admin-emoji-selection span {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.admin-emoji-page .admin-users-views .admin-emoji-selection button {
+    color: var(--text);
+    border-color: var(--border);
+}
+
+.admin-emoji-page .admin-users-views .admin-emoji-selection .admin-emoji-destructive {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--danger);
+    border-color: #5c2c2c;
+}
+
+.admin-emoji-page .admin-users-views .admin-emoji-selection .admin-emoji-destructive:hover:not(:disabled) {
+    background: var(--danger-dim);
+    border-color: var(--danger);
 }
 
 .admin-emoji-page #admin-emoji-drawer-close {
@@ -3004,11 +3072,11 @@ body.admin-page input {
     }
 
     .admin-emoji-page .admin-emoji-table th:first-child {
-        width: 80%;
+        width: 44px;
     }
 
     .admin-emoji-page .admin-emoji-table th:last-child {
-        width: 20%;
+        width: 56px;
     }
 }
 

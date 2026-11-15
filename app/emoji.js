@@ -6,7 +6,7 @@ const socket = io(window.location.origin, {
     transports: ['websocket']
 })
 
-function showModal({message, withInput = false, defaultValue = '', previewUrl = null}) {
+function showModal({message, withInput = false, defaultValue = '', previewUrl = null, confirmLabel = ''}) {
     return new Promise((resolve) => {
         const overlay = document.querySelector('#modal-overlay')
         const msgEl = document.querySelector('#modal-message')
@@ -17,7 +17,7 @@ function showModal({message, withInput = false, defaultValue = '', previewUrl = 
         const preview = document.querySelector('#modal-emoji-preview')
         preview.hidden = !previewUrl
         if (previewUrl) preview.src = previewUrl
-        confirmBtn.textContent = previewUrl ? 'delete emoji' : 'confirm'
+        confirmBtn.textContent = confirmLabel || (previewUrl ? 'delete emoji' : 'confirm')
         msgEl.textContent = message
         inputEl.style.display = withInput ? 'block' : 'none'
         inputEl.value = defaultValue
@@ -103,6 +103,10 @@ const maxFileSize = 2 * 1024 * 1024
 const imageTypes = ['image/png', 'image/gif', 'image/webp', 'image/jpeg']
 const bulkStatusLabels = {pending: 'ready', uploading: 'uploading…', added: 'added'}
 let bulkItems = []
+const selectedShortcodes = new Set()
+const selectAll = document.querySelector('#admin-emoji-select-all')
+let shownShortcodes = []
+let deleteProgress = ''
 
 function shortcodeFromFile(file) {
     return file.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 32)
@@ -132,6 +136,8 @@ async function loadEmojis() {
         const data = await readResponse(res)
         if (request !== loadRequest) return
         emojisData = data.emojis || []
+        const available = new Set(emojisData.map(emoji => emoji.shortcode))
+        for (const shortcode of selectedShortcodes) if (!available.has(shortcode)) selectedShortcodes.delete(shortcode)
         loaded = true
         loadError = ''
         if (selectedEmoji) {
@@ -174,9 +180,26 @@ function renderEmojis() {
     document.querySelector('#admin-emoji-results').textContent = loaded && !loadError
         ? filtered.length + ' of ' + emojisData.length + ' emoji' : ''
     document.querySelector('#admin-emoji-reset').hidden = !query && sort.value === 'newest'
+    shownShortcodes = filtered.map(emoji => emoji.shortcode)
     for (const emoji of filtered) {
         const row = element('tr', 'admin-directory-row')
         row.classList.toggle('selected', selectedEmoji?.shortcode === emoji.shortcode && drawer.open)
+        row.classList.toggle('checked', selectedShortcodes.has(emoji.shortcode))
+        const selectCell = element('td')
+        const selectLabel = element('label', 'admin-emoji-select')
+        const checkbox = element('input')
+        checkbox.type = 'checkbox'
+        checkbox.checked = selectedShortcodes.has(emoji.shortcode)
+        checkbox.disabled = busy
+        checkbox.setAttribute('aria-label', 'select ' + emoji.shortcode)
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) selectedShortcodes.add(emoji.shortcode)
+            else selectedShortcodes.delete(emoji.shortcode)
+            row.classList.toggle('checked', checkbox.checked)
+            renderSelection()
+        })
+        selectLabel.append(checkbox)
+        selectCell.append(selectLabel)
         const cell = element('td')
         const identity = element('div', 'admin-directory-identity')
         const thumbnail = element('div', 'admin-emoji-thumbnail')
@@ -198,14 +221,68 @@ function renderEmojis() {
         button.disabled = busy
         button.addEventListener('click', () => openEmoji(emoji))
         actionCell.append(button)
-        row.append(cell, actionCell)
+        row.append(selectCell, cell, actionCell)
         row.addEventListener('click', event => {
-            if (!busy && !event.target.closest('button')) button.click()
+            if (!busy && !event.target.closest('button, label, input')) button.click()
         })
         list.append(row)
     }
+    renderSelection()
     if (focused && !drawer.open) [...list.querySelectorAll('[data-emoji-open]')]
         .find(button => button.dataset.emojiOpen === focused)?.focus()
+}
+
+function renderSelection() {
+    const shownSelected = shownShortcodes.filter(shortcode => selectedShortcodes.has(shortcode)).length
+    selectAll.checked = shownShortcodes.length > 0 && shownSelected === shownShortcodes.length
+    selectAll.indeterminate = shownSelected > 0 && shownSelected < shownShortcodes.length
+    selectAll.disabled = busy || !shownShortcodes.length
+    document.querySelector('#admin-emoji-selection').hidden = !selectedShortcodes.size && !deleteProgress
+    document.querySelector('#admin-emoji-selection-count').textContent = deleteProgress || selectedShortcodes.size + ' selected'
+    document.querySelector('#admin-emoji-selection-clear').disabled = busy
+    document.querySelector('#admin-emoji-selection-delete').disabled = busy || !selectedShortcodes.size
+}
+
+async function deleteSelected() {
+    if (busy || !selectedShortcodes.size) return
+    const shortcodes = [...selectedShortcodes].sort((a, b) => a.localeCompare(b))
+    const count = shortcodes.length
+    const confirmed = await showModal({
+        confirmLabel: 'delete ' + count + ' emoji',
+        message: 'permanently delete ' + count + ' emoji?\n\n' + shortcodes.slice(0, 10).join(' ')
+            + (count > 10 ? ' and ' + (count - 10) + ' more' : '')
+            + '\n\nthis removes the images from storage. old messages will show the shortcodes instead.'
+    })
+    if (!confirmed || busy) return
+    busy = true
+    setBusy(true)
+    let deleted = 0
+    for (const [index, shortcode] of shortcodes.entries()) {
+        deleteProgress = 'deleting ' + (index + 1) + ' of ' + count + '…'
+        renderSelection()
+        try {
+            const res = await fetch('/admin/emoji/delete', {
+                method: 'POST', headers: {'content-type': 'application/json'},
+                body: JSON.stringify({session, shortcode})
+            })
+            await readResponse(res)
+            selectedShortcodes.delete(shortcode)
+            emojisData = emojisData.filter(emoji => emoji.shortcode !== shortcode)
+            deleted++
+        } catch (e) {
+            if (e.message === 'emoji not found') {
+                selectedShortcodes.delete(shortcode)
+                deleted++
+            }
+        }
+    }
+    deleteProgress = ''
+    busy = false
+    setBusy(false)
+    const failed = count - deleted
+    if (failed) showToast(deleted + ' deleted, ' + failed + ' failed and stay selected', deleted ? 'info' : 'error')
+    else showToast(deleted === 1 ? 'emoji deleted' : deleted + ' emoji deleted', 'success')
+    await loadEmojis()
 }
 
 function releasePreview() {
@@ -573,6 +650,18 @@ bulkInput.addEventListener('change', () => {
     openBulk(files)
 })
 document.querySelector('#admin-emoji-refresh').addEventListener('click', loadEmojis)
+selectAll.addEventListener('change', () => {
+    for (const shortcode of shownShortcodes) {
+        if (selectAll.checked) selectedShortcodes.add(shortcode)
+        else selectedShortcodes.delete(shortcode)
+    }
+    renderEmojis()
+})
+document.querySelector('#admin-emoji-selection-clear').addEventListener('click', () => {
+    selectedShortcodes.clear()
+    renderEmojis()
+})
+document.querySelector('#admin-emoji-selection-delete').addEventListener('click', deleteSelected)
 document.querySelector('#admin-emoji-drawer-close').addEventListener('click', closeEmoji)
 backdrop.addEventListener('click', () => closeEmoji(true))
 drawer.addEventListener('cancel', event => { event.preventDefault(); closeEmoji() })
