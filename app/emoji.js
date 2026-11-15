@@ -248,11 +248,13 @@ function releaseBulk() {
 
 function openBulk(files) {
     if (busy || !files.length) return
-    releasePreview()
-    releaseBulk()
-    selectedEmoji = null
-    const taken = new Set(emojisData.map(emoji => emoji.shortcode))
-    bulkItems = files.map(file => {
+    if (!bulkItems.length) {
+        releasePreview()
+        selectedEmoji = null
+    }
+    const taken = new Set([...emojisData.map(emoji => emoji.shortcode),
+        ...bulkItems.filter(item => item.status !== 'invalid').map(item => ':' + item.name + ':')])
+    bulkItems = bulkItems.concat(files.map(file => {
         const name = shortcodeFromFile(file)
         const item = {file, name, url: URL.createObjectURL(file), status: 'pending', error: ''}
         if (!imageTypes.includes(file.type) || file.size > maxFileSize || !file.size) {
@@ -265,7 +267,7 @@ function openBulk(files) {
         if (item.error) item.status = 'invalid'
         else taken.add(':' + name + ':')
         return item
-    })
+    }))
     renderBulkEditor()
     showDrawer()
 }
@@ -274,9 +276,9 @@ function renderBulkEditor() {
     detail.replaceChildren()
     document.querySelector('#admin-emoji-drawer-title').textContent = 'bulk upload'
     const pending = bulkItems.filter(item => item.status === 'pending' || item.status === 'failed')
-    const list = element('ul', 'admin-emoji-bulk-list')
+    const list = element('div', 'admin-emoji-bulk-grid')
     for (const item of bulkItems) {
-        const row = element('li', 'admin-emoji-bulk-item ' + item.status)
+        const row = element('div', 'admin-emoji-bulk-item ' + item.status)
         const thumbnail = element('div', 'admin-emoji-thumbnail')
         const image = element('img')
         image.src = item.url
@@ -305,7 +307,7 @@ function renderBulkEditor() {
         list.append(row)
     }
     const actions = element('div', 'admin-emoji-bulk-actions')
-    const choose = element('button', '', 'choose different images')
+    const choose = element('button', '', 'add image')
     choose.type = 'button'
     choose.disabled = busy
     choose.addEventListener('click', () => bulkInput.click())
@@ -315,8 +317,7 @@ function renderBulkEditor() {
     submit.disabled = busy || !pending.length
     submit.addEventListener('click', uploadBulk)
     actions.append(choose, submit)
-    detail.append(element('p', 'admin-emoji-help',
-        'shortcodes come from file names. PNG, GIF, WebP, or JPEG · up to 2 MB each.'), list, actions)
+    detail.append(actions, list)
 }
 
 async function uploadBulk() {

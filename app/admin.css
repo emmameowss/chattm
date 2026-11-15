@@ -2878,42 +2878,60 @@ body.admin-page input {
     margin-top: 8px;
 }
 
-.admin-emoji-page .admin-emoji-bulk-list {
+.admin-emoji-page .admin-emoji-bulk-actions {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: 8px;
-    margin: 16px 0;
-    padding: 0;
-    list-style: none;
+    margin-bottom: 16px;
+}
+
+.admin-emoji-page .admin-emoji-bulk-actions .admin-emoji-primary {
+    flex: 1;
+}
+
+.admin-emoji-page .admin-emoji-bulk-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
 }
 
 .admin-emoji-page .admin-emoji-bulk-item {
+    position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 8px 10px;
+    gap: 8px;
+    min-width: 0;
+    padding: 16px 8px 12px;
     border: 1px solid var(--border);
     border-radius: 6px;
+    text-align: center;
+}
+
+.admin-emoji-page .admin-emoji-bulk-item:is(.invalid, .failed) {
+    border-color: var(--danger-dim);
 }
 
 .admin-emoji-page .admin-emoji-bulk-item .admin-emoji-thumbnail {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
 }
 
 .admin-emoji-page .admin-emoji-bulk-item .admin-emoji-thumbnail img {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
     object-fit: contain;
 }
 
 .admin-emoji-page .admin-emoji-bulk-info {
     display: flex;
-    flex: 1;
     flex-direction: column;
+    align-items: center;
     gap: 2px;
+    width: 100%;
     min-width: 0;
 }
 
@@ -2931,23 +2949,23 @@ body.admin-page input {
 }
 
 .admin-emoji-page .admin-emoji-bulk-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    padding: 6px;
+    width: 28px;
+    height: 28px;
+    min-height: 0;
+    padding: 0;
     background: none;
-    border-color: var(--border);
+    border: 0;
+    color: var(--muted);
 }
 
-.admin-emoji-page .admin-emoji-bulk-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.admin-emoji-page .admin-emoji-bulk-actions .admin-emoji-primary {
-    flex: 1;
+.admin-emoji-page .admin-emoji-bulk-remove:hover:not(:disabled) {
+    color: var(--text);
 }
 
 @media (max-width: 700px) {
