@@ -4708,7 +4708,7 @@ httpServer.on("request", async (req, res) => {
       }
       const data = await readFile(resolvedPath);
       const ext = extname(filePath);
-      res.writeHead(200, { "content-type": types[ext] || "text/plain" });
+      res.writeHead(200, { "content-type": types[ext] || "text/plain", "cache-control": "no-cache" });
       res.end(data);
     } catch (e) {
       if (!res.headersSent) {
