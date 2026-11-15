@@ -2204,7 +2204,9 @@ httpServer.on("request", async (req, res) => {
       reply(403, { error: "forbidden" });
       return;
     }
+    req.pause();
     const security = await adminSecurity.check(sessionId, user);
+    req.resume();
     if (url.pathname === "/admin/security/status" && req.method === "GET") {
       reply(security.error === "unavailable" ? 503 : 200, security);
       return;
